@@ -1,0 +1,35 @@
+{
+  "name": "seemorgh",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:seed": "tsx scripts/seed.ts",
+    "db:reset": "node -e \"require('fs').rmSync('.data',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.11",
+    "@fontsource/vazirmatn": "^5.3.0",
+    "@node-rs/argon2": "^2.2.2",
+    "drizzle-orm": "^0.45.4",
+    "exceljs": "^4.4.0",
+    "jalaali-js": "^2.0.1",
+    "next": "16.4.3",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "server-only": "^0.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  }
+}

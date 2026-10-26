@@ -1,0 +1,14 @@
+node_modules/
+.next/
+.data/
+out/
+*.log
+.env
+.env.local
+.DS_Store
+
+*.tsbuildinfo
+
+*:Zone.Identifier
+
+.note.yaml
