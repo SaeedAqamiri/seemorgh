@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { getDb } from "../src/db/client";
 import {
   availability,
@@ -30,8 +30,33 @@ async function main() {
 
   const [existing] = await db.select().from(users).where(eq(users.phone, DEMO_PHONE)).limit(1);
   if (existing) {
+    const unlinked = await db
+      .select()
+      .from(students)
+      .where(and(eq(students.workspaceId, existing.workspaceId), isNull(students.userId)));
+
+    for (const student of unlinked) {
+      const [taken] = await db.select().from(users).where(eq(users.phone, student.phone)).limit(1);
+      if (taken) {
+        await db.update(students).set({ userId: taken.id }).where(eq(students.id, student.id));
+        continue;
+      }
+      const [studentUser] = await db
+        .insert(users)
+        .values({
+          workspaceId: existing.workspaceId,
+          role: "student",
+          name: student.name,
+          phone: student.phone,
+          passwordHash: hashPassword(DEMO_PASSWORD),
+        })
+        .returning();
+      await db.update(students).set({ userId: studentUser.id }).where(eq(students.id, student.id));
+    }
+
     console.log("داده نمونه از قبل وجود دارد. برای ساخت مجدد: bun run db:reset && bun run db:seed");
-    console.log(`ورود: ${DEMO_PHONE} / ${DEMO_PASSWORD}`);
+    console.log(`مشاور: ${DEMO_PHONE} / ${DEMO_PASSWORD}`);
+    console.log(`دانش‌آموزان: 09121111111 / ${DEMO_PASSWORD} — 09122222222 / ${DEMO_PASSWORD}`);
     return;
   }
 
@@ -137,6 +162,18 @@ async function main() {
       })
       .returning();
 
+    const [studentUser] = await db
+      .insert(users)
+      .values({
+        workspaceId: workspace.id,
+        role: "student",
+        name: demo.name,
+        phone: demo.phone,
+        passwordHash: hashPassword(DEMO_PASSWORD),
+      })
+      .returning();
+    await db.update(students).set({ userId: studentUser.id }).where(eq(students.id, student.id));
+
     await db.insert(studentConstraints).values({
       studentId: student.id,
       maxDailyMinutes: 300,
@@ -237,18 +274,6 @@ async function main() {
     .limit(1);
 
   if (firstStudent) {
-    const [studentUser] = await db
-      .insert(users)
-      .values({
-        workspaceId: workspace.id,
-        role: "student",
-        name: firstStudent.name,
-        phone: firstStudent.phone,
-        passwordHash: hashPassword(DEMO_PASSWORD),
-      })
-      .returning();
-    await db.update(students).set({ userId: studentUser.id }).where(eq(students.id, firstStudent.id));
-
     const [bank] = await db
       .insert(questionBanks)
       .values({
@@ -406,7 +431,7 @@ async function main() {
 
   console.log("داده نمونه ساخته شد.");
   console.log(`مشاور: ${DEMO_PHONE} / ${DEMO_PASSWORD}`);
-  console.log(`دانش‌آموز: 09121111111 / ${DEMO_PASSWORD}`);
+  console.log(`دانش‌آموزان: 09121111111 / ${DEMO_PASSWORD} — 09122222222 / ${DEMO_PASSWORD}`);
 }
 
 main().catch((error) => {
