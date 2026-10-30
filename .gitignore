@@ -8,6 +8,8 @@ out/
 .DS_Store
 
 *.tsbuildinfo
+__pycache__/
+*.pyc
 
 *:Zone.Identifier
 
