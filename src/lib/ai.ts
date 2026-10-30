@@ -138,7 +138,7 @@ export async function generateNarrative(input: {
       body: JSON.stringify({
         model,
         temperature: 0.3,
-        max_tokens: 400,
+        max_tokens: 3000,
         response_format: { type: "json_object" },
         messages: [
           {

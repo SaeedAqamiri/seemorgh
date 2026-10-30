@@ -441,7 +441,9 @@ export async function generatePlanAction(formData: FormData): Promise<void> {
       generated.warnings = ["برنامه پیشنهادی AI پس از اعتبارسنجی اعمال شد.", ...generated.warnings];
     } else {
       generated.warnings = [
-        `خروجی AI اعمال نشد (${aiResult.source})؛ برنامه قطعی ساخته شد.`,
+        `خروجی AI اعمال نشد (${aiResult.source})${
+          aiResult.errors.length ? `: ${aiResult.errors.slice(0, 3).join(" | ")}` : ""
+        }؛ برنامه قطعی ساخته شد.`,
         ...generated.warnings,
       ];
     }

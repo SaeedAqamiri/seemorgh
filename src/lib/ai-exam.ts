@@ -187,7 +187,7 @@ export async function generateAiSelection(input: {
       body: JSON.stringify({
         model,
         temperature: 0.2,
-        max_tokens: 1500,
+        max_tokens: 6000,
         response_format: { type: "json_object" },
         messages: [
           {

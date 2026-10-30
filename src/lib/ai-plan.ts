@@ -62,6 +62,7 @@ function anonymizedInput(input: AiPlannerInput) {
     constraints: {
       max_daily_minutes: input.constraints.maxDailyMinutes,
       rest_weekday: input.constraints.restWeekday,
+      rest_date: weekDates(input.weekStart)[input.constraints.restWeekday],
       buffer_pct: input.constraints.bufferPct,
     },
     resources: input.resources.map((resource) => ({
@@ -186,7 +187,7 @@ export function validateAiPlan(input: AiPlannerInput, raw: unknown): {
     }
     const weekday = weekdayIndex(date);
     if (weekday === input.constraints.restWeekday) {
-      errors.push(`روز ${date} روز تعطیل است اما بلوک دارد.`);
+      warnings.push(`بلوک‌های روز تعطیل ${date} نادیده گرفته شدند.`);
       continue;
     }
     const capacity = dayCapacity(input, weekday);
@@ -320,13 +321,13 @@ export async function generateAiPlan(input: {
       body: JSON.stringify({
         model,
         temperature: 0.2,
-        max_tokens: 2500,
+        max_tokens: 8000,
         response_format: { type: "json_object" },
         messages: [
           {
             role: "system",
             content:
-              "تو برنامه‌ریز تحصیلی هستی. فقط JSON معتبر برگردان با کلیدهای days و warnings. هر روز: {date: 'YYYY-MM-DD', blocks: [{start_min: عدد دقیقه از نیمه‌شب یا HH:MM, minutes: عدد, subject_id, resource_id, topic, type: 'study'|'review'|'test', target_units, reason}]}. محدودیت‌های زمان آزاد، سقف روزانه، روز تعطیل و باقی‌مانده واحدها را قطعاً رعایت کن. هیچ منبع یا درسی از فهرست ورودی نساز. minutes بین ۱۵ تا ۱۲۰. reason کوتاه و فارسی. بدون نام یا داده هویتی.",
+              "تو برنامه‌ریز تحصیلی هستی. فقط JSON معتبر برگردان با کلیدهای days و warnings. هر روز: {date: 'YYYY-MM-DD', blocks: [{start_min: عدد دقیقه از نیمه‌شب یا HH:MM, minutes: عدد, subject_id, resource_id, topic, type: 'study'|'review'|'test', target_units, reason}]}. محدودیت‌های زمان آزاد، سقف روزانه، روز تعطیل و باقی‌مانده واحدها را قطعاً رعایت کن. تاریخ constraints.rest_date روز تعطیل است؛ برای آن حتماً blocks خالی بگذار و هیچ بلوکی نساز. هر بلوک باید کامل داخل یکی از بازه‌های availability همان weekday باشد. هیچ منبع یا درسی از فهرست ورودی نساز. minutes بین ۱۵ تا ۱۲۰. reason کوتاه و فارسی. بدون نام یا داده هویتی.",
           },
           { role: "user", content: JSON.stringify(payload) },
         ],

@@ -54,7 +54,7 @@ describe("AI plan validation", () => {
     expect(result.errors.join(" ")).toContain("بیشتر");
   });
 
-  it("rejects blocks outside availability or on the rest day", () => {
+  it("rejects blocks outside availability and ignores rest-day blocks", () => {
     const outside = validateAiPlan(input, planWith({ ...validBlock, start_min: 9 * 60 }));
     expect(outside.ok).toBe(false);
     expect(outside.errors.join(" ")).toContain("زمان آزاد");
@@ -63,8 +63,8 @@ describe("AI plan validation", () => {
       input,
       planWith({ ...validBlock }, "2026-10-30"),
     );
-    expect(restDay.ok).toBe(false);
-    expect(restDay.errors.join(" ")).toContain("تعطیل");
+    expect(restDay.warnings.join(" ")).toContain("تعطیل");
+    expect(restDay.tasks).toHaveLength(0);
   });
 
   it("rejects daily capacity overflow and unknown resources", () => {
