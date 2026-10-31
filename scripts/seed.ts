@@ -432,9 +432,12 @@ async function main() {
   console.log("داده نمونه ساخته شد.");
   console.log(`مشاور: ${DEMO_PHONE} / ${DEMO_PASSWORD}`);
   console.log(`دانش‌آموزان: 09121111111 / ${DEMO_PASSWORD} — 09122222222 / ${DEMO_PASSWORD}`);
+  process.exit(0);
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+main()
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
