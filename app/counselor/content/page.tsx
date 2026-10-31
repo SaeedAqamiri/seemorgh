@@ -32,8 +32,8 @@ export default async function CounselorContentPage({
       <div>
         <h1>محتوا</h1>
         <small>
-          فیلم، متن و تست روان‌شناسی را با لینک اضافه کنید؛ فیلم‌های آپارات و یوتیوب داخل سایت
-          پخش می‌شوند.
+          فیلم، متن و تست روان‌شناسی را با لینک اضافه کنید؛ فیلم‌های آپارات داخل سایت پخش
+          می‌شوند.
         </small>
       </div>
 
@@ -84,7 +84,7 @@ export default async function CounselorContentPage({
             </div>
           </div>
           <div className="field">
-            <label>لینک (آپارات / یوتیوب / mp4 / مقاله)</label>
+            <label>لینک (آپارات یا مقاله)</label>
             <input
               name="url"
               dir="ltr"

@@ -30,7 +30,7 @@ export async function createSession(userId: string): Promise<void> {
     value: token,
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: process.env.COOKIE_SECURE === "true",
     path: "/",
     maxAge: SESSION_DAYS * 24 * 60 * 60,
   });

@@ -19,14 +19,6 @@ export function ContentFrame({ item }: { item: ContentItemView }) {
     );
   }
 
-  if (embed.type === "video") {
-    return (
-      <div className="video-frame">
-        <video src={embed.src} controls preload="metadata" playsInline />
-      </div>
-    );
-  }
-
   return null;
 }
 
@@ -38,7 +30,7 @@ export function ContentCard({
   compact?: boolean;
 }) {
   const embed = resolveEmbed(item.url, item.kind);
-  const hasVideo = embed.type === "iframe" || embed.type === "video";
+  const hasVideo = embed.type === "iframe";
 
   return (
     <div className="card" style={compact ? { boxShadow: "none" } : undefined}>

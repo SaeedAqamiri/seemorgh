@@ -2,24 +2,16 @@ import { describe, expect, it } from "vitest";
 import { resolveEmbed } from "./embed";
 
 describe("content embeds", () => {
-  it("embeds YouTube and Aparat videos", () => {
-    expect(resolveEmbed("https://www.youtube.com/watch?v=abc123", "video")).toMatchObject({
-      type: "iframe",
-      provider: "youtube",
-    });
-    expect(resolveEmbed("https://youtu.be/abc123", "video")).toMatchObject({
-      type: "iframe",
-      provider: "youtube",
-    });
-    expect(resolveEmbed("https://www.aparat.com/v/xyz789", "video")).toMatchObject({
+  it("embeds Aparat videos", () => {
+    expect(resolveEmbed("https://www.aparat.com/v/fiuznb0", "video")).toMatchObject({
       type: "iframe",
       provider: "aparat",
     });
   });
 
-  it("streams direct video files and links other URLs", () => {
-    expect(resolveEmbed("https://cdn.example.com/lesson.mp4", "video")).toMatchObject({
-      type: "video",
+  it("links non-Aparat URLs and rejects unsafe schemes", () => {
+    expect(resolveEmbed("https://www.youtube.com/watch?v=abc123", "video")).toMatchObject({
+      type: "link",
     });
     expect(resolveEmbed("https://example.com/article", "text")).toMatchObject({
       type: "link",

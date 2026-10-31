@@ -402,10 +402,10 @@ async function main() {
     await db.insert(contentItems).values([
       {
         workspaceId: workspace.id,
-        title: "ویدیو نمونه — پخش داخل سایت",
+        title: "ویدیو نمونه آپارات — پخش داخل سایت",
         kind: "video",
-        url: "https://www.youtube.com/watch?v=aqz-KE-bpKQ",
-        body: "این یک ویدیو نمونه برای تست پخش داخل سایت است. لینک آپارات یا یوتیوب خودت را جای آن بگذار.",
+        url: "https://www.aparat.com/v/fiuznb0",
+        body: "این یک ویدیو نمونه از آپارات برای تست پخش داخل سایت است. لینک آپارات خودت را جای آن بگذار.",
         subjectId: demoResource?.subjectId ?? null,
         resourceId: demoResource?.id ?? null,
         createdBy: counselor.id,
@@ -422,7 +422,7 @@ async function main() {
         workspaceId: workspace.id,
         title: "تست روان‌شناسی — لینک نمونه",
         kind: "psychology",
-        url: "https://www.youtube.com/watch?v=aqz-KE-bpKQ",
+        url: "https://www.aparat.com/v/fiuznb0",
         body: "این بخش فعلاً فقط لینک محتواست؛ تفسیر تخصصی انجام نمی‌شود.",
         createdBy: counselor.id,
       },
