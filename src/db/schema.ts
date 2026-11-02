@@ -186,6 +186,72 @@ export const studentConstraints = pgTable(
   },
 );
 
+export type PanelCellJson =
+  | { kind: "empty" }
+  | { kind: "rest" }
+  | { kind: "review"; subjectId: string }
+  | { kind: "test"; subjectId: string; resourceId: string | null; count: number };
+
+export type WeeklyGridJson = PanelCellJson[][];
+
+export const weeklyPanels = pgTable(
+  "weekly_panels",
+  {
+    id: id(),
+    studentId: text("student_id")
+      .notNull()
+      .references(() => students.id, { onDelete: "cascade" }),
+    weekStart: text("week_start").notNull(),
+    gridJson: jsonb("grid_json").$type<WeeklyGridJson>(),
+    dailyRoutine: text("daily_routine").notNull().default(""),
+    nextWeekHomework: text("next_week_homework").notNull().default(""),
+    updatedBy: text("updated_by").references(() => users.id, { onDelete: "set null" }),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("weekly_panels_student_week_unique").on(table.studentId, table.weekStart),
+  ],
+);
+
+export type PerformanceCellJson =
+  | { kind: "empty" }
+  | { kind: "rest" }
+  | { kind: "review"; subjectId: string; startMin: number; endMin: number; note: string }
+  | {
+      kind: "practice";
+      subjectId: string;
+      resourceId: string | null;
+      count: number;
+      startMin: number;
+      endMin: number;
+      note: string;
+    };
+
+export type PerformanceGridJson = PerformanceCellJson[][];
+
+export const performancePanels = pgTable(
+  "performance_panels",
+  {
+    id: id(),
+    studentId: text("student_id")
+      .notNull()
+      .references(() => students.id, { onDelete: "cascade" }),
+    weekStart: text("week_start").notNull(),
+    cellsJson: jsonb("cells_json").$type<PerformanceGridJson>(),
+    narrative: text("narrative").notNull().default(""),
+    narrativeAt: timestamp("narrative_at", { withTimezone: true, mode: "date" }),
+    updatedBy: text("updated_by").references(() => users.id, { onDelete: "set null" }),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("performance_panels_student_week_unique").on(table.studentId, table.weekStart),
+  ],
+);
+
 export const plans = pgTable(
   "plans",
   {
@@ -525,5 +591,7 @@ export type Availability = typeof availability.$inferSelect;
 export type StudentConstraints = typeof studentConstraints.$inferSelect;
 export type Plan = typeof plans.$inferSelect;
 export type Task = typeof tasks.$inferSelect;
+export type WeeklyPanel = typeof weeklyPanels.$inferSelect;
+export type PerformancePanel = typeof performancePanels.$inferSelect;
 export type Question = typeof questions.$inferSelect;
 export type Exam = typeof exams.$inferSelect;

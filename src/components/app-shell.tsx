@@ -30,6 +30,7 @@ export async function AppShell({
             {user.role === "counselor" ? (
               <>
                 <Link href="/counselor">دانش‌آموزان</Link>
+                <Link href="/counselor/performance">تحلیل عملکرد</Link>
                 <Link href="/counselor/exams">آزمون‌ها</Link>
                 <Link href="/counselor/questions">بانک سوال</Link>
                 <Link href="/counselor/content">محتوا</Link>
@@ -39,6 +40,8 @@ export async function AppShell({
               <>
                 <Link href="/student">امروز</Link>
                 <Link href="/student/week">هفته</Link>
+                <Link href="/student/panel">برنامه‌ریزی</Link>
+                <Link href="/student/performance">عملکرد</Link>
                 <Link href="/student/exams">آزمون‌ها</Link>
                 <Link href="/student/content">محتوا</Link>
               </>

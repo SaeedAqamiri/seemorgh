@@ -100,6 +100,30 @@ CREATE TABLE IF NOT EXISTS student_constraints (
   buffer_pct integer NOT NULL DEFAULT 15
 );
 
+CREATE TABLE IF NOT EXISTS weekly_panels (
+  id text PRIMARY KEY,
+  student_id text NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  week_start text NOT NULL,
+  grid_json jsonb,
+  daily_routine text NOT NULL DEFAULT '',
+  next_week_homework text NOT NULL DEFAULT '',
+  updated_by text REFERENCES users(id) ON DELETE SET NULL,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS weekly_panels_student_week_unique ON weekly_panels(student_id, week_start);
+
+CREATE TABLE IF NOT EXISTS performance_panels (
+  id text PRIMARY KEY,
+  student_id text NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  week_start text NOT NULL,
+  cells_json jsonb,
+  narrative text NOT NULL DEFAULT '',
+  narrative_at timestamptz,
+  updated_by text REFERENCES users(id) ON DELETE SET NULL,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS performance_panels_student_week_unique ON performance_panels(student_id, week_start);
+
 CREATE TABLE IF NOT EXISTS plans (
   id text PRIMARY KEY,
   student_id text NOT NULL REFERENCES students(id) ON DELETE CASCADE,

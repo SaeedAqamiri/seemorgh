@@ -154,6 +154,15 @@ export default async function StudentDetailPage({
             >
               اکسل گزارش
             </a>
+            <Link className="btn btn-secondary btn-sm" href={`/counselor/students/${id}/panel?week=${weekStart}`}>
+              پنل برنامه‌ریزی
+            </Link>
+            <Link
+              className="btn btn-secondary btn-sm"
+              href={`/counselor/students/${id}/performance?week=${weekStart}`}
+            >
+              دفترچه عملکرد
+            </Link>
             <Link className="btn btn-secondary btn-sm" href={`/counselor/students/${id}/report`}>
               گزارش ماهانه
             </Link>

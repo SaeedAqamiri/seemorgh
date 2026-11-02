@@ -384,6 +384,208 @@ tr:last-child td {
   overflow-x: auto;
 }
 
+.panel-grid {
+  min-width: 720px;
+}
+
+.panel-grid th,
+.panel-grid td {
+  border: 1px solid var(--border);
+  padding: 0.45rem;
+  vertical-align: top;
+  font-size: 0.8rem;
+}
+
+.panel-grid thead th {
+  background: var(--surface-2);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.panel-grid .panel-day {
+  background: var(--surface-2);
+  white-space: nowrap;
+  min-width: 92px;
+}
+
+.panel-cell {
+  min-width: 118px;
+  background: var(--surface);
+}
+
+.panel-cell.is-rest {
+  background: var(--surface-2);
+}
+
+.panel-rest {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.panel-edit {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.panel-edit select,
+.panel-edit input {
+  width: 100%;
+  font-size: 0.74rem;
+  padding: 0.22rem 0.35rem;
+}
+
+.perf-grid th[scope="row"] {
+  text-align: center;
+  vertical-align: middle;
+}
+
+.perf-view {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.perf-edit-wrap {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.perf-edit-wrap > .perf-tag {
+  opacity: 0.75;
+  font-size: 0.66rem;
+}
+
+.perf-tag {
+  display: inline-block;
+  background: var(--surface-2);
+  border-radius: 6px;
+  padding: 0.12rem 0.4rem;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.perf-tag-done {
+  background: var(--brand-soft);
+  color: var(--brand-strong);
+}
+
+.perf-note {
+  font-size: 0.72rem;
+  color: var(--muted);
+  background: var(--surface-2);
+  border-radius: 6px;
+  padding: 0.2rem 0.35rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.start-chart {
+  font-size: 0.8rem;
+}
+
+.chart-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.chart-day {
+  min-width: 74px;
+  font-weight: 600;
+  font-size: 0.78rem;
+}
+
+.chart-track {
+  position: relative;
+  flex: 1;
+  height: 22px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.chart-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--border);
+}
+
+.chart-tick.is-planned {
+  width: 2px;
+  background: var(--muted);
+}
+
+.chart-dot {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+.chart-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--muted);
+}
+
+.chart-dot.is-onplan {
+  background: var(--brand);
+}
+
+.chart-dot.is-offplan {
+  background: var(--danger);
+}
+
+.chart-dot.is-none {
+  background: var(--muted);
+}
+
+.chart-row .chart-dot {
+  position: absolute;
+  top: 3px;
+}
+
+.chart-time {
+  min-width: 104px;
+  font-size: 0.74rem;
+  color: var(--muted);
+  text-align: left;
+}
+
+.narrative {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.8rem 1rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+@media print {
+  .topbar,
+  .btn,
+  button,
+  form.inline-form {
+    display: none !important;
+  }
+
+  .card {
+    box-shadow: none !important;
+    border: 1px solid var(--border) !important;
+  }
+
+  .narrative {
+    border: none;
+    background: none;
+    padding: 0;
+  }
+}
+
 .stat {
   background: var(--surface);
   border: 1px solid var(--border);
