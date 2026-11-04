@@ -73,6 +73,5 @@ export async function saveWeeklyPanelAction(formData: FormData): Promise<void> {
     revalidatePath(`/counselor/students/${studentId}`);
   }
   revalidatePath("/student");
-  revalidatePath("/student/week");
   redirect(panelPath(user.role, studentId, weekStart, "&success=saved"));
 }

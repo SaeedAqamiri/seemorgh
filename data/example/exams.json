@@ -1,0 +1,355 @@
+[
+  {
+    "id": "4d573076-5873-4633-922a-7420839c7a87",
+    "workspaceId": "c664b088-1db1-4c52-91c6-c0cbd117a15c",
+    "title": "آزمون نمونه زیست",
+    "createdBy": "73b87269-17ae-4edc-99fb-0d39fab16c5b",
+    "status": "scheduled",
+    "startAt": "2026-10-26T10:34:13.456Z",
+    "endAt": "2026-10-26T12:44:13.456Z",
+    "durationMinutes": 45,
+    "blueprintJson": {
+      "items": [
+        {
+          "count": 12,
+          "topic": "",
+          "subjectId": "d65512c5-6bdf-4db9-b3e4-56578bb548ac",
+          "difficulty": ""
+        }
+      ]
+    },
+    "questionSnapshotJson": {
+      "items": [
+        {
+          "id": "40cb94be-16c8-4a5d-b7fd-58ee97130e87",
+          "body": "پمپ سدیم-پتاسیم در هر چرخه چند سدیم بیرون می‌برد؟",
+          "type": "mcq",
+          "score": 1,
+          "topic": "تنظیم عصبی",
+          "correct": 3,
+          "options": [
+            "۱",
+            "۲",
+            "۳",
+            "۴"
+          ],
+          "subjectId": "d65512c5-6bdf-4db9-b3e4-56578bb548ac",
+          "explanation": "پاسخ صحیح در گزینه مشخص شده است.",
+          "subjectTitle": "زیست‌شناسی"
+        },
+        {
+          "id": "689cd6a8-b253-4fb6-a860-1689d3bb085e",
+          "body": "تفاوت ژنوتیپ و فنوتیپ را کوتاه توضیح دهید.",
+          "type": "short",
+          "score": 2,
+          "topic": "ژنتیک",
+          "correct": "ژنوتیپ ترکیب ژن‌ها و فنوتیپ صفت ظاهری است.",
+          "options": null,
+          "subjectId": "d65512c5-6bdf-4db9-b3e4-56578bb548ac",
+          "explanation": "",
+          "subjectTitle": "زیست‌شناسی"
+        },
+        {
+          "id": "a2596fa0-b9b1-47d6-af0e-ec059f839a15",
+          "body": "در آمیزش آزمون، فرد هتروزیگوت با کدام فرد بررسی می‌شود؟",
+          "type": "mcq",
+          "score": 1,
+          "topic": "ژنتیک",
+          "correct": 2,
+          "options": [
+            "هوموزیگوت غالب",
+            "هوموزیگوت مغلوب",
+            "هتروزیگوت",
+            "هیچ‌کدام"
+          ],
+          "subjectId": "d65512c5-6bdf-4db9-b3e4-56578bb548ac",
+          "explanation": "پاسخ صحیح در گزینه مشخص شده است.",
+          "subjectTitle": "زیست‌شناسی"
+        },
+        {
+          "id": "ce19f159-8fe8-48ac-b2ea-02fb003bade6",
+          "body": "آنزیم‌ها کدام نقش را دارند؟",
+          "type": "mcq",
+          "score": 1,
+          "topic": "سینتیک",
+          "correct": 1,
+          "options": [
+            "کاتالیزور",
+            "مصرف ATP",
+            "ساخت DNA",
+            "انتقال خون"
+          ],
+          "subjectId": "d65512c5-6bdf-4db9-b3e4-56578bb548ac",
+          "explanation": "پاسخ صحیح در گزینه مشخص شده است.",
+          "subjectTitle": "زیست‌شناسی"
+        },
+        {
+          "id": "45ab8c35-8e49-4f09-a280-1d833a9ae4ec",
+          "body": "واحد ساختاری دستگاه عصبی چیست؟",
+          "type": "mcq",
+          "score": 1,
+          "topic": "تنظیم عصبی",
+          "correct": 1,
+          "options": [
+            "نرون",
+            "نفرون",
+            "آلئول",
+            "میوسیت"
+          ],
+          "subjectId": "d65512c5-6bdf-4db9-b3e4-56578bb548ac",
+          "explanation": "پاسخ صحیح در گزینه مشخص شده است.",
+          "subjectTitle": "زیست‌شناسی"
+        },
+        {
+          "id": "a8fca8e0-1ff2-4af1-8f4a-494deb8432c6",
+          "body": "نسبت فنوتیپی ۹:۳:۳:۱ مربوط به کدام حالت است؟",
+          "type": "mcq",
+          "score": 1,
+          "topic": "ژنتیک",
+          "correct": 2,
+          "options": [
+            "تک‌آمیزی",
+            "دورگه مستقل",
+            "هم‌توانی",
+            "چندآللی"
+          ],
+          "subjectId": "d65512c5-6bdf-4db9-b3e4-56578bb548ac",
+          "explanation": "پاسخ صحیح در گزینه مشخص شده است.",
+          "subjectTitle": "زیست‌شناسی"
+        },
+        {
+          "id": "53b7d186-f744-42bc-82ce-21d62c7afe47",
+          "body": "غلاف میلین کدام ویژگی را افزایش می‌دهد؟",
+          "type": "mcq",
+          "score": 1,
+          "topic": "تنظیم عصبی",
+          "correct": 1,
+          "options": [
+            "سرعت هدایت",
+            "تعداد نرون",
+            "فشار خون",
+            "گوارش"
+          ],
+          "subjectId": "d65512c5-6bdf-4db9-b3e4-56578bb548ac",
+          "explanation": "پاسخ صحیح در گزینه مشخص شده است.",
+          "subjectTitle": "زیست‌شناسی"
+        },
+        {
+          "id": "780ed057-07c9-4553-a4ce-66d8a194f861",
+          "body": "دو عامل مؤثر بر فعالیت آنزیم را نام ببرید.",
+          "type": "short",
+          "score": 2,
+          "topic": "سینتیک",
+          "correct": "دما و pH",
+          "options": null,
+          "subjectId": "d65512c5-6bdf-4db9-b3e4-56578bb548ac",
+          "explanation": "",
+          "subjectTitle": "زیست‌شناسی"
+        },
+        {
+          "id": "fb31f22a-2af8-490c-9b80-e1c3b99c2ec0",
+          "body": "احتمال فرزند پسر از والدین چقدر است؟",
+          "type": "mcq",
+          "score": 1,
+          "topic": "ژنتیک",
+          "correct": 2,
+          "options": [
+            "۲۵٪",
+            "۵۰٪",
+            "۷۵٪",
+            "۱۰۰٪"
+          ],
+          "subjectId": "d65512c5-6bdf-4db9-b3e4-56578bb548ac",
+          "explanation": "پاسخ صحیح در گزینه مشخص شده است.",
+          "subjectTitle": "زیست‌شناسی"
+        },
+        {
+          "id": "d8b24d4c-d7fd-431b-a941-7d1c44acf98b",
+          "body": "واحد وراثت چیست؟",
+          "type": "mcq",
+          "score": 1,
+          "topic": "ژنتیک",
+          "correct": 1,
+          "options": [
+            "ژن",
+            "پروتئین",
+            "سلول",
+            "بافت"
+          ],
+          "subjectId": "d65512c5-6bdf-4db9-b3e4-56578bb548ac",
+          "explanation": "پاسخ صحیح در گزینه مشخص شده است.",
+          "subjectTitle": "زیست‌شناسی"
+        },
+        {
+          "id": "d9ec8ad2-d46b-4639-b9d6-832c9ad43bce",
+          "body": "افزایش دما بیش از حد بهینه چه اثری دارد؟",
+          "type": "mcq",
+          "score": 1,
+          "topic": "سینتیک",
+          "correct": 2,
+          "options": [
+            "افزایش فعالیت",
+            "دناتوره شدن آنزیم",
+            "تغییر pH",
+            "بی‌اثر است"
+          ],
+          "subjectId": "d65512c5-6bdf-4db9-b3e4-56578bb548ac",
+          "explanation": "پاسخ صحیح در گزینه مشخص شده است.",
+          "subjectTitle": "زیست‌شناسی"
+        },
+        {
+          "id": "f687ef33-e953-4cbf-aa89-3232abeabef5",
+          "body": "بازدارنده رقابتی چه می‌کند؟",
+          "type": "mcq",
+          "score": 1,
+          "topic": "سینتیک",
+          "correct": 1,
+          "options": [
+            "جایگاه فعال را اشغال می‌کند",
+            "آنزیم را می‌سازد",
+            "pH را تغییر می‌دهد",
+            "ATP مصرف می‌کند"
+          ],
+          "subjectId": "d65512c5-6bdf-4db9-b3e4-56578bb548ac",
+          "explanation": "پاسخ صحیح در گزینه مشخص شده است.",
+          "subjectTitle": "زیست‌شناسی"
+        }
+      ],
+      "totalScore": 14
+    },
+    "shuffleQuestions": false,
+    "shuffleOptions": false,
+    "aiSelection": false,
+    "maxAttempts": 1,
+    "totalScore": 14,
+    "publishedAt": "2026-10-26T10:44:13.456Z",
+    "createdAt": "2026-10-26T10:44:13.456Z"
+  },
+  {
+    "id": "8263b921-7a6d-4004-bc00-ad66b9ae7483",
+    "workspaceId": "c664b088-1db1-4c52-91c6-c0cbd117a15c",
+    "title": "آزمون تست خودکار",
+    "createdBy": "73b87269-17ae-4edc-99fb-0d39fab16c5b",
+    "status": "open",
+    "startAt": "2026-10-26T14:47:00.000Z",
+    "endAt": "2026-10-26T16:00:00.000Z",
+    "durationMinutes": 10,
+    "blueprintJson": {
+      "items": [
+        {
+          "count": 3,
+          "topic": "",
+          "subjectId": "d65512c5-6bdf-4db9-b3e4-56578bb548ac",
+          "difficulty": ""
+        }
+      ]
+    },
+    "questionSnapshotJson": {
+      "items": [
+        {
+          "id": "780ed057-07c9-4553-a4ce-66d8a194f861",
+          "body": "دو عامل مؤثر بر فعالیت آنزیم را نام ببرید.",
+          "type": "short",
+          "score": 2,
+          "topic": "سینتیک",
+          "correct": "دما و pH",
+          "options": null,
+          "subjectId": "d65512c5-6bdf-4db9-b3e4-56578bb548ac",
+          "explanation": "",
+          "subjectTitle": "زیست‌شناسی"
+        },
+        {
+          "id": "ce19f159-8fe8-48ac-b2ea-02fb003bade6",
+          "body": "آنزیم‌ها کدام نقش را دارند؟",
+          "type": "mcq",
+          "score": 1,
+          "topic": "سینتیک",
+          "correct": 1,
+          "options": [
+            "کاتالیزور",
+            "مصرف ATP",
+            "ساخت DNA",
+            "انتقال خون"
+          ],
+          "subjectId": "d65512c5-6bdf-4db9-b3e4-56578bb548ac",
+          "explanation": "پاسخ صحیح در گزینه مشخص شده است.",
+          "subjectTitle": "زیست‌شناسی"
+        },
+        {
+          "id": "45ab8c35-8e49-4f09-a280-1d833a9ae4ec",
+          "body": "واحد ساختاری دستگاه عصبی چیست؟",
+          "type": "mcq",
+          "score": 1,
+          "topic": "تنظیم عصبی",
+          "correct": 1,
+          "options": [
+            "نرون",
+            "نفرون",
+            "آلئول",
+            "میوسیت"
+          ],
+          "subjectId": "d65512c5-6bdf-4db9-b3e4-56578bb548ac",
+          "explanation": "پاسخ صحیح در گزینه مشخص شده است.",
+          "subjectTitle": "زیست‌شناسی"
+        }
+      ],
+      "totalScore": 4
+    },
+    "shuffleQuestions": false,
+    "shuffleOptions": false,
+    "aiSelection": false,
+    "maxAttempts": 1,
+    "totalScore": 4,
+    "publishedAt": "2026-10-26T14:44:24.169Z",
+    "createdAt": "2026-10-26T14:44:16.543Z"
+  },
+  {
+    "id": "ffe89e0f-513d-486b-9acd-b54b8fd7ea53",
+    "workspaceId": "c664b088-1db1-4c52-91c6-c0cbd117a15c",
+    "title": "آزمون تحویل خودکار",
+    "createdBy": "73b87269-17ae-4edc-99fb-0d39fab16c5b",
+    "status": "open",
+    "startAt": "2026-10-26T14:54:00.000Z",
+    "endAt": "2026-10-26T15:20:00.000Z",
+    "durationMinutes": 5,
+    "blueprintJson": {
+      "items": [
+        {
+          "count": 1,
+          "topic": "",
+          "subjectId": "d65512c5-6bdf-4db9-b3e4-56578bb548ac",
+          "difficulty": ""
+        }
+      ]
+    },
+    "questionSnapshotJson": {
+      "items": [
+        {
+          "id": "a2596fa0-b9b1-47d6-af0e-ec059f839a15",
+          "body": "در آمیزش آزمون، فرد هتروزیگوت با کدام فرد بررسی می‌شود؟",
+          "type": "mcq",
+          "score": 1,
+          "topic": "ژنتیک",
+          "correct": 2,
+          "options": [
+            "هوموزیگوت غالب",
+            "هوموزیگوت مغلوب",
+            "هتروزیگوت",
+            "هیچ‌کدام"
+          ],
+          "subjectId": "d65512c5-6bdf-4db9-b3e4-56578bb548ac",
+          "explanation": "پاسخ صحیح در گزینه مشخص شده است.",
+          "subjectTitle": "زیست‌شناسی"
+        }
+      ],
+      "totalScore": 1
+    },
+    "shuffleQuestions": false,
+    "shuffleOptions": false,
+    "aiSelection": false,
+    "maxAttempts": 1,
+    "totalScore": 1,
+    "publishedAt": "2026-10-26T14:52:55.452Z",
+    "createdAt": "2026-10-26T14:52:49.755Z"
+  }
+]

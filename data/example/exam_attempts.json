@@ -1,0 +1,44 @@
+[
+  {
+    "id": "e94d7c84-0c8a-4e90-9a9c-29dcd381e004",
+    "examId": "8263b921-7a6d-4004-bc00-ad66b9ae7483",
+    "studentId": "e144309c-7ce2-4ef8-af19-9f05e029590e",
+    "attemptNo": 1,
+    "startedAt": "2026-10-26T14:47:25.231Z",
+    "deadlineAt": "2026-10-26T14:57:00.000Z",
+    "submittedAt": "2026-10-26T14:47:51.896Z",
+    "status": "graded",
+    "score": 4,
+    "maxScore": 4,
+    "timeSpentSec": 27,
+    "createdAt": "2026-10-26T14:47:25.233Z"
+  },
+  {
+    "id": "5e22fb14-3f27-467d-9ac3-4d02cc7dc7be",
+    "examId": "8263b921-7a6d-4004-bc00-ad66b9ae7483",
+    "studentId": "81d7da38-1b28-4a30-9f2d-2ee4c3262315",
+    "attemptNo": 1,
+    "startedAt": "2026-10-26T14:49:08.501Z",
+    "deadlineAt": "2026-10-26T14:57:00.000Z",
+    "submittedAt": "2026-10-26T14:49:20.927Z",
+    "status": "graded",
+    "score": 3,
+    "maxScore": 4,
+    "timeSpentSec": 12,
+    "createdAt": "2026-10-26T14:49:08.502Z"
+  },
+  {
+    "id": "972f490a-5572-499d-9978-b4527732f8d1",
+    "examId": "ffe89e0f-513d-486b-9acd-b54b8fd7ea53",
+    "studentId": "81d7da38-1b28-4a30-9f2d-2ee4c3262315",
+    "attemptNo": 1,
+    "startedAt": "2026-10-26T14:54:19.918Z",
+    "deadlineAt": "2026-10-26T14:59:00.000Z",
+    "submittedAt": "2026-10-26T14:59:01.082Z",
+    "status": "graded",
+    "score": 1,
+    "maxScore": 1,
+    "timeSpentSec": 280,
+    "createdAt": "2026-10-26T14:54:19.919Z"
+  }
+]

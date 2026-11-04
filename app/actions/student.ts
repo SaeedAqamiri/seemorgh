@@ -4,7 +4,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getDb } from "@/db/client";
-import { dailyLogs, plans, resources, tasks } from "@/db/schema";
+import { dailyLogs, plans, tasks } from "@/db/schema";
 import { requireStudent } from "@/lib/auth";
 import { todayISO } from "@/lib/dates";
 
@@ -80,15 +80,6 @@ export async function finishTaskAction(formData: FormData): Promise<void> {
     })
     .where(eq(tasks.id, taskId));
 
-  if (row.task.resourceId && actualUnits > 0) {
-    await db
-      .update(resources)
-      .set({
-        completedUnits: sql`least(${resources.totalUnits}, ${resources.completedUnits} + ${actualUnits})`,
-      })
-      .where(eq(resources.id, row.task.resourceId));
-  }
-
   revalidatePath("/student");
   revalidatePath("/counselor");
   redirect("/student?success=done");
@@ -124,5 +115,6 @@ export async function saveDailyLogAction(formData: FormData): Promise<void> {
     });
 
   revalidatePath("/student");
-  redirect("/student?success=log");
+  revalidatePath("/student/performance");
+  redirect("/student/performance?success=log");
 }

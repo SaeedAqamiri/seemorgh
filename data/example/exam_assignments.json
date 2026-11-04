@@ -1,0 +1,37 @@
+[
+  {
+    "id": "f51f4e88-58b1-47ba-88be-908061839885",
+    "examId": "4d573076-5873-4633-922a-7420839c7a87",
+    "studentId": "e144309c-7ce2-4ef8-af19-9f05e029590e",
+    "status": "assigned",
+    "createdAt": "2026-10-26T10:44:13.458Z"
+  },
+  {
+    "id": "c097fa04-f339-4fcf-b2b7-42fcea5eb967",
+    "examId": "4d573076-5873-4633-922a-7420839c7a87",
+    "studentId": "81d7da38-1b28-4a30-9f2d-2ee4c3262315",
+    "status": "assigned",
+    "createdAt": "2026-10-26T10:44:13.458Z"
+  },
+  {
+    "id": "e3d58fc5-776a-4832-8598-4b6759009b90",
+    "examId": "8263b921-7a6d-4004-bc00-ad66b9ae7483",
+    "studentId": "e144309c-7ce2-4ef8-af19-9f05e029590e",
+    "status": "submitted",
+    "createdAt": "2026-10-26T14:44:16.545Z"
+  },
+  {
+    "id": "d8aa886d-3a55-417c-99fc-1dcb7aa9b21e",
+    "examId": "8263b921-7a6d-4004-bc00-ad66b9ae7483",
+    "studentId": "81d7da38-1b28-4a30-9f2d-2ee4c3262315",
+    "status": "submitted",
+    "createdAt": "2026-10-26T14:44:16.545Z"
+  },
+  {
+    "id": "c7e9641e-1d13-480e-a9b2-a645ff0b030e",
+    "examId": "ffe89e0f-513d-486b-9acd-b54b8fd7ea53",
+    "studentId": "81d7da38-1b28-4a30-9f2d-2ee4c3262315",
+    "status": "submitted",
+    "createdAt": "2026-10-26T14:52:49.759Z"
+  }
+]

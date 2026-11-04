@@ -15,7 +15,7 @@ import {
   subjects,
   tasks,
 } from "@/db/schema";
-import { requireCounselor } from "@/lib/auth";
+import { getSessionUser, requireCounselor } from "@/lib/auth";
 import { formatJalali, parseISODate, parseTime, startOfWeekSaturday, todayISO } from "@/lib/dates";
 import { logAudit } from "@/lib/audit";
 import { notifyStudentUser } from "@/lib/notifications";
@@ -34,6 +34,10 @@ function numberField(form: FormData, name: string): number {
 
 function studentPath(studentId: string, suffix = ""): string {
   return `/counselor/students/${studentId}${suffix}`;
+}
+
+function resourcesPath(studentId: string, suffix = ""): string {
+  return `/counselor/students/${studentId}/resources${suffix}`;
 }
 
 function fail(path: string, message: string): never {
@@ -184,26 +188,82 @@ export async function deleteExamTargetAction(formData: FormData): Promise<void> 
   redirect(studentPath(studentId, "?success=target-deleted"));
 }
 
-export async function addResourceAction(formData: FormData): Promise<void> {
-  const counselor = await requireCounselor();
+type ResourceContext = {
+  role: "counselor" | "student";
+  studentId: string;
+  workspaceId: string;
+  basePath: string;
+};
+
+async function resolveResourceContext(formData: FormData): Promise<ResourceContext> {
+  const user = await getSessionUser();
+  if (!user) redirect("/login");
+
+  const db = await getDb();
+  if (user.role === "student") {
+    const [own] = await db
+      .select({ id: students.id })
+      .from(students)
+      .where(and(eq(students.userId, user.id), eq(students.workspaceId, user.workspaceId)))
+      .limit(1);
+    if (!own) redirect("/login?error=حساب دانش‌آموزی پیدا نشد.");
+    return {
+      role: "student",
+      studentId: own.id,
+      workspaceId: user.workspaceId,
+      basePath: "/student/resources",
+    };
+  }
+
   const studentId = field(formData, "studentId");
-  await assertStudent(counselor.workspaceId, studentId);
+  const [owned] = await db
+    .select({ id: students.id })
+    .from(students)
+    .where(and(eq(students.workspaceId, user.workspaceId), eq(students.id, studentId)))
+    .limit(1);
+  if (!owned) fail("/counselor", "دانش‌آموز پیدا نشد.");
+  return {
+    role: "counselor",
+    studentId: owned.id,
+    workspaceId: user.workspaceId,
+    basePath: resourcesPath(owned.id),
+  };
+}
+
+function revalidateResourceViews(context: ResourceContext) {
+  revalidatePath(context.basePath);
+  revalidatePath(studentPath(context.studentId));
+  revalidatePath("/student/resources");
+  revalidatePath("/student/report");
+  revalidatePath("/student/performance");
+}
+
+export async function addResourceAction(formData: FormData): Promise<void> {
+  const context = await resolveResourceContext(formData);
+  const studentId = context.studentId;
 
   const subjectId = field(formData, "subjectId");
   const title = field(formData, "title");
-  const unitType = field(formData, "unitType") || "page";
+  const unitType = field(formData, "unitType") || "test";
   const totalUnits = Math.max(0, numberField(formData, "totalUnits"));
   const completedUnits = Math.max(0, numberField(formData, "completedUnits"));
   const priority = Math.max(1, Math.min(5, numberField(formData, "priority") || 3));
   const parsedChapters = parseChapters(field(formData, "chapters"), totalUnits);
 
-  if (!subjectId || !title) fail(studentPath(studentId), "درس و عنوان منبع لازم است.");
-  if (completedUnits > totalUnits) fail(studentPath(studentId), "پیشرفت نمی‌تواند بیشتر از کل باشد.");
-  if (parsedChapters.error) fail(studentPath(studentId), parsedChapters.error);
+  if (!subjectId || !title) fail(context.basePath, "درس و عنوان منبع لازم است.");
+  if (completedUnits > totalUnits) fail(context.basePath, "پیشرفت نمی‌تواند بیشتر از کل باشد.");
+  if (parsedChapters.error) fail(context.basePath, parsedChapters.error);
 
   const db = await getDb();
+  const [subjectRow] = await db
+    .select({ id: subjects.id })
+    .from(subjects)
+    .where(and(eq(subjects.id, subjectId), eq(subjects.workspaceId, context.workspaceId)))
+    .limit(1);
+  if (!subjectRow) fail(context.basePath, "درس انتخاب‌شده معتبر نیست.");
+
   await db.insert(resources).values({
-    workspaceId: counselor.workspaceId,
+    workspaceId: context.workspaceId,
     studentId,
     subjectId,
     title,
@@ -214,14 +274,13 @@ export async function addResourceAction(formData: FormData): Promise<void> {
     priority,
   });
 
-  revalidatePath(studentPath(studentId));
-  redirect(studentPath(studentId, "?success=resource"));
+  revalidateResourceViews(context);
+  redirect(`${context.basePath}?success=resource`);
 }
 
 export async function updateResourceAction(formData: FormData): Promise<void> {
-  const counselor = await requireCounselor();
-  const studentId = field(formData, "studentId");
-  await assertStudent(counselor.workspaceId, studentId);
+  const context = await resolveResourceContext(formData);
+  const studentId = context.studentId;
 
   const resourceId = field(formData, "resourceId");
   const completedUnits = Math.max(0, numberField(formData, "completedUnits"));
@@ -229,8 +288,8 @@ export async function updateResourceAction(formData: FormData): Promise<void> {
   const priority = Math.max(1, Math.min(5, numberField(formData, "priority") || 3));
   const parsedChapters = parseChapters(field(formData, "chapters"), totalUnits);
 
-  if (completedUnits > totalUnits) fail(studentPath(studentId), "پیشرفت نمی‌تواند بیشتر از کل باشد.");
-  if (parsedChapters.error) fail(studentPath(studentId), parsedChapters.error);
+  if (completedUnits > totalUnits) fail(context.basePath, "پیشرفت نمی‌تواند بیشتر از کل باشد.");
+  if (parsedChapters.error) fail(context.basePath, parsedChapters.error);
 
   const db = await getDb();
   await db
@@ -245,18 +304,16 @@ export async function updateResourceAction(formData: FormData): Promise<void> {
       and(
         eq(resources.id, resourceId),
         eq(resources.studentId, studentId),
-        eq(resources.workspaceId, counselor.workspaceId),
+        eq(resources.workspaceId, context.workspaceId),
       ),
     );
 
-  revalidatePath(studentPath(studentId));
-  redirect(studentPath(studentId, "?success=resource-updated"));
+  revalidateResourceViews(context);
+  redirect(`${context.basePath}?success=resource-updated`);
 }
 
 export async function deleteResourceAction(formData: FormData): Promise<void> {
-  const counselor = await requireCounselor();
-  const studentId = field(formData, "studentId");
-  await assertStudent(counselor.workspaceId, studentId);
+  const context = await resolveResourceContext(formData);
   const resourceId = field(formData, "resourceId");
 
   const db = await getDb();
@@ -265,13 +322,13 @@ export async function deleteResourceAction(formData: FormData): Promise<void> {
     .where(
       and(
         eq(resources.id, resourceId),
-        eq(resources.studentId, studentId),
-        eq(resources.workspaceId, counselor.workspaceId),
+        eq(resources.studentId, context.studentId),
+        eq(resources.workspaceId, context.workspaceId),
       ),
     );
 
-  revalidatePath(studentPath(studentId));
-  redirect(studentPath(studentId, "?success=resource-deleted"));
+  revalidateResourceViews(context);
+  redirect(`${context.basePath}?success=resource-deleted`);
 }
 
 export async function addAvailabilityAction(formData: FormData): Promise<void> {

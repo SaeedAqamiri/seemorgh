@@ -6,16 +6,18 @@ import { redirect } from "next/navigation";
 import { getDb } from "@/db/client";
 import { performancePanels, students, subjects } from "@/db/schema";
 import { getSessionUser } from "@/lib/auth";
-import { startOfWeekSaturday } from "@/lib/dates";
+import { isISODate, startOfWeekSaturday } from "@/lib/dates";
 import {
   generatePerformanceNarrative,
 } from "@/lib/ai-performance";
 import {
   getPerformanceAnalysis,
+  getPerformanceRangeData,
   getPerformanceView,
   PerformanceValidationError,
   savePerformancePanel,
 } from "@/lib/performance";
+import { saveReport } from "@/lib/reports";
 import { getWeeklyPanelView } from "@/lib/panel";
 
 function field(form: FormData, name: string): string {
@@ -90,9 +92,111 @@ export async function savePerformancePanelAction(formData: FormData): Promise<vo
     throw error;
   }
 
+  revalidatePath("/student");
   revalidatePath("/student/performance");
+  revalidatePath("/student/report");
+  revalidatePath(`/counselor/students/${studentId}`);
   if (ctx.role === "counselor") revalidatePath("/counselor/performance");
   redirect(perfPath(ctx.role, studentId, weekStart, "&success=saved"));
+}
+
+function rangeReportPath(
+  role: "counselor" | "student",
+  studentId: string,
+  from: string,
+  to: string,
+  extra?: Record<string, string>,
+): string {
+  const base =
+    role === "counselor"
+      ? `/counselor/students/${studentId}/report`
+      : "/student/report";
+  const params = new URLSearchParams({ from, to, ...(extra ?? {}) });
+  return `${base}?${params.toString()}`;
+}
+
+async function resolveStudentForReport(formData: FormData): Promise<{
+  role: "counselor" | "student";
+  studentId: string;
+  workspaceId: string;
+}> {
+  const user = await getSessionUser();
+  if (!user) redirect("/login");
+  const db = await getDb();
+
+  if (user.role === "student") {
+    const [own] = await db
+      .select({ id: students.id })
+      .from(students)
+      .where(and(eq(students.userId, user.id), eq(students.workspaceId, user.workspaceId)))
+      .limit(1);
+    if (!own) redirect("/login?error=حساب دانش‌آموزی پیدا نشد.");
+    return { role: "student", studentId: own.id, workspaceId: user.workspaceId };
+  }
+
+  const [owned] = await db
+    .select({ id: students.id })
+    .from(students)
+    .where(
+      and(
+        eq(students.workspaceId, user.workspaceId),
+        eq(students.id, field(formData, "studentId")),
+      ),
+    )
+    .limit(1);
+  if (!owned) redirect("/counselor");
+  return { role: "counselor", studentId: owned.id, workspaceId: user.workspaceId };
+}
+
+export async function generatePerformanceRangeNarrativeAction(formData: FormData): Promise<void> {
+  const ctx = await resolveStudentForReport(formData);
+  const from = field(formData, "from");
+  const to = field(formData, "to");
+
+  if (!isISODate(from) || !isISODate(to) || from > to) {
+    redirect(
+      rangeReportPath(ctx.role, ctx.studentId, from, to, {
+        error: "بازه انتخاب‌شده معتبر نیست.",
+      }),
+    );
+  }
+
+  const range = await getPerformanceRangeData(ctx.studentId, from, to);
+  if (!range.analysis.hasAnyData) {
+    redirect(
+      rangeReportPath(ctx.role, ctx.studentId, from, to, {
+        error: "در این بازه عملکردی ثبت نشده است.",
+      }),
+    );
+  }
+
+  const result = await generatePerformanceNarrative({
+    workspaceId: ctx.workspaceId,
+    studentId: ctx.studentId,
+    analysis: range.analysis,
+    plannedSubjectsByDay: range.plannedSubjectsByDay,
+    notes: range.notes,
+    dailyRoutine: range.dailyRoutine,
+  });
+
+  await saveReport({
+    studentId: ctx.studentId,
+    periodType: "performance",
+    periodStart: from,
+    periodEnd: to,
+    metrics: {
+      activeDays: range.analysis.activeDays,
+      onplanDays: range.analysis.onplanDays,
+      offplanDays: range.analysis.offplanDays,
+      totalMinutes: range.analysis.totalMinutes,
+      totalPractice: range.analysis.totalPractice,
+    },
+    narrative: result.narrative,
+  });
+
+  revalidatePath("/student/report");
+  revalidatePath(`/counselor/students/${ctx.studentId}/report`);
+  redirect(rangeReportPath(ctx.role, ctx.studentId, from, to, { success: "narrative" }));
 }
 
 export async function generatePerformanceNarrativeAction(formData: FormData): Promise<void> {

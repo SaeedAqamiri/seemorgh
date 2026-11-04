@@ -1,18 +1,20 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import {
   performancePanels,
+  plans,
   resources,
   students,
   subjects,
+  tasks,
   users,
-  weeklyPanels,
   type PerformanceCellJson,
   type PerformanceGridJson,
   type WeeklyGridJson,
 } from "@/db/schema";
-import { weekDates } from "./dates";
-import { PANEL_DAYS, PANEL_SLOTS } from "./panel";
+import { addDays, startOfWeekSaturday, tehranDateTime, weekDates } from "./dates";
+import { getWeeklyPanelView, PANEL_DAYS, PANEL_SLOTS } from "./panel";
+import { diffResourcePracticeCounts } from "./resource-progress";
 
 export { PANEL_DAYS, PANEL_SLOTS };
 
@@ -183,19 +185,34 @@ export async function savePerformancePanel(input: SavePerformanceInput): Promise
     .limit(1);
   if (!studentRow) throw new PerformanceValidationError("دانش‌آموز پیدا نشد.");
 
-  const [subjectRows, resourceRows] = await Promise.all([
+  const [subjectRows, resourceRows, existingPanelRows] = await Promise.all([
     db
       .select({ id: subjects.id })
       .from(subjects)
       .where(eq(subjects.workspaceId, studentRow.workspaceId)),
     db
-      .select({ id: resources.id })
+      .select({
+        id: resources.id,
+        subjectId: resources.subjectId,
+        totalUnits: resources.totalUnits,
+        completedUnits: resources.completedUnits,
+      })
       .from(resources)
       .where(eq(resources.studentId, input.studentId)),
+    db
+      .select({ cellsJson: performancePanels.cellsJson })
+      .from(performancePanels)
+      .where(
+        and(
+          eq(performancePanels.studentId, input.studentId),
+          eq(performancePanels.weekStart, input.weekStart),
+        ),
+      )
+      .limit(1),
   ]);
 
   const subjectIds = new Set(subjectRows.map((row) => row.id));
-  const resourceIds = new Set(resourceRows.map((row) => row.id));
+  const resourceById = new Map(resourceRows.map((row) => [row.id, row]));
 
   for (const row of grid) {
     for (const cell of row) {
@@ -204,29 +221,102 @@ export async function savePerformancePanel(input: SavePerformanceInput): Promise
           throw new PerformanceValidationError("یکی از درس‌های ثبت عملکرد معتبر نیست.");
         }
       }
-      if (cell.kind === "practice" && cell.resourceId && !resourceIds.has(cell.resourceId)) {
-        throw new PerformanceValidationError("یکی از منابع ثبت عملکرد معتبر نیست.");
+      if (cell.kind === "practice" && cell.resourceId) {
+        const resource = resourceById.get(cell.resourceId);
+        if (!resource) {
+          throw new PerformanceValidationError("یکی از منابع ثبت عملکرد معتبر نیست.");
+        }
+        if (resource.subjectId !== cell.subjectId) {
+          throw new PerformanceValidationError("منبع انتخاب‌شده با درس عملکرد هم‌خوان نیست.");
+        }
       }
     }
   }
 
-  await db
-    .insert(performancePanels)
-    .values({
-      studentId: input.studentId,
-      weekStart: input.weekStart,
-      cellsJson: grid,
-      updatedBy: input.actorId,
-      updatedAt: new Date(),
-    })
-    .onConflictDoUpdate({
-      target: [performancePanels.studentId, performancePanels.weekStart],
-      set: {
+  const previousGrid = existingPanelRows[0]?.cellsJson
+    ? normalizePerfGrid(existingPanelRows[0].cellsJson)
+    : null;
+  const deltas = diffResourcePracticeCounts(previousGrid, grid);
+
+  await db.transaction(async (tx) => {
+    await tx
+      .insert(performancePanels)
+      .values({
+        studentId: input.studentId,
+        weekStart: input.weekStart,
         cellsJson: grid,
         updatedBy: input.actorId,
         updatedAt: new Date(),
-      },
-    });
+      })
+      .onConflictDoUpdate({
+        target: [performancePanels.studentId, performancePanels.weekStart],
+        set: {
+          cellsJson: grid,
+          updatedBy: input.actorId,
+          updatedAt: new Date(),
+        },
+      });
+
+    for (const [resourceId, delta] of deltas) {
+      if (!resourceById.has(resourceId) || delta === 0) continue;
+      await tx
+        .update(resources)
+        .set({
+          completedUnits: sql`least(greatest(${resources.totalUnits}, 0), greatest(0, ${resources.completedUnits} + ${delta}))`,
+        })
+        .where(eq(resources.id, resourceId));
+    }
+
+    const [plan] = await tx
+      .select({ id: plans.id })
+      .from(plans)
+      .where(
+        and(
+          eq(plans.studentId, input.studentId),
+          eq(plans.weekStart, input.weekStart),
+        ),
+      )
+      .limit(1);
+
+    if (!plan) return;
+
+    const dates = weekDates(input.weekStart);
+    const planTasks = await tx.select().from(tasks).where(eq(tasks.planId, plan.id));
+
+    for (const task of planTasks) {
+      const day = dates.indexOf(task.planDate);
+      if (day < 0) continue;
+      const slot = PANEL_SLOTS.findIndex(
+        (candidate) =>
+          task.plannedStart >= candidate.startMin && task.plannedStart < candidate.endMin,
+      );
+      if (slot < 0) continue;
+      const cell = grid[day]?.[slot];
+      if (!cell) continue;
+
+      if (cell.kind === "practice" || cell.kind === "review") {
+        await tx
+          .update(tasks)
+          .set({
+            status: "done",
+            actualStartedAt: tehranDateTime(task.planDate, cell.startMin),
+            actualEndedAt: tehranDateTime(task.planDate, cell.endMin),
+            actualUnits: cell.kind === "practice" ? cell.count : 0,
+          })
+          .where(eq(tasks.id, task.id));
+      } else {
+        await tx
+          .update(tasks)
+          .set({
+            status: "pending",
+            actualStartedAt: null,
+            actualEndedAt: null,
+            actualUnits: 0,
+          })
+          .where(eq(tasks.id, task.id));
+      }
+    }
+  });
 }
 
 export type DayStartStatus = {
@@ -252,8 +342,7 @@ export type PerformanceAnalysis = {
   hasAnyData: boolean;
 };
 
-const ONPLAN_EARLY_GRACE_MIN = 5;
-const ONPLAN_LATE_WINDOW_MIN = 30;
+const ONPLAN_MAX_DIFF_MIN = 30;
 
 function plannedKind(cell: { kind: string } | undefined): boolean {
   return cell?.kind === "review" || cell?.kind === "test";
@@ -265,18 +354,20 @@ export function buildPerformanceAnalysis(
   weekStart: string,
   planGrid: WeeklyGridJson | null,
   perfGrid: PerformanceGridJson,
+  plannedStartByDate?: Map<string, number>,
 ): PerformanceAnalysis {
   const dates = weekDates(weekStart);
   const days: DayStartStatus[] = [];
 
   for (let day = 0; day < PANEL_DAYS; day += 1) {
-    const plannedStartMin = (() => {
+    const gridPlannedStartMin = (() => {
       if (!planGrid) return null;
       for (let slot = 0; slot < PANEL_SLOTS.length; slot += 1) {
         if (plannedKind(planGrid[day]?.[slot])) return PANEL_SLOTS[slot].startMin;
       }
       return null;
     })();
+    const plannedStartMin = plannedStartByDate?.get(dates[day]) ?? gridPlannedStartMin;
 
     const performed = perfGrid[day]
       .map((cell, slot) => ({ cell, slot }))
@@ -295,39 +386,19 @@ export function buildPerformanceAnalysis(
       0,
     );
 
-    const firstPlannedWithWork = (() => {
-      for (let slot = 0; slot < PANEL_SLOTS.length; slot += 1) {
-        const planned = planGrid?.[day]?.[slot];
-        const done = perfGrid[day]?.[slot];
-        const doneIsActivity = done?.kind === "review" || done?.kind === "practice";
-        if (plannedKind(planned) && doneIsActivity) {
-          const activity = done as PerfActivityCell;
-          return {
-            plannedStartMin: PANEL_SLOTS[slot].startMin,
-            performedStartMin: activity.startMin,
-            performedEndMin: activity.endMin,
-          };
-        }
-      }
-      return null;
-    })();
+    const firstPerformed = performed.length
+      ? [...performed].sort((a, b) => a.cell.startMin - b.cell.startMin)[0]
+      : null;
+    const performedStartMin = firstPerformed?.cell.startMin ?? null;
+    const performedEndMin = firstPerformed?.cell.endMin ?? null;
 
-    let status: DayStartStatus["status"] = "none";
-    let performedStartMin: number | null = null;
-    let performedEndMin: number | null = null;
-
-    if (firstPlannedWithWork) {
-      performedStartMin = firstPlannedWithWork.performedStartMin;
-      performedEndMin = firstPlannedWithWork.performedEndMin;
-      const diff = (performedStartMin ?? 0) - firstPlannedWithWork.plannedStartMin;
-      status =
-        diff >= -ONPLAN_EARLY_GRACE_MIN && diff <= ONPLAN_LATE_WINDOW_MIN ? "onplan" : "offplan";
-    } else if (performed.length > 0) {
-      const first = [...performed].sort((a, b) => a.cell.startMin - b.cell.startMin)[0];
-      performedStartMin = first.cell.startMin;
-      performedEndMin = first.cell.endMin;
-      status = "offplan";
-    }
+    const status: DayStartStatus["status"] =
+      performedStartMin === null
+        ? "none"
+        : plannedStartMin !== null &&
+            Math.abs(performedStartMin - plannedStartMin) <= ONPLAN_MAX_DIFF_MIN
+          ? "onplan"
+          : "offplan";
 
     days.push({
       date: dates[day],
@@ -364,14 +435,129 @@ export async function getPerformanceAnalysis(
   studentId: string,
   weekStart: string,
 ): Promise<PerformanceAnalysis> {
+  const [plan, perf] = await Promise.all([
+    getWeeklyPanelView(studentId, weekStart),
+    getPerformanceView(studentId, weekStart),
+  ]);
+  return buildPerformanceAnalysis(weekStart, plan.grid, perf.grid);
+}
+
+export type PerformanceRangeData = {
+  analysis: PerformanceAnalysis;
+  plannedSubjectsByDay: string[][];
+  notes: { weekday: number; slot: number; text: string }[];
+  dailyRoutine: string;
+};
+
+export async function getPerformanceRangeData(
+  studentId: string,
+  from: string,
+  to: string,
+): Promise<PerformanceRangeData> {
   const db = await getDb();
-  const [panel] = await db
-    .select({ gridJson: weeklyPanels.gridJson })
-    .from(weeklyPanels)
-    .where(and(eq(weeklyPanels.studentId, studentId), eq(weeklyPanels.weekStart, weekStart)))
+  const [studentRow] = await db
+    .select({ workspaceId: students.workspaceId })
+    .from(students)
+    .where(eq(students.id, studentId))
     .limit(1);
-  const perf = await getPerformanceView(studentId, weekStart);
-  return buildPerformanceAnalysis(weekStart, panel?.gridJson ?? null, perf.grid);
+
+  if (!studentRow) throw new Error("student not found");
+
+  const subjectRows = await db
+    .select({ id: subjects.id, title: subjects.title })
+    .from(subjects)
+    .where(eq(subjects.workspaceId, studentRow.workspaceId));
+  const subjectTitles = new Map(subjectRows.map((row) => [row.id, row.title]));
+
+  const days: DayStartStatus[] = [];
+  const plannedSubjectsByDay: string[][] = [];
+  const notes: { weekday: number; slot: number; text: string }[] = [];
+  let dailyRoutine = "";
+
+  if (from <= to) {
+    let weekStart = startOfWeekSaturday(from);
+    while (weekStart <= to) {
+      const [planView, perfView, planRows] = await Promise.all([
+        getWeeklyPanelView(studentId, weekStart),
+        getPerformanceView(studentId, weekStart),
+        db
+          .select({ id: plans.id })
+          .from(plans)
+          .where(and(eq(plans.studentId, studentId), eq(plans.weekStart, weekStart)))
+          .limit(1),
+      ]);
+
+      const plan = planRows[0];
+      const taskRows = plan
+        ? await db
+            .select({ planDate: tasks.planDate, plannedStart: tasks.plannedStart })
+            .from(tasks)
+            .where(eq(tasks.planId, plan.id))
+        : [];
+      const plannedStartByDate = new Map<string, number>();
+      for (const task of taskRows) {
+        const current = plannedStartByDate.get(task.planDate);
+        if (current === undefined || task.plannedStart < current) {
+          plannedStartByDate.set(task.planDate, task.plannedStart);
+        }
+      }
+
+      const weekAnalysis = buildPerformanceAnalysis(
+        weekStart,
+        planView.grid,
+        perfView.grid,
+        plannedStartByDate,
+      );
+      const dates = weekDates(weekStart);
+
+      for (let dayIndex = 0; dayIndex < PANEL_DAYS; dayIndex += 1) {
+        const date = dates[dayIndex];
+        if (date < from || date > to) continue;
+        days.push(weekAnalysis.days[dayIndex]);
+
+        const plannedRow = planView.grid[dayIndex] ?? [];
+        plannedSubjectsByDay.push([
+          ...new Set(
+            plannedRow
+              .filter((cell) => cell.kind === "review" || cell.kind === "test")
+              .map((cell) => subjectTitles.get(cell.subjectId) ?? "درس"),
+          ),
+        ]);
+
+        const perfRow = perfView.grid[dayIndex] ?? [];
+        perfRow.forEach((cell, slot) => {
+          const note = cell.kind === "review" || cell.kind === "practice" ? cell.note.trim() : "";
+          if (note) notes.push({ weekday: dayIndex, slot, text: note.slice(0, 300) });
+        });
+      }
+
+      if (planView.dailyRoutine.trim()) dailyRoutine = planView.dailyRoutine;
+      weekStart = addDays(weekStart, 7);
+    }
+  }
+
+  const activeDays = days.filter((day) => day.performedStartMin !== null).length;
+  const onplanDays = days.filter((day) => day.status === "onplan").length;
+  const offplanDays = days.filter((day) => day.status === "offplan").length;
+  const totalMinutes = days.reduce((sum, day) => sum + day.performedMinutes, 0);
+  const totalPractice = days.reduce((sum, day) => sum + day.practiceCount, 0);
+
+  return {
+    analysis: {
+      weekStart: from,
+      dates: days.map((day) => day.date),
+      days,
+      activeDays,
+      onplanDays,
+      offplanDays,
+      totalMinutes,
+      totalPractice,
+      hasAnyData: activeDays > 0,
+    },
+    plannedSubjectsByDay,
+    notes,
+    dailyRoutine,
+  };
 }
 
 export type StudentOption = { id: string; name: string };

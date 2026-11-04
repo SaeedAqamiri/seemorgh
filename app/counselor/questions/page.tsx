@@ -7,7 +7,6 @@ import {
   restoreQuestionAction,
   updateQuestionAction,
 } from "@/app/actions/questions";
-import { uploadExcelAction } from "@/app/actions/import";
 import { SubmitButton } from "@/components/submit-button";
 import { requireCounselor } from "@/lib/auth";
 import { listBanks, listQuestions } from "@/lib/questions";
@@ -58,14 +57,6 @@ export default async function QuestionsPage({
         <div>
           <h1>بانک سوال</h1>
           <small>سوالات اختصاصی دفتر شما؛ در آزمون‌ها فقط از همین بانک انتخاب می‌شود.</small>
-        </div>
-        <div className="row">
-          <a className="btn btn-secondary btn-sm" href="/counselor/export?type=template">
-            قالب اکسل
-          </a>
-          <Link className="btn btn-secondary btn-sm" href="/counselor">
-            ایمپورت اکسل
-          </Link>
         </div>
       </div>
 
@@ -384,21 +375,6 @@ export default async function QuestionsPage({
         )}
       </div>
 
-      <div className="card">
-        <div className="section-head">
-          <h2>ایمپورت سوالات با اکسل</h2>
-        </div>
-        <form action={uploadExcelAction} className="row">
-          <input type="file" name="file" accept=".xlsx" required style={{ maxWidth: "360px" }} />
-          <SubmitButton className="btn-secondary" pendingLabel="در حال بررسی…">
-            آپلود و پیش‌نمایش
-          </SubmitButton>
-        </form>
-        <p className="muted" style={{ marginBottom: 0, fontSize: "0.82rem" }}>
-          شیت Questions: bank, subject, topic, type, difficulty, body, option1..4, correct, score,
-          explanation, external_key. کلید یکتا برای به‌روزرسانی: bank + external_key.
-        </p>
-      </div>
     </div>
   );
 }

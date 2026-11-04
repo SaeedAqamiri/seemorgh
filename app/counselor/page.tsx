@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { createStudentAction } from "@/app/actions/counselor";
-import { uploadExcelAction } from "@/app/actions/import";
 import { SubmitButton } from "@/components/submit-button";
 import { requireCounselor } from "@/lib/auth";
 import { listStudents } from "@/lib/counselor";
@@ -15,16 +14,10 @@ const SUCCESS: Record<string, string> = {
 export default async function CounselorPage({
   searchParams,
 }: {
-  searchParams: Promise<{
-    success?: string;
-    error?: string;
-    applied?: string;
-    skipped?: string;
-    total?: string;
-  }>;
+  searchParams: Promise<{ success?: string; error?: string }>;
 }) {
   const counselor = await requireCounselor();
-  const { success, error, applied, skipped, total } = await searchParams;
+  const { success, error } = await searchParams;
   const students = await listStudents(counselor.workspaceId, counselor.id);
 
   const withPlan = students.filter((student) => student.planStatus === "approved" || student.planStatus === "active");
@@ -43,12 +36,6 @@ export default async function CounselorPage({
       </div>
 
       {success && SUCCESS[success] ? <div className="alert alert-success">{SUCCESS[success]}</div> : null}
-      {success === "imported" ? (
-        <div className="alert alert-success">
-          ایمپورت انجام شد: {Number(applied ?? 0).toLocaleString("fa-IR")} ردیف اعمال شد و{" "}
-          {Number(skipped ?? 0).toLocaleString("fa-IR")} ردیف رد شد (از {Number(total ?? 0).toLocaleString("fa-IR")} ردیف).
-        </div>
-      ) : null}
       {error ? <div className="alert alert-error">{error}</div> : null}
 
       <div className="grid grid-3">
@@ -124,31 +111,6 @@ export default async function CounselorPage({
 
       <div className="card">
         <div className="section-head">
-          <h2>اکسل</h2>
-          <a className="btn btn-secondary btn-sm" href="/counselor/export?type=template">
-            دانلود قالب
-          </a>
-        </div>
-        <p className="muted" style={{ marginTop: 0 }}>
-          دانش‌آموزان، منابع، زمان‌های آزاد، محدودیت‌ها و سوالات را با یک فایل وارد کنید.
-          قبل از اعمال، پیش‌نمایش و خطای سطر‌به‌سطر را می‌بینید.
-        </p>
-        <form action={uploadExcelAction} className="row">
-          <input
-            type="file"
-            name="file"
-            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            required
-            style={{ maxWidth: "360px" }}
-          />
-          <SubmitButton className="btn-secondary" pendingLabel="در حال بررسی…">
-            آپلود و پیش‌نمایش
-          </SubmitButton>
-        </form>
-      </div>
-
-      <div className="card">
-        <div className="section-head">
           <h2>فهرست دانش‌آموزان</h2>
         </div>
 
@@ -163,7 +125,7 @@ export default async function CounselorPage({
                   <th>پایه / رشته</th>
                   <th>برنامه هفته</th>
                   <th>امروز</th>
-                  <th>واحد باقی‌مانده</th>
+                  <th>پیشرفت منابع</th>
                   <th>دعوت</th>
                   <th />
                 </tr>
@@ -204,7 +166,12 @@ export default async function CounselorPage({
                         ? "—"
                         : `${student.todayDone} از ${student.todayTasks}`}
                     </td>
-                    <td>{student.remainingUnits.toLocaleString("fa-IR")}</td>
+                    <td>
+                      <strong>{student.progressPercent}٪</strong>
+                      <div className="muted" style={{ fontSize: "0.78rem" }}>
+                        {student.remainingUnits.toLocaleString("fa-IR")} واحد باقی‌مانده
+                      </div>
+                    </td>
                     <td>
                       {student.hasAccount ? (
                         <span className="badge badge-green">فعال</span>

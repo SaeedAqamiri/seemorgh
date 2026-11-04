@@ -1,0 +1,54 @@
+[
+  {
+    "id": "aba10f61-951b-41f4-83d6-2bcae1334ab8",
+    "workspaceId": "c664b088-1db1-4c52-91c6-c0cbd117a15c",
+    "title": "راهنمای مطالعه فعال",
+    "kind": "text",
+    "url": null,
+    "body": "هر روز با یک بلوک کوتاه شروع کن. هدف این هفته: ثبت شروع/پایان هر تسک و خواندن صفحات مشخص‌شده.",
+    "subjectId": null,
+    "resourceId": null,
+    "createdBy": "73b87269-17ae-4edc-99fb-0d39fab16c5b",
+    "status": "active",
+    "createdAt": "2026-10-26T10:44:13.460Z"
+  },
+  {
+    "id": "3550213e-9d2f-4cd6-ab1c-95f09bb38740",
+    "workspaceId": "c664b088-1db1-4c52-91c6-c0cbd117a15c",
+    "title": "تست روان‌شناسی — لینک نمونه",
+    "kind": "psychology",
+    "url": "https://www.youtube.com/watch?v=aqz-KE-bpKQ",
+    "body": "این بخش فعلاً فقط لینک محتواست؛ تفسیر تخصصی انجام نمی‌شود.",
+    "subjectId": null,
+    "resourceId": null,
+    "createdBy": "73b87269-17ae-4edc-99fb-0d39fab16c5b",
+    "status": "active",
+    "createdAt": "2026-10-26T10:44:13.460Z"
+  },
+  {
+    "id": "cc1d843b-4bda-4564-9df3-52ae11092c28",
+    "workspaceId": "c664b088-1db1-4c52-91c6-c0cbd117a15c",
+    "title": "پیام تست گزارش",
+    "kind": "text",
+    "url": null,
+    "body": "این یک محتوای متنی تستی است که در گزارش تست ثبت می‌شود.",
+    "subjectId": null,
+    "resourceId": null,
+    "createdBy": "73b87269-17ae-4edc-99fb-0d39fab16c5b",
+    "status": "active",
+    "createdAt": "2026-10-26T14:51:11.356Z"
+  },
+  {
+    "id": "d8d1134d-0e39-4e71-b03c-f37f34b5ff04",
+    "workspaceId": "c664b088-1db1-4c52-91c6-c0cbd117a15c",
+    "title": "ویدیو نمونه — پخش داخل سایت",
+    "kind": "video",
+    "url": "https://www.youtube.com/watch?v=aqz-KE-bpKQ",
+    "body": "این یک ویدیو نمونه برای تست پخش داخل سایت است. لینک آپارات یا یوتیوب خودت را جای آن بگذار.",
+    "subjectId": "d65512c5-6bdf-4db9-b3e4-56578bb548ac",
+    "resourceId": null,
+    "createdBy": "73b87269-17ae-4edc-99fb-0d39fab16c5b",
+    "status": "active",
+    "createdAt": "2026-10-26T10:44:13.460Z"
+  }
+]

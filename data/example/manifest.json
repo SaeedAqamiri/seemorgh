@@ -1,0 +1,31 @@
+{
+  "exportedAt": "2026-11-04T18:16:05.527Z",
+  "note": "Demo data for Seemorgh. All demo passwords are seemorgh123.",
+  "tables": {
+    "workspaces": 1,
+    "users": 21,
+    "students": 20,
+    "subjects": 7,
+    "resources": 281,
+    "availability": 120,
+    "student_constraints": 20,
+    "exam_targets": 60,
+    "external_exams": 80,
+    "question_banks": 2,
+    "questions": 13,
+    "exams": 3,
+    "exam_assignments": 5,
+    "exam_attempts": 3,
+    "exam_answers": 7,
+    "plans": 4,
+    "tasks": 144,
+    "weekly_panels": 340,
+    "performance_panels": 340,
+    "daily_logs": 1,
+    "content_items": 4,
+    "reports": 1,
+    "notifications": 6,
+    "audit_logs": 20,
+    "ai_runs": 5
+  }
+}

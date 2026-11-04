@@ -29,6 +29,9 @@ export type StudentListItem = {
   todayTasks: number;
   todayDone: number;
   remainingUnits: number;
+  totalUnits: number;
+  completedUnits: number;
+  progressPercent: number;
 };
 
 export async function listStudents(
@@ -88,6 +91,8 @@ export async function listStudents(
   const resourceRows = await db
     .select({
       studentId: resources.studentId,
+      total: sql<number>`coalesce(sum(${resources.totalUnits}), 0)::int`,
+      completed: sql<number>`coalesce(sum(least(${resources.completedUnits}, ${resources.totalUnits})), 0)::int`,
       remaining: sql<number>`coalesce(sum(greatest(${resources.totalUnits} - ${resources.completedUnits}, 0)), 0)::int`,
     })
     .from(resources)
@@ -97,12 +102,15 @@ export async function listStudents(
   const planByStudent = new Map(planRows.map((plan) => [plan.studentId, plan]));
   const taskStatsByPlan = new Map(taskStats.map((row) => [row.planId, row]));
   const todayByStudent = new Map(todayStats.map((row) => [row.studentId, row]));
-  const remainingByStudent = new Map(resourceRows.map((row) => [row.studentId, row.remaining]));
+  const resourceByStudent = new Map(resourceRows.map((row) => [row.studentId, row]));
 
   return rows.map((student) => {
     const plan = planByStudent.get(student.id);
     const stats = plan ? taskStatsByPlan.get(plan.id) : undefined;
     const todayRow = todayByStudent.get(student.id);
+    const resourceRow = resourceByStudent.get(student.id);
+    const totalUnits = resourceRow?.total ?? 0;
+    const completedUnits = resourceRow?.completed ?? 0;
     return {
       id: student.id,
       name: student.name,
@@ -118,7 +126,10 @@ export async function listStudents(
       totalTasks: stats?.total ?? 0,
       todayTasks: todayRow?.total ?? 0,
       todayDone: todayRow?.done ?? 0,
-      remainingUnits: remainingByStudent.get(student.id) ?? 0,
+      remainingUnits: resourceRow?.remaining ?? 0,
+      totalUnits,
+      completedUnits,
+      progressPercent: totalUnits === 0 ? 0 : Math.round((completedUnits / totalUnits) * 100),
     };
   });
 }

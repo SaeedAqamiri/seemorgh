@@ -1,0 +1,962 @@
+[
+  {
+    "id": "6ad48465-cbe3-4838-bedf-ff50f0ac6e9d",
+    "studentId": "e144309c-7ce2-4ef8-af19-9f05e029590e",
+    "weekday": 0,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T15:25:37.168Z"
+  },
+  {
+    "id": "3e495559-b707-4eea-aace-9da3f17f1aca",
+    "studentId": "e144309c-7ce2-4ef8-af19-9f05e029590e",
+    "weekday": 1,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T15:25:37.168Z"
+  },
+  {
+    "id": "92422d14-910a-4f26-9d9d-74c4b5ad091d",
+    "studentId": "e144309c-7ce2-4ef8-af19-9f05e029590e",
+    "weekday": 2,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T15:25:37.168Z"
+  },
+  {
+    "id": "b5dfeda2-648b-4866-a74f-c02486f59bd2",
+    "studentId": "e144309c-7ce2-4ef8-af19-9f05e029590e",
+    "weekday": 3,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T15:25:37.168Z"
+  },
+  {
+    "id": "b66df64c-619a-4f32-b0f5-9ee363256c6d",
+    "studentId": "e144309c-7ce2-4ef8-af19-9f05e029590e",
+    "weekday": 4,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T15:25:37.168Z"
+  },
+  {
+    "id": "5ed35810-590c-4722-b37c-a9ae4f42576d",
+    "studentId": "e144309c-7ce2-4ef8-af19-9f05e029590e",
+    "weekday": 5,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T15:25:37.168Z"
+  },
+  {
+    "id": "e50bb2ad-fc22-4e7e-9f8d-5ab8447b2e4b",
+    "studentId": "81d7da38-1b28-4a30-9f2d-2ee4c3262315",
+    "weekday": 0,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T15:25:37.258Z"
+  },
+  {
+    "id": "88d8d4d9-1d8a-4f9c-b97f-f21a3ad5ba12",
+    "studentId": "81d7da38-1b28-4a30-9f2d-2ee4c3262315",
+    "weekday": 1,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T15:25:37.258Z"
+  },
+  {
+    "id": "c0f7f80e-9cd2-4bb5-843f-dcd697baee5c",
+    "studentId": "81d7da38-1b28-4a30-9f2d-2ee4c3262315",
+    "weekday": 2,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T15:25:37.258Z"
+  },
+  {
+    "id": "f4a9d1d6-268a-4603-8373-ff85dda5483a",
+    "studentId": "81d7da38-1b28-4a30-9f2d-2ee4c3262315",
+    "weekday": 3,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T15:25:37.258Z"
+  },
+  {
+    "id": "362f34d3-87d5-4e2e-87d8-10e1b30212bf",
+    "studentId": "81d7da38-1b28-4a30-9f2d-2ee4c3262315",
+    "weekday": 4,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T15:25:37.258Z"
+  },
+  {
+    "id": "337cac8d-b559-4335-8096-3f9636d29070",
+    "studentId": "81d7da38-1b28-4a30-9f2d-2ee4c3262315",
+    "weekday": 5,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T15:25:37.258Z"
+  },
+  {
+    "id": "2460f669-141c-4c2c-9e51-8d4f50209206",
+    "studentId": "a30df639-0844-4ba5-932e-62a245464d26",
+    "weekday": 0,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.777Z"
+  },
+  {
+    "id": "fec01b96-adff-48a2-a12c-00ff8ac69849",
+    "studentId": "a30df639-0844-4ba5-932e-62a245464d26",
+    "weekday": 1,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.777Z"
+  },
+  {
+    "id": "312b7be4-98de-43fe-b058-8ee4b48b11e6",
+    "studentId": "a30df639-0844-4ba5-932e-62a245464d26",
+    "weekday": 2,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.777Z"
+  },
+  {
+    "id": "456e4b42-d32c-42f6-96ed-209f37abe7b8",
+    "studentId": "a30df639-0844-4ba5-932e-62a245464d26",
+    "weekday": 3,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.777Z"
+  },
+  {
+    "id": "05038e4e-2579-46c0-820a-5a29c407099f",
+    "studentId": "a30df639-0844-4ba5-932e-62a245464d26",
+    "weekday": 4,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.777Z"
+  },
+  {
+    "id": "49e1e7e9-8c07-40a0-a09b-1ffcfb5d39fd",
+    "studentId": "a30df639-0844-4ba5-932e-62a245464d26",
+    "weekday": 5,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.777Z"
+  },
+  {
+    "id": "9926051c-2d18-4a32-b0e5-65e6c2555121",
+    "studentId": "426b2efb-26d4-461a-99f7-f2816df6ee5f",
+    "weekday": 0,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.804Z"
+  },
+  {
+    "id": "a711fb13-9be2-442e-8cd6-8241b13b4273",
+    "studentId": "426b2efb-26d4-461a-99f7-f2816df6ee5f",
+    "weekday": 1,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.804Z"
+  },
+  {
+    "id": "88a47464-7131-454b-abea-804e10d65f12",
+    "studentId": "426b2efb-26d4-461a-99f7-f2816df6ee5f",
+    "weekday": 2,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.804Z"
+  },
+  {
+    "id": "17ffaf61-a1c4-4bfd-bcf7-167857a7e8af",
+    "studentId": "426b2efb-26d4-461a-99f7-f2816df6ee5f",
+    "weekday": 3,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.804Z"
+  },
+  {
+    "id": "6773e11c-7d25-42f5-bc86-d25693a508b1",
+    "studentId": "426b2efb-26d4-461a-99f7-f2816df6ee5f",
+    "weekday": 4,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.804Z"
+  },
+  {
+    "id": "2a5eac9f-4e6b-4b4d-b1a3-743971ee4626",
+    "studentId": "426b2efb-26d4-461a-99f7-f2816df6ee5f",
+    "weekday": 5,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.804Z"
+  },
+  {
+    "id": "b9a1407d-c798-40d8-acf8-59aa05427d08",
+    "studentId": "2baeb669-dbb2-4552-b16d-80115a030498",
+    "weekday": 0,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.820Z"
+  },
+  {
+    "id": "8bf78d0a-35d7-4cec-bc06-39aa93e94105",
+    "studentId": "2baeb669-dbb2-4552-b16d-80115a030498",
+    "weekday": 1,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.820Z"
+  },
+  {
+    "id": "56a5fa76-a0e6-4f3f-831d-e275dd693d46",
+    "studentId": "2baeb669-dbb2-4552-b16d-80115a030498",
+    "weekday": 2,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.820Z"
+  },
+  {
+    "id": "ccf04ea4-9ee4-4f25-83df-db94b9973ea2",
+    "studentId": "2baeb669-dbb2-4552-b16d-80115a030498",
+    "weekday": 3,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.820Z"
+  },
+  {
+    "id": "6bde41b0-01b0-465b-80ab-67d93c2aaa02",
+    "studentId": "2baeb669-dbb2-4552-b16d-80115a030498",
+    "weekday": 4,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.820Z"
+  },
+  {
+    "id": "c07fcdaa-2155-4e9b-97a0-3a15714dda99",
+    "studentId": "2baeb669-dbb2-4552-b16d-80115a030498",
+    "weekday": 5,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.820Z"
+  },
+  {
+    "id": "fb2c2280-ecab-42f3-af19-9e9466ab2340",
+    "studentId": "deb618bc-d0fc-4623-a4e5-5d4f5f547f35",
+    "weekday": 0,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.836Z"
+  },
+  {
+    "id": "ef3f46f8-3844-4d10-8049-3f3dd176bc4a",
+    "studentId": "deb618bc-d0fc-4623-a4e5-5d4f5f547f35",
+    "weekday": 1,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.836Z"
+  },
+  {
+    "id": "b71338b7-7485-4717-b994-4d4f2780ba06",
+    "studentId": "deb618bc-d0fc-4623-a4e5-5d4f5f547f35",
+    "weekday": 2,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.836Z"
+  },
+  {
+    "id": "13ec0cc5-3c28-4cb2-864c-15a62ea46067",
+    "studentId": "deb618bc-d0fc-4623-a4e5-5d4f5f547f35",
+    "weekday": 3,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.836Z"
+  },
+  {
+    "id": "31feab59-c170-4184-9634-3bb9b941f23e",
+    "studentId": "deb618bc-d0fc-4623-a4e5-5d4f5f547f35",
+    "weekday": 4,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.836Z"
+  },
+  {
+    "id": "054c6ad3-0ecd-4bbd-9b5d-5cd90c708177",
+    "studentId": "deb618bc-d0fc-4623-a4e5-5d4f5f547f35",
+    "weekday": 5,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.836Z"
+  },
+  {
+    "id": "6d5eb365-8e9e-4c70-aef1-8b9e2d9dd429",
+    "studentId": "78a83dfb-ec97-4c58-944d-866fbec9ede3",
+    "weekday": 0,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.852Z"
+  },
+  {
+    "id": "e95630b0-32a7-47d1-a568-6257daf5bbae",
+    "studentId": "78a83dfb-ec97-4c58-944d-866fbec9ede3",
+    "weekday": 1,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.852Z"
+  },
+  {
+    "id": "0804febc-d603-4950-bf5d-30024212c748",
+    "studentId": "78a83dfb-ec97-4c58-944d-866fbec9ede3",
+    "weekday": 2,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.852Z"
+  },
+  {
+    "id": "b94d47fd-c8c6-4571-b6ea-45d40863330f",
+    "studentId": "78a83dfb-ec97-4c58-944d-866fbec9ede3",
+    "weekday": 3,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.852Z"
+  },
+  {
+    "id": "c8dd35e4-5ce7-4f57-bae0-9938421b1a45",
+    "studentId": "78a83dfb-ec97-4c58-944d-866fbec9ede3",
+    "weekday": 4,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.852Z"
+  },
+  {
+    "id": "3bcedb2e-85e8-4f43-a479-3e58d1ec215c",
+    "studentId": "78a83dfb-ec97-4c58-944d-866fbec9ede3",
+    "weekday": 5,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.852Z"
+  },
+  {
+    "id": "f8302b62-850c-4e5b-b7d4-c3b990eb41c6",
+    "studentId": "31b116f9-291d-46a7-af53-8b2bfa179b95",
+    "weekday": 0,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.868Z"
+  },
+  {
+    "id": "8a8f57e4-84d2-4013-ac70-028d2dc4c95f",
+    "studentId": "31b116f9-291d-46a7-af53-8b2bfa179b95",
+    "weekday": 1,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.868Z"
+  },
+  {
+    "id": "9fce5d67-0048-43bb-8685-9c2c95ed0b58",
+    "studentId": "31b116f9-291d-46a7-af53-8b2bfa179b95",
+    "weekday": 2,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.868Z"
+  },
+  {
+    "id": "3c8de0d2-7d7d-4b60-ae4f-26ce3a753c87",
+    "studentId": "31b116f9-291d-46a7-af53-8b2bfa179b95",
+    "weekday": 3,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.868Z"
+  },
+  {
+    "id": "87042aa0-7502-4d1c-8613-b420a1402b38",
+    "studentId": "31b116f9-291d-46a7-af53-8b2bfa179b95",
+    "weekday": 4,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.868Z"
+  },
+  {
+    "id": "5adbb21a-1293-4f0f-90ed-5d959f6e790b",
+    "studentId": "31b116f9-291d-46a7-af53-8b2bfa179b95",
+    "weekday": 5,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.868Z"
+  },
+  {
+    "id": "349d3f8d-d195-4589-9e99-20dfa4c53ec9",
+    "studentId": "ee288e78-4359-426d-8b44-adbd5420ae65",
+    "weekday": 0,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.883Z"
+  },
+  {
+    "id": "7ec0e3cb-78de-4fbb-bc58-c8996559fea5",
+    "studentId": "ee288e78-4359-426d-8b44-adbd5420ae65",
+    "weekday": 1,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.883Z"
+  },
+  {
+    "id": "5ae55ff0-bce4-4f36-9faa-6b536aef4204",
+    "studentId": "ee288e78-4359-426d-8b44-adbd5420ae65",
+    "weekday": 2,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.883Z"
+  },
+  {
+    "id": "9bfa6722-1836-493e-8c1f-aa685f2fbd0d",
+    "studentId": "ee288e78-4359-426d-8b44-adbd5420ae65",
+    "weekday": 3,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.883Z"
+  },
+  {
+    "id": "6fec0e85-d35a-4491-a483-d4c13c792159",
+    "studentId": "ee288e78-4359-426d-8b44-adbd5420ae65",
+    "weekday": 4,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.883Z"
+  },
+  {
+    "id": "c2a08b47-0d57-4484-a06b-24e1d8332d98",
+    "studentId": "ee288e78-4359-426d-8b44-adbd5420ae65",
+    "weekday": 5,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.883Z"
+  },
+  {
+    "id": "2dfd6a10-7cc2-43af-a9aa-e1c42da06a29",
+    "studentId": "9b6f4084-2739-43e5-a959-f39d4978e269",
+    "weekday": 0,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.900Z"
+  },
+  {
+    "id": "adc74116-a32d-4d48-9e0a-150e46ba9da9",
+    "studentId": "9b6f4084-2739-43e5-a959-f39d4978e269",
+    "weekday": 1,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.900Z"
+  },
+  {
+    "id": "422f49e3-8c35-482a-81b0-4fc2bf74a9fd",
+    "studentId": "9b6f4084-2739-43e5-a959-f39d4978e269",
+    "weekday": 2,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.900Z"
+  },
+  {
+    "id": "3e5ca590-b927-41f0-ae05-75ca760131d1",
+    "studentId": "9b6f4084-2739-43e5-a959-f39d4978e269",
+    "weekday": 3,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.900Z"
+  },
+  {
+    "id": "d5a20f4d-5388-47f0-8f07-6159b2edbe3f",
+    "studentId": "9b6f4084-2739-43e5-a959-f39d4978e269",
+    "weekday": 4,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.900Z"
+  },
+  {
+    "id": "c63c6e38-6569-4087-9976-78b0cb82f77a",
+    "studentId": "9b6f4084-2739-43e5-a959-f39d4978e269",
+    "weekday": 5,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.900Z"
+  },
+  {
+    "id": "91a59c55-ce22-4ba4-8558-8ec9434b929a",
+    "studentId": "3cb58510-a785-471c-9537-cc8807972b3a",
+    "weekday": 0,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.915Z"
+  },
+  {
+    "id": "1946732a-05ea-473d-9c2b-fc480805fc6e",
+    "studentId": "3cb58510-a785-471c-9537-cc8807972b3a",
+    "weekday": 1,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.915Z"
+  },
+  {
+    "id": "da6e238b-73e5-4df6-8ef8-0945f89adf49",
+    "studentId": "3cb58510-a785-471c-9537-cc8807972b3a",
+    "weekday": 2,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.915Z"
+  },
+  {
+    "id": "7585ea6d-c257-4e41-9b92-0678e0f6488d",
+    "studentId": "3cb58510-a785-471c-9537-cc8807972b3a",
+    "weekday": 3,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.915Z"
+  },
+  {
+    "id": "3a75920d-9d06-40c6-884d-6365f557a7c4",
+    "studentId": "3cb58510-a785-471c-9537-cc8807972b3a",
+    "weekday": 4,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.915Z"
+  },
+  {
+    "id": "496425c4-3bcf-4100-9e19-8e835b6adeaa",
+    "studentId": "3cb58510-a785-471c-9537-cc8807972b3a",
+    "weekday": 5,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.915Z"
+  },
+  {
+    "id": "ba2999e0-eb80-480f-a353-679edcade675",
+    "studentId": "8a24adbc-8966-441c-88f3-093cb116885e",
+    "weekday": 0,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.929Z"
+  },
+  {
+    "id": "493207e7-15c3-4a6f-bb19-c6013d4ae893",
+    "studentId": "8a24adbc-8966-441c-88f3-093cb116885e",
+    "weekday": 1,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.929Z"
+  },
+  {
+    "id": "58961969-7060-4b13-8a74-9af4056853bb",
+    "studentId": "8a24adbc-8966-441c-88f3-093cb116885e",
+    "weekday": 2,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.929Z"
+  },
+  {
+    "id": "9b37ebc0-4712-4648-a047-90018bb60b11",
+    "studentId": "8a24adbc-8966-441c-88f3-093cb116885e",
+    "weekday": 3,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.929Z"
+  },
+  {
+    "id": "6b991468-0eb2-4825-8099-b8759a888790",
+    "studentId": "8a24adbc-8966-441c-88f3-093cb116885e",
+    "weekday": 4,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.929Z"
+  },
+  {
+    "id": "acb9ff35-5856-41f1-bc97-b5656e8397a3",
+    "studentId": "8a24adbc-8966-441c-88f3-093cb116885e",
+    "weekday": 5,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.929Z"
+  },
+  {
+    "id": "b5628b03-0451-4476-a434-8a78415a0c03",
+    "studentId": "8488b0e8-1e85-436a-a853-bb9070db2221",
+    "weekday": 0,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.943Z"
+  },
+  {
+    "id": "7d9154d0-5ab0-437a-bc18-105cea65d4ed",
+    "studentId": "8488b0e8-1e85-436a-a853-bb9070db2221",
+    "weekday": 1,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.943Z"
+  },
+  {
+    "id": "e6853950-37c3-4559-b984-1c1b92a9cab1",
+    "studentId": "8488b0e8-1e85-436a-a853-bb9070db2221",
+    "weekday": 2,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.943Z"
+  },
+  {
+    "id": "e5915d7e-d8ea-428d-86b0-bbd91d511805",
+    "studentId": "8488b0e8-1e85-436a-a853-bb9070db2221",
+    "weekday": 3,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.943Z"
+  },
+  {
+    "id": "8ca5aed2-e1d7-466b-9006-9b4010173650",
+    "studentId": "8488b0e8-1e85-436a-a853-bb9070db2221",
+    "weekday": 4,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.943Z"
+  },
+  {
+    "id": "7553e484-2f36-4019-90c5-a1cb7ebb1807",
+    "studentId": "8488b0e8-1e85-436a-a853-bb9070db2221",
+    "weekday": 5,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.943Z"
+  },
+  {
+    "id": "a3ef8d31-06c3-4574-9852-717da9b49226",
+    "studentId": "e4491984-7dea-4656-9f0c-a172ddb56faf",
+    "weekday": 0,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.958Z"
+  },
+  {
+    "id": "b2b50636-44b3-45bf-8bcc-6c772430fd69",
+    "studentId": "e4491984-7dea-4656-9f0c-a172ddb56faf",
+    "weekday": 1,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.958Z"
+  },
+  {
+    "id": "56c2b0d2-0b4c-4be3-9408-d3cac3183e0c",
+    "studentId": "e4491984-7dea-4656-9f0c-a172ddb56faf",
+    "weekday": 2,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.958Z"
+  },
+  {
+    "id": "ef723698-4164-4dba-90fc-d9af6784b0fa",
+    "studentId": "e4491984-7dea-4656-9f0c-a172ddb56faf",
+    "weekday": 3,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.958Z"
+  },
+  {
+    "id": "a865772b-e5fa-43c0-8708-5c5a640419aa",
+    "studentId": "e4491984-7dea-4656-9f0c-a172ddb56faf",
+    "weekday": 4,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.958Z"
+  },
+  {
+    "id": "7a499589-270a-43bc-bc9e-9c1682576816",
+    "studentId": "e4491984-7dea-4656-9f0c-a172ddb56faf",
+    "weekday": 5,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.958Z"
+  },
+  {
+    "id": "fadeec4b-a835-440d-92d6-b2fe98f38678",
+    "studentId": "ea5fd15a-b849-46b5-8394-d830db581f21",
+    "weekday": 0,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.975Z"
+  },
+  {
+    "id": "d765732c-74a7-4a0a-95bc-4153bb4bdd26",
+    "studentId": "ea5fd15a-b849-46b5-8394-d830db581f21",
+    "weekday": 1,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.975Z"
+  },
+  {
+    "id": "df30b4d4-f804-4f7e-9175-4629d2c117c1",
+    "studentId": "ea5fd15a-b849-46b5-8394-d830db581f21",
+    "weekday": 2,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.975Z"
+  },
+  {
+    "id": "0a90714a-a19c-4cc9-8119-8ed7ca68d4ed",
+    "studentId": "ea5fd15a-b849-46b5-8394-d830db581f21",
+    "weekday": 3,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.975Z"
+  },
+  {
+    "id": "3af01e70-bb26-43c8-9649-f4e8a17260fb",
+    "studentId": "ea5fd15a-b849-46b5-8394-d830db581f21",
+    "weekday": 4,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.975Z"
+  },
+  {
+    "id": "702e9cb4-d619-4c1e-b62f-019be616e5b3",
+    "studentId": "ea5fd15a-b849-46b5-8394-d830db581f21",
+    "weekday": 5,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.975Z"
+  },
+  {
+    "id": "7c9b3560-d3b2-4496-95ab-61e8dba2b8f3",
+    "studentId": "85ffbaf6-75c4-4436-805f-dbe8d279f319",
+    "weekday": 0,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.991Z"
+  },
+  {
+    "id": "8adb9a62-6621-4f20-a6a0-33106af852e4",
+    "studentId": "85ffbaf6-75c4-4436-805f-dbe8d279f319",
+    "weekday": 1,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.991Z"
+  },
+  {
+    "id": "55d23943-4376-408b-ac35-c63d3969c62e",
+    "studentId": "85ffbaf6-75c4-4436-805f-dbe8d279f319",
+    "weekday": 2,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.991Z"
+  },
+  {
+    "id": "34a11490-73bf-4a18-b3ab-67cf2424bab8",
+    "studentId": "85ffbaf6-75c4-4436-805f-dbe8d279f319",
+    "weekday": 3,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.991Z"
+  },
+  {
+    "id": "eb627bbb-4c10-4c9e-ad93-326f8764a8b5",
+    "studentId": "85ffbaf6-75c4-4436-805f-dbe8d279f319",
+    "weekday": 4,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.991Z"
+  },
+  {
+    "id": "cb44e57b-df5b-4d4e-94ed-22fd83b6a2dc",
+    "studentId": "85ffbaf6-75c4-4436-805f-dbe8d279f319",
+    "weekday": 5,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:01.991Z"
+  },
+  {
+    "id": "8f2d01aa-0e45-4838-a03b-861f05f943a0",
+    "studentId": "c81c8204-72c3-4afb-abc4-7d75d28fe195",
+    "weekday": 0,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:02.007Z"
+  },
+  {
+    "id": "91de3f79-08e6-40f2-a87d-ca75e073779b",
+    "studentId": "c81c8204-72c3-4afb-abc4-7d75d28fe195",
+    "weekday": 1,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:02.007Z"
+  },
+  {
+    "id": "53a34259-308b-46ad-a6de-8b8fe35404c9",
+    "studentId": "c81c8204-72c3-4afb-abc4-7d75d28fe195",
+    "weekday": 2,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:02.007Z"
+  },
+  {
+    "id": "bb7a1d77-2e45-40c3-b3db-7809ef9a07ac",
+    "studentId": "c81c8204-72c3-4afb-abc4-7d75d28fe195",
+    "weekday": 3,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:02.007Z"
+  },
+  {
+    "id": "89d8990d-7b43-47cd-9b9c-61c10ef539d3",
+    "studentId": "c81c8204-72c3-4afb-abc4-7d75d28fe195",
+    "weekday": 4,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:02.007Z"
+  },
+  {
+    "id": "166038d1-b901-491d-9ea9-f78c4bad356d",
+    "studentId": "c81c8204-72c3-4afb-abc4-7d75d28fe195",
+    "weekday": 5,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:02.007Z"
+  },
+  {
+    "id": "0afabc6f-2d8f-4545-a5ca-5376a1db59d6",
+    "studentId": "6b84fd88-b936-4fba-a9d6-f7eaa9f211df",
+    "weekday": 0,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:02.021Z"
+  },
+  {
+    "id": "3a823077-69c2-4279-a4e0-73a6bc8d6ec0",
+    "studentId": "6b84fd88-b936-4fba-a9d6-f7eaa9f211df",
+    "weekday": 1,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:02.021Z"
+  },
+  {
+    "id": "49727924-89fd-4f34-a185-5c5b6ae54f35",
+    "studentId": "6b84fd88-b936-4fba-a9d6-f7eaa9f211df",
+    "weekday": 2,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:02.021Z"
+  },
+  {
+    "id": "badbd163-43d3-4835-abbe-3510b10cecb2",
+    "studentId": "6b84fd88-b936-4fba-a9d6-f7eaa9f211df",
+    "weekday": 3,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:02.021Z"
+  },
+  {
+    "id": "d90e9b42-0dee-4c11-b1b1-888eb340a328",
+    "studentId": "6b84fd88-b936-4fba-a9d6-f7eaa9f211df",
+    "weekday": 4,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:02.021Z"
+  },
+  {
+    "id": "aef4b881-1e3a-496c-9864-8ea9f455b64b",
+    "studentId": "6b84fd88-b936-4fba-a9d6-f7eaa9f211df",
+    "weekday": 5,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:02.021Z"
+  },
+  {
+    "id": "39580730-2129-4224-919f-c2d9f10365b4",
+    "studentId": "4a4d8bbd-8278-46e6-866b-3402ad58cdd1",
+    "weekday": 0,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:02.036Z"
+  },
+  {
+    "id": "cfc98fc2-960a-45cb-8282-5387256ac9fa",
+    "studentId": "4a4d8bbd-8278-46e6-866b-3402ad58cdd1",
+    "weekday": 1,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:02.036Z"
+  },
+  {
+    "id": "e8ac27ef-bdbf-4b81-8457-3dc4d4bffc3e",
+    "studentId": "4a4d8bbd-8278-46e6-866b-3402ad58cdd1",
+    "weekday": 2,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:02.036Z"
+  },
+  {
+    "id": "42a61ea6-8096-4891-8408-b4e0e4c3fd86",
+    "studentId": "4a4d8bbd-8278-46e6-866b-3402ad58cdd1",
+    "weekday": 3,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:02.036Z"
+  },
+  {
+    "id": "cecab356-021d-4c21-bade-0d08d98ee900",
+    "studentId": "4a4d8bbd-8278-46e6-866b-3402ad58cdd1",
+    "weekday": 4,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:02.036Z"
+  },
+  {
+    "id": "dab9bbb7-fb9f-4144-bbbc-6c48b3d75740",
+    "studentId": "4a4d8bbd-8278-46e6-866b-3402ad58cdd1",
+    "weekday": 5,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:02.036Z"
+  },
+  {
+    "id": "f07965b2-5668-480a-aa9b-9e24ccdf137a",
+    "studentId": "6611c69e-78a1-4171-aae5-5132c0ebf1c0",
+    "weekday": 0,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:02.050Z"
+  },
+  {
+    "id": "32438bd7-134a-4059-8bca-2b8f2a14db90",
+    "studentId": "6611c69e-78a1-4171-aae5-5132c0ebf1c0",
+    "weekday": 1,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:02.050Z"
+  },
+  {
+    "id": "9d970138-3bd8-4960-9298-bfea00301efd",
+    "studentId": "6611c69e-78a1-4171-aae5-5132c0ebf1c0",
+    "weekday": 2,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:02.050Z"
+  },
+  {
+    "id": "62f1b8f7-572b-4341-887f-13a3f2079235",
+    "studentId": "6611c69e-78a1-4171-aae5-5132c0ebf1c0",
+    "weekday": 3,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:02.050Z"
+  },
+  {
+    "id": "dccb4211-65b1-4986-8020-4eb32f3d76e5",
+    "studentId": "6611c69e-78a1-4171-aae5-5132c0ebf1c0",
+    "weekday": 4,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:02.050Z"
+  },
+  {
+    "id": "a1e58f10-25b9-4117-8895-f1057398103a",
+    "studentId": "6611c69e-78a1-4171-aae5-5132c0ebf1c0",
+    "weekday": 5,
+    "startMin": 480,
+    "endMin": 1200,
+    "createdAt": "2026-11-04T18:02:02.050Z"
+  }
+]

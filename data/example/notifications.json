@@ -1,0 +1,78 @@
+[
+  {
+    "id": "b508cf2c-0ceb-4bc1-b515-9855b38ae9a0",
+    "userId": "d31bad2c-7d7b-4520-84bc-98253bba4320",
+    "type": "plan_approved",
+    "payloadJson": {
+      "body": "برنامه ۱۴۰۵ آبان ۲, شنبه آماده اجراست.",
+      "title": "برنامه هفته تأیید شد",
+      "planId": "6b39e7cf-9703-4d54-8ef9-5919af868653",
+      "weekStart": "2026-10-24"
+    },
+    "readAt": "2026-10-26T14:43:15.779Z",
+    "createdAt": "2026-10-26T14:40:55.152Z"
+  },
+  {
+    "id": "e97ae688-b4cc-4ba6-a59e-582b762621da",
+    "userId": "d31bad2c-7d7b-4520-84bc-98253bba4320",
+    "type": "exam_published",
+    "payloadJson": {
+      "body": "آزمون تست خودکار — 3 سوال، 10 دقیقه",
+      "title": "آزمون جدید زمان‌بندی شد",
+      "examId": "8263b921-7a6d-4004-bc00-ad66b9ae7483",
+      "startAt": "2026-10-26T14:47:00.000Z"
+    },
+    "readAt": null,
+    "createdAt": "2026-10-26T14:44:24.171Z"
+  },
+  {
+    "id": "06888343-3852-4b33-8095-dab3180cb672",
+    "userId": "d31bad2c-7d7b-4520-84bc-98253bba4320",
+    "type": "exam_graded",
+    "payloadJson": {
+      "body": "تصحیح پاسخ‌های کوتاه انجام شد؛ نمره نهایی را ببین.",
+      "title": "کارنامه آزمون به‌روز شد",
+      "examId": "8263b921-7a6d-4004-bc00-ad66b9ae7483"
+    },
+    "readAt": null,
+    "createdAt": "2026-10-26T14:48:42.366Z"
+  },
+  {
+    "id": "3c41c45e-d1e0-4a3c-8f11-5aa8993e5648",
+    "userId": "0bcf74bc-a0c0-43ef-a95d-fb4fbd05b8f2",
+    "type": "exam_graded",
+    "payloadJson": {
+      "body": "تصحیح پاسخ‌های کوتاه انجام شد؛ نمره نهایی را ببین.",
+      "title": "کارنامه آزمون به‌روز شد",
+      "examId": "8263b921-7a6d-4004-bc00-ad66b9ae7483"
+    },
+    "readAt": "2026-10-26T14:51:41.918Z",
+    "createdAt": "2026-10-26T14:49:58.610Z"
+  },
+  {
+    "id": "5c31cdce-7ef7-4c3a-a1d2-b26d3946746d",
+    "userId": "0bcf74bc-a0c0-43ef-a95d-fb4fbd05b8f2",
+    "type": "exam_published",
+    "payloadJson": {
+      "body": "آزمون تحویل خودکار — 1 سوال، 5 دقیقه",
+      "title": "آزمون جدید زمان‌بندی شد",
+      "examId": "ffe89e0f-513d-486b-9acd-b54b8fd7ea53",
+      "startAt": "2026-10-26T14:54:00.000Z"
+    },
+    "readAt": null,
+    "createdAt": "2026-10-26T14:52:55.454Z"
+  },
+  {
+    "id": "e8f4c6b0-0e45-4cdb-8cd4-98d4a1789e16",
+    "userId": "d31bad2c-7d7b-4520-84bc-98253bba4320",
+    "type": "plan_approved",
+    "payloadJson": {
+      "body": "برنامه ۱۴۰۵ آبان ۹, شنبه آماده اجراست.",
+      "title": "برنامه هفته تأیید شد",
+      "planId": "25f7bdb8-b5f5-42cb-bb76-db5787eabc5c",
+      "weekStart": "2026-10-31"
+    },
+    "readAt": null,
+    "createdAt": "2026-11-04T15:59:50.313Z"
+  }
+]

@@ -7,7 +7,7 @@ import type { NotificationItem } from "@/lib/notifications";
 function notificationLink(item: NotificationItem): string | null {
   const payload = item.payload ?? {};
   if (item.type === "plan_approved" && typeof payload.weekStart === "string") {
-    return `/student/week?week=${payload.weekStart}`;
+    return `/student/panel?week=${payload.weekStart}`;
   }
   if (item.type === "exam_published" && typeof payload.examId === "string") {
     return `/student/exams`;

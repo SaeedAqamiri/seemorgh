@@ -267,6 +267,23 @@ CREATE TABLE IF NOT EXISTS exam_answers (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS exam_answers_unique ON exam_answers(attempt_id, question_id);
 
+CREATE TABLE IF NOT EXISTS external_exams (
+  id text PRIMARY KEY,
+  workspace_id text NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  student_id text NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  title text NOT NULL,
+  exam_date text NOT NULL,
+  exam_type text NOT NULL DEFAULT 'external',
+  provider text NOT NULL DEFAULT '',
+  subjects_json jsonb,
+  overall_percent integer NOT NULL DEFAULT 0,
+  note text NOT NULL DEFAULT '',
+  created_by text REFERENCES users(id) ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS external_exams_student_idx ON external_exams(student_id, exam_date);
+CREATE UNIQUE INDEX IF NOT EXISTS external_exams_student_title_date_unique ON external_exams(student_id, title, exam_date);
+
 CREATE TABLE IF NOT EXISTS notifications (
   id text PRIMARY KEY,
   user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,

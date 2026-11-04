@@ -1,0 +1,46 @@
+[
+  {
+    "id": "e79af201-66a1-415f-9409-480e7c8299e3",
+    "studentId": "e144309c-7ce2-4ef8-af19-9f05e029590e",
+    "weekStart": "2026-10-24",
+    "status": "approved",
+    "version": 1,
+    "warningsJson": null,
+    "aiRunId": null,
+    "createdAt": "2026-11-04T15:25:37.183Z",
+    "approvedAt": "2026-11-04T16:00:33.954Z"
+  },
+  {
+    "id": "25f7bdb8-b5f5-42cb-bb76-db5787eabc5c",
+    "studentId": "e144309c-7ce2-4ef8-af19-9f05e029590e",
+    "weekStart": "2026-10-31",
+    "status": "approved",
+    "version": 2,
+    "warningsJson": [],
+    "aiRunId": null,
+    "createdAt": "2026-11-04T15:25:37.228Z",
+    "approvedAt": "2026-11-04T16:00:33.986Z"
+  },
+  {
+    "id": "89545c98-6ed6-4127-a321-96f2a33be94a",
+    "studentId": "81d7da38-1b28-4a30-9f2d-2ee4c3262315",
+    "weekStart": "2026-10-24",
+    "status": "approved",
+    "version": 1,
+    "warningsJson": null,
+    "aiRunId": null,
+    "createdAt": "2026-11-04T15:25:37.266Z",
+    "approvedAt": "2026-11-04T16:00:34.010Z"
+  },
+  {
+    "id": "c9751197-47b1-42a3-832f-76b931b72c06",
+    "studentId": "81d7da38-1b28-4a30-9f2d-2ee4c3262315",
+    "weekStart": "2026-10-31",
+    "status": "approved",
+    "version": 1,
+    "warningsJson": null,
+    "aiRunId": null,
+    "createdAt": "2026-11-04T15:25:37.308Z",
+    "approvedAt": "2026-11-04T16:00:34.035Z"
+  }
+]

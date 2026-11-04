@@ -1,11 +1,4 @@
 import Link from "next/link";
-import {
-  finishTaskAction,
-  saveDailyLogAction,
-  skipTaskAction,
-  startTaskAction,
-} from "@/app/actions/student";
-import { SubmitButton } from "@/components/submit-button";
 import { ContentCard } from "@/components/content-card";
 import { requireStudent } from "@/lib/auth";
 import {
@@ -18,13 +11,6 @@ import {
 } from "@/lib/dates";
 import { getStudentTodayData, summarizeWeek } from "@/lib/student";
 
-const SUCCESS: Record<string, string> = {
-  started: "شروع ثبت شد. موفق باشی!",
-  done: "آفرین، تسک انجام شد.",
-  skipped: "تسک رد شد.",
-  log: "حال امروز ذخیره شد.",
-};
-
 const TYPE_LABELS = {
   study: "مطالعه",
   review: "مرور",
@@ -34,10 +20,10 @@ const TYPE_LABELS = {
 export default async function StudentHomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ success?: string; error?: string }>;
+  searchParams: Promise<{ error?: string }>;
 }) {
   const { user, student } = await requireStudent();
-  const { success, error } = await searchParams;
+  const { error } = await searchParams;
   const data = await getStudentTodayData(student.id);
   const week = summarizeWeek(data.weekTasks, data.weekStart);
   const doneToday = data.tasks.filter((task) => task.status === "done").length;
@@ -67,7 +53,6 @@ export default async function StudentHomePage({
         </p>
       </div>
 
-      {success && SUCCESS[success] ? <div className="alert alert-success">{SUCCESS[success]}</div> : null}
       {error ? <div className="alert alert-error">{error}</div> : null}
 
       {lateStart ? (
@@ -123,8 +108,8 @@ export default async function StudentHomePage({
         <div className="card empty">
           <p>امروز تسکی نداری.</p>
           <p className="muted">روز تعطیل یا استراحت است؛ فردا ادامه بده.</p>
-          <Link href="/student/week" className="btn btn-secondary btn-sm">
-            دیدن برنامه هفته
+          <Link href="/student/panel" className="btn btn-secondary btn-sm">
+            دیدن برنامه‌ریزی
           </Link>
         </div>
       ) : (
@@ -197,95 +182,22 @@ export default async function StudentHomePage({
                     </details>
                   ) : null}
                 </div>
-                <div className="stack" style={{ gap: "0.3rem", alignItems: "flex-end" }}>
-                  {task.status === "pending" ? (
-                    <>
-                      {!task.actualStartedAt ? (
-                        <form action={startTaskAction}>
-                          <input type="hidden" name="taskId" value={task.id} />
-                          <SubmitButton className="btn-sm" pendingLabel="…">
-                            شروع
-                          </SubmitButton>
-                        </form>
-                      ) : null}
-                      <details>
-                        <summary className="btn btn-secondary btn-sm" style={{ cursor: "pointer" }}>
-                          پایان
-                        </summary>
-                        <form action={finishTaskAction} className="stack" style={{ marginTop: "0.4rem", minWidth: "200px" }}>
-                          <input type="hidden" name="taskId" value={task.id} />
-                          <div className="field">
-                            <label>
-                              {task.resourceUnitType === "page"
-                                ? "چند صفحه خواندی؟"
-                                : task.resourceUnitType === "test"
-                                  ? "چند تست زدی؟"
-                                  : "واحد انجام‌شده"}
-                            </label>
-                            <input
-                              name="actualUnits"
-                              type="number"
-                              min={0}
-                              defaultValue={task.targetUnits}
-                            />
-                          </div>
-                          <div className="field">
-                            <label>یادداشت (اختیاری)</label>
-                            <input name="note" />
-                          </div>
-                          <SubmitButton className="btn-sm">ثبت انجام</SubmitButton>
-                        </form>
-                      </details>
-                      <form action={skipTaskAction}>
-                        <input type="hidden" name="taskId" value={task.id} />
-                        <SubmitButton className="btn-ghost btn-sm" pendingLabel="…">
-                          رد کردن
-                        </SubmitButton>
-                      </form>
-                    </>
-                  ) : null}
-                </div>
+                <span
+                  className={`badge ${
+                    task.status === "done"
+                      ? "badge-green"
+                      : task.status === "skipped"
+                        ? "badge-warn"
+                        : ""
+                  }`}
+                >
+                  {task.status === "done" ? "انجام شد" : task.status === "skipped" ? "رد شد" : "در انتظار"}
+                </span>
               </div>
             ))}
           </div>
         </>
       )}
-
-      <div className="card">
-        <div className="section-head">
-          <h2>حال امروز</h2>
-          <small>اختیاری</small>
-        </div>
-        <form action={saveDailyLogAction} className="stack">
-          <div className="row">
-            <div className="field" style={{ flex: 1 }}>
-              <label>روحیه</label>
-              <select name="mood" defaultValue={String(data.log?.mood ?? 3)}>
-                {[1, 2, 3, 4, 5].map((value) => (
-                  <option key={value} value={value}>
-                    {value === 1 ? "خیلی کم" : value === 5 ? "عالی" : value}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="field" style={{ flex: 1 }}>
-              <label>انرژی</label>
-              <select name="energy" defaultValue={String(data.log?.energy ?? 3)}>
-                {[1, 2, 3, 4, 5].map((value) => (
-                  <option key={value} value={value}>
-                    {value === 1 ? "خیلی کم" : value === 5 ? "عالی" : value}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div className="field">
-            <label>یادداشت</label>
-            <textarea name="note" defaultValue={data.log?.note ?? ""} rows={2} />
-          </div>
-          <SubmitButton className="btn-secondary">ذخیره</SubmitButton>
-        </form>
-      </div>
     </div>
   );
 }

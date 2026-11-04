@@ -479,6 +479,46 @@ export const examAnswers = pgTable(
 );
 
 
+export type ExamSubjectScore = {
+  subjectId: string | null;
+  subjectTitle: string;
+  percent: number;
+  correct?: number;
+  wrong?: number;
+  blank?: number;
+  total?: number;
+};
+
+export const externalExams = pgTable(
+  "external_exams",
+  {
+    id: id(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    studentId: text("student_id")
+      .notNull()
+      .references(() => students.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    examDate: text("exam_date").notNull(),
+    examType: text("exam_type").notNull().default("external"),
+    provider: text("provider").notNull().default(""),
+    subjectsJson: jsonb("subjects_json").$type<ExamSubjectScore[]>(),
+    overallPercent: integer("overall_percent").notNull().default(0),
+    note: text("note").notNull().default(""),
+    createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index("external_exams_student_idx").on(table.studentId, table.examDate),
+    uniqueIndex("external_exams_student_title_date_unique").on(
+      table.studentId,
+      table.title,
+      table.examDate,
+    ),
+  ],
+);
+
 export const notifications = pgTable(
   "notifications",
   {
@@ -595,3 +635,4 @@ export type WeeklyPanel = typeof weeklyPanels.$inferSelect;
 export type PerformancePanel = typeof performancePanels.$inferSelect;
 export type Question = typeof questions.$inferSelect;
 export type Exam = typeof exams.$inferSelect;
+export type ExternalExam = typeof externalExams.$inferSelect;

@@ -1,0 +1,122 @@
+[
+  {
+    "studentId": "e144309c-7ce2-4ef8-af19-9f05e029590e",
+    "maxDailyMinutes": 720,
+    "restWeekday": 6,
+    "bufferPct": 0
+  },
+  {
+    "studentId": "81d7da38-1b28-4a30-9f2d-2ee4c3262315",
+    "maxDailyMinutes": 720,
+    "restWeekday": 6,
+    "bufferPct": 0
+  },
+  {
+    "studentId": "a30df639-0844-4ba5-932e-62a245464d26",
+    "maxDailyMinutes": 720,
+    "restWeekday": 6,
+    "bufferPct": 0
+  },
+  {
+    "studentId": "426b2efb-26d4-461a-99f7-f2816df6ee5f",
+    "maxDailyMinutes": 720,
+    "restWeekday": 6,
+    "bufferPct": 0
+  },
+  {
+    "studentId": "2baeb669-dbb2-4552-b16d-80115a030498",
+    "maxDailyMinutes": 720,
+    "restWeekday": 6,
+    "bufferPct": 0
+  },
+  {
+    "studentId": "deb618bc-d0fc-4623-a4e5-5d4f5f547f35",
+    "maxDailyMinutes": 720,
+    "restWeekday": 6,
+    "bufferPct": 0
+  },
+  {
+    "studentId": "78a83dfb-ec97-4c58-944d-866fbec9ede3",
+    "maxDailyMinutes": 720,
+    "restWeekday": 6,
+    "bufferPct": 0
+  },
+  {
+    "studentId": "31b116f9-291d-46a7-af53-8b2bfa179b95",
+    "maxDailyMinutes": 720,
+    "restWeekday": 6,
+    "bufferPct": 0
+  },
+  {
+    "studentId": "ee288e78-4359-426d-8b44-adbd5420ae65",
+    "maxDailyMinutes": 720,
+    "restWeekday": 6,
+    "bufferPct": 0
+  },
+  {
+    "studentId": "9b6f4084-2739-43e5-a959-f39d4978e269",
+    "maxDailyMinutes": 720,
+    "restWeekday": 6,
+    "bufferPct": 0
+  },
+  {
+    "studentId": "3cb58510-a785-471c-9537-cc8807972b3a",
+    "maxDailyMinutes": 720,
+    "restWeekday": 6,
+    "bufferPct": 0
+  },
+  {
+    "studentId": "8a24adbc-8966-441c-88f3-093cb116885e",
+    "maxDailyMinutes": 720,
+    "restWeekday": 6,
+    "bufferPct": 0
+  },
+  {
+    "studentId": "8488b0e8-1e85-436a-a853-bb9070db2221",
+    "maxDailyMinutes": 720,
+    "restWeekday": 6,
+    "bufferPct": 0
+  },
+  {
+    "studentId": "e4491984-7dea-4656-9f0c-a172ddb56faf",
+    "maxDailyMinutes": 720,
+    "restWeekday": 6,
+    "bufferPct": 0
+  },
+  {
+    "studentId": "ea5fd15a-b849-46b5-8394-d830db581f21",
+    "maxDailyMinutes": 720,
+    "restWeekday": 6,
+    "bufferPct": 0
+  },
+  {
+    "studentId": "85ffbaf6-75c4-4436-805f-dbe8d279f319",
+    "maxDailyMinutes": 720,
+    "restWeekday": 6,
+    "bufferPct": 0
+  },
+  {
+    "studentId": "c81c8204-72c3-4afb-abc4-7d75d28fe195",
+    "maxDailyMinutes": 720,
+    "restWeekday": 6,
+    "bufferPct": 0
+  },
+  {
+    "studentId": "6b84fd88-b936-4fba-a9d6-f7eaa9f211df",
+    "maxDailyMinutes": 720,
+    "restWeekday": 6,
+    "bufferPct": 0
+  },
+  {
+    "studentId": "4a4d8bbd-8278-46e6-866b-3402ad58cdd1",
+    "maxDailyMinutes": 720,
+    "restWeekday": 6,
+    "bufferPct": 0
+  },
+  {
+    "studentId": "6611c69e-78a1-4171-aae5-5132c0ebf1c0",
+    "maxDailyMinutes": 720,
+    "restWeekday": 6,
+    "bufferPct": 0
+  }
+]

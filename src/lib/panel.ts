@@ -19,7 +19,8 @@ export const PANEL_SLOTS = [
   { startMin: 600, endMin: 720 },
   { startMin: 720, endMin: 840 },
   { startMin: 840, endMin: 960 },
-  { startMin: 960, endMin: 1200 },
+  { startMin: 960, endMin: 1080 },
+  { startMin: 1080, endMin: 1200 },
 ] as const;
 
 export type PanelSlot = (typeof PANEL_SLOTS)[number];

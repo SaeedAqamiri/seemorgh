@@ -1,0 +1,272 @@
+[
+  {
+    "id": "23acf64b-84bb-4e69-8363-158a9a071aca",
+    "workspaceId": "c664b088-1db1-4c52-91c6-c0cbd117a15c",
+    "actorId": "73b87269-17ae-4edc-99fb-0d39fab16c5b",
+    "action": "plan.reopen",
+    "entity": "plan",
+    "entityId": "6b39e7cf-9703-4d54-8ef9-5919af868653",
+    "diffJson": null,
+    "createdAt": "2026-10-26T14:39:53.658Z"
+  },
+  {
+    "id": "543a4542-50a9-496b-bcb3-3748535f21ee",
+    "workspaceId": "c664b088-1db1-4c52-91c6-c0cbd117a15c",
+    "actorId": "73b87269-17ae-4edc-99fb-0d39fab16c5b",
+    "action": "plan.task.update",
+    "entity": "task",
+    "entityId": "a090cda2-e333-43c4-8d43-373ee11d033a",
+    "diffJson": {
+      "note": "",
+      "topic": "زیست دوازدهم — تست",
+      "plannedEnd": 1150,
+      "plannedStart": 1090
+    },
+    "createdAt": "2026-10-26T14:40:17.590Z"
+  },
+  {
+    "id": "31546622-06b5-4ea5-af0c-f63f6344f07a",
+    "workspaceId": "c664b088-1db1-4c52-91c6-c0cbd117a15c",
+    "actorId": "73b87269-17ae-4edc-99fb-0d39fab16c5b",
+    "action": "plan.task.update",
+    "entity": "task",
+    "entityId": "f35a9285-26a9-47ee-b3c4-297553bab748",
+    "diffJson": {
+      "note": "",
+      "topic": "ریاضی تجربی — تست",
+      "plannedEnd": 1125,
+      "plannedStart": 1085
+    },
+    "createdAt": "2026-10-26T14:40:46.290Z"
+  },
+  {
+    "id": "46826742-b3bb-4c8d-a5f8-27f546cc75c7",
+    "workspaceId": "c664b088-1db1-4c52-91c6-c0cbd117a15c",
+    "actorId": "73b87269-17ae-4edc-99fb-0d39fab16c5b",
+    "action": "plan.approve",
+    "entity": "plan",
+    "entityId": "6b39e7cf-9703-4d54-8ef9-5919af868653",
+    "diffJson": {
+      "version": 1,
+      "weekStart": "2026-10-24"
+    },
+    "createdAt": "2026-10-26T14:40:55.149Z"
+  },
+  {
+    "id": "86e79d6e-2047-4573-a4ae-30c67be2b005",
+    "workspaceId": "c664b088-1db1-4c52-91c6-c0cbd117a15c",
+    "actorId": "73b87269-17ae-4edc-99fb-0d39fab16c5b",
+    "action": "report.narrative",
+    "entity": "report",
+    "entityId": "e144309c-7ce2-4ef8-af19-9f05e029590e",
+    "diffJson": {
+      "to": "2026-11-21",
+      "from": "2026-10-23",
+      "period": "month",
+      "source": "fallback-or-ai"
+    },
+    "createdAt": "2026-10-26T14:43:44.508Z"
+  },
+  {
+    "id": "cb10b5f1-54ad-47e9-951d-2cc3f5f1e477",
+    "workspaceId": "c664b088-1db1-4c52-91c6-c0cbd117a15c",
+    "actorId": "73b87269-17ae-4edc-99fb-0d39fab16c5b",
+    "action": "exam.publish",
+    "entity": "exam",
+    "entityId": "8263b921-7a6d-4004-bc00-ad66b9ae7483",
+    "diffJson": {
+      "questions": 3,
+      "totalScore": 4
+    },
+    "createdAt": "2026-10-26T14:44:24.175Z"
+  },
+  {
+    "id": "284292ae-753e-4e19-a022-3d7a595babf2",
+    "workspaceId": "c664b088-1db1-4c52-91c6-c0cbd117a15c",
+    "actorId": "d31bad2c-7d7b-4520-84bc-98253bba4320",
+    "action": "exam.start",
+    "entity": "exam_attempt",
+    "entityId": "e94d7c84-0c8a-4e90-9a9c-29dcd381e004",
+    "diffJson": {
+      "examId": "8263b921-7a6d-4004-bc00-ad66b9ae7483",
+      "deadlineAt": "2026-10-26T14:57:00.000Z"
+    },
+    "createdAt": "2026-10-26T14:47:25.241Z"
+  },
+  {
+    "id": "a4a39489-a87f-4fe3-9571-6ff70521d3d9",
+    "workspaceId": "c664b088-1db1-4c52-91c6-c0cbd117a15c",
+    "actorId": "d31bad2c-7d7b-4520-84bc-98253bba4320",
+    "action": "exam.submit",
+    "entity": "exam_attempt",
+    "entityId": "e94d7c84-0c8a-4e90-9a9c-29dcd381e004",
+    "diffJson": {
+      "auto": false,
+      "examId": "8263b921-7a6d-4004-bc00-ad66b9ae7483"
+    },
+    "createdAt": "2026-10-26T14:47:51.907Z"
+  },
+  {
+    "id": "8309337b-2d17-47b3-9a68-f954951a0def",
+    "workspaceId": "c664b088-1db1-4c52-91c6-c0cbd117a15c",
+    "actorId": "73b87269-17ae-4edc-99fb-0d39fab16c5b",
+    "action": "exam.grade",
+    "entity": "exam_answer",
+    "entityId": "583d1d05-e532-48c4-b297-7b4e003ba33e",
+    "diffJson": {
+      "max": 2,
+      "score": 2,
+      "feedback": "پاسخ کامل و درست"
+    },
+    "createdAt": "2026-10-26T14:48:42.364Z"
+  },
+  {
+    "id": "36054cb4-8223-4648-9c75-96d193fee3b9",
+    "workspaceId": "c664b088-1db1-4c52-91c6-c0cbd117a15c",
+    "actorId": "0bcf74bc-a0c0-43ef-a95d-fb4fbd05b8f2",
+    "action": "exam.start",
+    "entity": "exam_attempt",
+    "entityId": "5e22fb14-3f27-467d-9ac3-4d02cc7dc7be",
+    "diffJson": {
+      "examId": "8263b921-7a6d-4004-bc00-ad66b9ae7483",
+      "deadlineAt": "2026-10-26T14:57:00.000Z"
+    },
+    "createdAt": "2026-10-26T14:49:08.504Z"
+  },
+  {
+    "id": "240d904e-76c4-406f-afd5-04dc750f41b3",
+    "workspaceId": "c664b088-1db1-4c52-91c6-c0cbd117a15c",
+    "actorId": "0bcf74bc-a0c0-43ef-a95d-fb4fbd05b8f2",
+    "action": "exam.submit",
+    "entity": "exam_attempt",
+    "entityId": "5e22fb14-3f27-467d-9ac3-4d02cc7dc7be",
+    "diffJson": {
+      "auto": false,
+      "examId": "8263b921-7a6d-4004-bc00-ad66b9ae7483"
+    },
+    "createdAt": "2026-10-26T14:49:20.936Z"
+  },
+  {
+    "id": "16a240ab-23b5-4a8b-a16a-8bb2c9946387",
+    "workspaceId": "c664b088-1db1-4c52-91c6-c0cbd117a15c",
+    "actorId": "73b87269-17ae-4edc-99fb-0d39fab16c5b",
+    "action": "exam.grade",
+    "entity": "exam_answer",
+    "entityId": "b8009618-2c4e-4807-b42a-b67a67430ddc",
+    "diffJson": {
+      "max": 2,
+      "score": 2,
+      "feedback": "درست است"
+    },
+    "createdAt": "2026-10-26T14:49:58.609Z"
+  },
+  {
+    "id": "58a661be-754f-4df8-9523-933fcb51f22b",
+    "workspaceId": "c664b088-1db1-4c52-91c6-c0cbd117a15c",
+    "actorId": "73b87269-17ae-4edc-99fb-0d39fab16c5b",
+    "action": "plan.generate",
+    "entity": "plan",
+    "entityId": "6d421e10-d083-454c-92ce-76bc5bb2c56d",
+    "diffJson": {
+      "tasks": 19,
+      "aiRunId": null,
+      "warnings": [],
+      "weekStart": "2026-10-31"
+    },
+    "createdAt": "2026-10-26T14:50:16.350Z"
+  },
+  {
+    "id": "bdd9d171-3efb-46ad-81f1-4ab0a0020377",
+    "workspaceId": "c664b088-1db1-4c52-91c6-c0cbd117a15c",
+    "actorId": "73b87269-17ae-4edc-99fb-0d39fab16c5b",
+    "action": "exam.publish",
+    "entity": "exam",
+    "entityId": "ffe89e0f-513d-486b-9acd-b54b8fd7ea53",
+    "diffJson": {
+      "questions": 1,
+      "totalScore": 1
+    },
+    "createdAt": "2026-10-26T14:52:55.454Z"
+  },
+  {
+    "id": "7ba27f47-fbb1-4687-ae71-7df05f1a20e1",
+    "workspaceId": "c664b088-1db1-4c52-91c6-c0cbd117a15c",
+    "actorId": "0bcf74bc-a0c0-43ef-a95d-fb4fbd05b8f2",
+    "action": "exam.start",
+    "entity": "exam_attempt",
+    "entityId": "972f490a-5572-499d-9978-b4527732f8d1",
+    "diffJson": {
+      "examId": "ffe89e0f-513d-486b-9acd-b54b8fd7ea53",
+      "deadlineAt": "2026-10-26T14:59:00.000Z"
+    },
+    "createdAt": "2026-10-26T14:54:19.925Z"
+  },
+  {
+    "id": "66318b03-b634-4155-8fbc-0faad278c5a3",
+    "workspaceId": "c664b088-1db1-4c52-91c6-c0cbd117a15c",
+    "actorId": "0bcf74bc-a0c0-43ef-a95d-fb4fbd05b8f2",
+    "action": "exam.submit",
+    "entity": "exam_attempt",
+    "entityId": "972f490a-5572-499d-9978-b4527732f8d1",
+    "diffJson": {
+      "auto": false,
+      "examId": "ffe89e0f-513d-486b-9acd-b54b8fd7ea53"
+    },
+    "createdAt": "2026-10-26T14:59:01.089Z"
+  },
+  {
+    "id": "3043df57-49c6-473e-ade8-ab79ac0e0b34",
+    "workspaceId": "c664b088-1db1-4c52-91c6-c0cbd117a15c",
+    "actorId": "73b87269-17ae-4edc-99fb-0d39fab16c5b",
+    "action": "plan.generate",
+    "entity": "plan",
+    "entityId": "e92ff372-be06-47eb-9265-f003714271c2",
+    "diffJson": {
+      "tasks": 21,
+      "aiRunId": "197ca7ca-58dc-42c3-890e-c7e0a0fead22",
+      "warnings": [
+        "خروجی AI اعمال نشد (error)؛ برنامه قطعی ساخته شد."
+      ],
+      "weekStart": "2026-11-07"
+    },
+    "createdAt": "2026-10-28T08:28:54.268Z"
+  },
+  {
+    "id": "ecdedda4-21db-49b1-b838-9173406636fe",
+    "workspaceId": "c664b088-1db1-4c52-91c6-c0cbd117a15c",
+    "actorId": "73b87269-17ae-4edc-99fb-0d39fab16c5b",
+    "action": "plan.reopen",
+    "entity": "plan",
+    "entityId": "25f7bdb8-b5f5-42cb-bb76-db5787eabc5c",
+    "diffJson": null,
+    "createdAt": "2026-11-04T15:48:16.311Z"
+  },
+  {
+    "id": "20bd8b13-90f3-43be-8ed9-2015c0136b1a",
+    "workspaceId": "c664b088-1db1-4c52-91c6-c0cbd117a15c",
+    "actorId": "73b87269-17ae-4edc-99fb-0d39fab16c5b",
+    "action": "plan.generate",
+    "entity": "plan",
+    "entityId": "25f7bdb8-b5f5-42cb-bb76-db5787eabc5c",
+    "diffJson": {
+      "tasks": 67,
+      "aiRunId": null,
+      "warnings": [],
+      "weekStart": "2026-10-31"
+    },
+    "createdAt": "2026-11-04T15:48:21.037Z"
+  },
+  {
+    "id": "1982fb89-0892-4634-8a25-bb657ec7141b",
+    "workspaceId": "c664b088-1db1-4c52-91c6-c0cbd117a15c",
+    "actorId": "73b87269-17ae-4edc-99fb-0d39fab16c5b",
+    "action": "plan.approve",
+    "entity": "plan",
+    "entityId": "25f7bdb8-b5f5-42cb-bb76-db5787eabc5c",
+    "diffJson": {
+      "version": 2,
+      "weekStart": "2026-10-31"
+    },
+    "createdAt": "2026-11-04T15:59:50.311Z"
+  }
+]
