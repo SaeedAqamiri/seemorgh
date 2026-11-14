@@ -120,6 +120,11 @@ export const subjects = pgTable(
     title: text("title").notNull(),
     grade: text("grade"),
     field: text("field"),
+    kind: text("kind", { enum: ["general", "specialized", "both"] })
+      .notNull()
+      .default("general"),
+    fieldsJson: jsonb("fields_json").$type<string[]>(),
+    color: text("color").notNull().default("#1f6f4a"),
     weight: integer("weight").notNull().default(3),
     createdAt: createdAt(),
   },
@@ -131,6 +136,8 @@ export type ResourceChapter = {
   pages: number;
   startPage: number;
   endPage: number;
+  testCount?: number;
+  exerciseCount?: number;
 };
 
 export const resources = pgTable(
@@ -157,6 +164,93 @@ export const resources = pgTable(
     createdAt: createdAt(),
   },
   (table) => [index("resources_student_idx").on(table.studentId)],
+);
+
+export const resourceChapters = pgTable(
+  "resource_chapters",
+  {
+    id: id(),
+    resourceId: text("resource_id")
+      .notNull()
+      .references(() => resources.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    sortIndex: integer("sort_index").notNull().default(0),
+    pageStart: integer("page_start"),
+    pageEnd: integer("page_end"),
+    pages: integer("pages").notNull().default(0),
+    completedPages: integer("completed_pages").notNull().default(0),
+    testCount: integer("test_count").notNull().default(0),
+    completedTests: integer("completed_tests").notNull().default(0),
+    exerciseCount: integer("exercise_count").notNull().default(0),
+    completedExercises: integer("completed_exercises").notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (table) => [index("resource_chapters_resource_idx").on(table.resourceId)],
+);
+
+export const resourcePool = pgTable(
+  "resource_pool",
+  {
+    id: id(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    subjectId: text("subject_id")
+      .notNull()
+      .references(() => subjects.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    publisher: text("publisher").notNull().default(""),
+    grade: text("grade").notNull().default(""),
+    unitType: text("unit_type", { enum: ["test", "page", "chapter"] })
+      .notNull()
+      .default("test"),
+    totalUnits: integer("total_units").notNull().default(0),
+    priority: integer("priority").notNull().default(3),
+    createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("resource_pool_workspace_subject_title_unique").on(
+      table.workspaceId,
+      table.subjectId,
+      table.title,
+    ),
+    index("resource_pool_workspace_idx").on(table.workspaceId),
+  ],
+);
+
+export const resourcePoolChapters = pgTable(
+  "resource_pool_chapters",
+  {
+    id: id(),
+    poolId: text("pool_id")
+      .notNull()
+      .references(() => resourcePool.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    sortIndex: integer("sort_index").notNull().default(0),
+    pageStart: integer("page_start"),
+    pageEnd: integer("page_end"),
+    pages: integer("pages").notNull().default(0),
+    testCount: integer("test_count").notNull().default(0),
+    exerciseCount: integer("exercise_count").notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (table) => [index("resource_pool_chapters_pool_idx").on(table.poolId)],
+);
+
+export const bellSchedules = pgTable(
+  "bell_schedules",
+  {
+    id: id(),
+    studentId: text("student_id")
+      .notNull()
+      .references(() => students.id, { onDelete: "cascade" }),
+    slotIndex: integer("slot_index").notNull(),
+    startMin: integer("start_min").notNull(),
+    endMin: integer("end_min").notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [uniqueIndex("bell_schedules_student_slot_unique").on(table.studentId, table.slotIndex)],
 );
 
 export const availability = pgTable(
@@ -186,11 +280,46 @@ export const studentConstraints = pgTable(
   },
 );
 
+export type PanelActionKind =
+  | "empty"
+  | "rest"
+  | "study"
+  | "review"
+  | "test"
+  | "timedTest"
+  | "exercise"
+  | "routine";
+
+type PanelTextAction = {
+  kind: "study" | "review";
+  subjectId: string;
+  resourceText: string;
+};
+
+type PanelCountAction = {
+  kind: "test" | "timedTest" | "exercise";
+  subjectId: string;
+  resourceId: string | null;
+  chapterId: string | null;
+  count: number;
+};
+
+type PanelRoutineAction = {
+  kind: "routine";
+  routineMode: "study" | "test";
+  subjectId: string;
+  resourceText: string;
+  resourceId: string | null;
+  chapterId: string | null;
+  count: number;
+};
+
 export type PanelCellJson =
   | { kind: "empty" }
   | { kind: "rest" }
-  | { kind: "review"; subjectId: string }
-  | { kind: "test"; subjectId: string; resourceId: string | null; count: number };
+  | PanelTextAction
+  | PanelCountAction
+  | PanelRoutineAction;
 
 export type WeeklyGridJson = PanelCellJson[][];
 
@@ -215,19 +344,28 @@ export const weeklyPanels = pgTable(
   ],
 );
 
+type PerformanceTimes = { minutes: number; note: string };
+
 export type PerformanceCellJson =
   | { kind: "empty" }
   | { kind: "rest" }
-  | { kind: "review"; subjectId: string; startMin: number; endMin: number; note: string }
-  | {
-      kind: "practice";
+  | ({ kind: "study" | "review"; subjectId: string; resourceText: string } & PerformanceTimes)
+  | ({
+      kind: "test" | "timedTest" | "exercise";
       subjectId: string;
       resourceId: string | null;
+      chapterId: string | null;
       count: number;
-      startMin: number;
-      endMin: number;
-      note: string;
-    };
+    } & PerformanceTimes)
+  | ({
+      kind: "routine";
+      routineMode: "study" | "test";
+      subjectId: string;
+      resourceText: string;
+      resourceId: string | null;
+      chapterId: string | null;
+      count: number;
+    } & PerformanceTimes);
 
 export type PerformanceGridJson = PerformanceCellJson[][];
 
@@ -289,10 +427,14 @@ export const tasks = pgTable(
       .notNull()
       .references(() => subjects.id, { onDelete: "cascade" }),
     resourceId: text("resource_id").references(() => resources.id, { onDelete: "set null" }),
+    chapterId: text("chapter_id").references(() => resourceChapters.id, { onDelete: "set null" }),
+    resourceText: text("resource_text").notNull().default(""),
     topic: text("topic").notNull().default(""),
-    type: text("type", { enum: ["study", "review", "test"] })
+    type: text("type", { enum: ["study", "review", "test", "timed_test", "exercise"] })
       .notNull()
       .default("study"),
+    actionKind: text("action_kind").notNull().default("study"),
+    routineMode: text("routine_mode", { enum: ["study", "test"] }),
     targetUnits: integer("target_units").notNull().default(0),
     estMinutes: integer("est_minutes").notNull(),
     status: text("status", { enum: ["pending", "done", "skipped"] })
@@ -322,6 +464,8 @@ export const dailyLogs = pgTable(
     energy: integer("energy"),
     note: text("note").notNull().default(""),
     firstStartedAt: timestamp("first_started_at", { withTimezone: true, mode: "date" }),
+    firstOpenedAt: timestamp("first_opened_at", { withTimezone: true, mode: "date" }),
+    challengeCompletedAt: timestamp("challenge_completed_at", { withTimezone: true, mode: "date" }),
     createdAt: createdAt(),
   },
   (table) => [uniqueIndex("daily_logs_student_date_unique").on(table.studentId, table.logDate)],
@@ -627,6 +771,10 @@ export type User = typeof users.$inferSelect;
 export type Student = typeof students.$inferSelect;
 export type Subject = typeof subjects.$inferSelect;
 export type Resource = typeof resources.$inferSelect;
+export type ResourceChapterRow = typeof resourceChapters.$inferSelect;
+export type ResourcePoolBook = typeof resourcePool.$inferSelect;
+export type ResourcePoolChapter = typeof resourcePoolChapters.$inferSelect;
+export type BellSchedule = typeof bellSchedules.$inferSelect;
 export type Availability = typeof availability.$inferSelect;
 export type StudentConstraints = typeof studentConstraints.$inferSelect;
 export type Plan = typeof plans.$inferSelect;

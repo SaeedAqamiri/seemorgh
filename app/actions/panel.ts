@@ -8,15 +8,16 @@ import { students } from "@/db/schema";
 import { getSessionUser } from "@/lib/auth";
 import { startOfWeekSaturday } from "@/lib/dates";
 import { PanelValidationError, saveWeeklyPanel } from "@/lib/panel";
+import { saveBellSlots, ScheduleValidationError } from "@/lib/schedule";
 
 function field(form: FormData, name: string): string {
   return String(form.get(name) ?? "").trim();
 }
 
 function panelPath(role: "counselor" | "student", studentId: string, week: string, suffix = ""): string {
-  return role === "counselor"
-    ? `/counselor/students/${studentId}/panel?week=${week}${suffix}`
-    : `/student/panel?week=${week}${suffix}`;
+  const base =
+    role === "counselor" ? `/counselor/students/${studentId}/panel` : "/student/panel";
+  return `${base}${week ? `?week=${week}` : ""}${suffix}`;
 }
 
 export async function saveWeeklyPanelAction(formData: FormData): Promise<void> {
@@ -73,5 +74,57 @@ export async function saveWeeklyPanelAction(formData: FormData): Promise<void> {
     revalidatePath(`/counselor/students/${studentId}`);
   }
   revalidatePath("/student");
+  redirect(panelPath(user.role, studentId, weekStart, "&success=saved"));
+}
+
+export async function saveBellSlotsAction(formData: FormData): Promise<void> {
+  const user = await getSessionUser();
+  if (!user) redirect("/login");
+
+  let studentId = field(formData, "studentId");
+
+  if (user.role === "student") {
+    const db = await getDb();
+    const [own] = await db
+      .select({ id: students.id })
+      .from(students)
+      .where(and(eq(students.userId, user.id), eq(students.workspaceId, user.workspaceId)))
+      .limit(1);
+    if (!own) redirect("/login?error=حساب دانش‌آموزی پیدا نشد.");
+    studentId = own.id;
+  } else {
+    const db = await getDb();
+    const [owned] = await db
+      .select({ id: students.id })
+      .from(students)
+      .where(and(eq(students.workspaceId, user.workspaceId), eq(students.id, studentId)))
+      .limit(1);
+    if (!owned) redirect("/counselor");
+  }
+
+  const weekStart = startOfWeekSaturday(
+    field(formData, "weekStart") || new Date().toISOString().slice(0, 10),
+  );
+
+  let slots: unknown;
+  try {
+    slots = JSON.parse(field(formData, "slotsJson") || "null");
+  } catch {
+    redirect(panelPath(user.role, studentId, weekStart, "&error=" + encodeURIComponent("داده زنگ‌ها نامعتبر است.")));
+  }
+
+  try {
+    await saveBellSlots(studentId, slots);
+  } catch (error) {
+    if (error instanceof ScheduleValidationError) {
+      redirect(panelPath(user.role, studentId, weekStart, "&error=" + encodeURIComponent(error.message)));
+    }
+    throw error;
+  }
+
+  revalidatePath(`/counselor/students/${studentId}/panel`);
+  revalidatePath(`/counselor/students/${studentId}/performance`);
+  revalidatePath("/student/panel");
+  revalidatePath("/student/performance");
   redirect(panelPath(user.role, studentId, weekStart, "&success=saved"));
 }

@@ -11,7 +11,10 @@ import {
   subjects,
   tasks,
 } from "@/db/schema";
-import { startOfWeekSaturday, todayISO, weekDates } from "./dates";
+import { startOfWeekSaturday, tehranMinutesOf, todayISO, weekDates } from "./dates";
+import { listSubjectsForField } from "./subject-catalog";
+import { chaptersByResourceIds, ensureChaptersFromJson } from "./resource-chapters";
+import type { ResourceChapterRow } from "@/db/schema";
 
 export type StudentListItem = {
   id: string;
@@ -143,6 +146,7 @@ export type ResourceWithSubject = {
   totalUnits: number;
   completedUnits: number;
   chaptersJson: { title: string; pages: number; startPage: number; endPage: number }[] | null;
+  chapters: ResourceChapterRow[];
   priority: number;
 };
 
@@ -152,7 +156,7 @@ export type StudentDetail = {
   resources: ResourceWithSubject[];
   availability: (typeof availability.$inferSelect)[];
   constraints: typeof studentConstraints.$inferSelect;
-  subjects: (typeof subjects.$inferSelect)[];
+  subjects: Awaited<ReturnType<typeof listSubjectsForField>>;
   plans: (typeof plans.$inferSelect)[];
 };
 
@@ -202,11 +206,7 @@ export async function getStudentDetail(
         .from(studentConstraints)
         .where(eq(studentConstraints.studentId, studentId))
         .limit(1),
-      db
-        .select()
-        .from(subjects)
-        .where(eq(subjects.workspaceId, workspaceId))
-        .orderBy(asc(subjects.title)),
+      listSubjectsForField(workspaceId, student.field),
       db
         .select()
         .from(plans)
@@ -215,9 +215,50 @@ export async function getStudentDetail(
         .limit(12),
     ]);
 
+  const knownSubjectIds = new Set(subjectRows.map((row) => row.id));
+  const missingSubjectIds = [
+    ...new Set(resourceRows.map((row) => row.subjectId).filter((id) => !knownSubjectIds.has(id))),
+  ];
+  if (missingSubjectIds.length > 0) {
+    const extraSubjects = await db
+      .select({
+        id: subjects.id,
+        title: subjects.title,
+        kind: subjects.kind,
+        color: subjects.color,
+        fieldsJson: subjects.fieldsJson,
+      })
+      .from(subjects)
+      .where(inArray(subjects.id, missingSubjectIds));
+    subjectRows.push(...extraSubjects);
+  }
+
+  let chapterMap = await chaptersByResourceIds(
+    db,
+    resourceRows.map((row) => row.id),
+  );
+  let backfilled = false;
+  for (const row of resourceRows) {
+    if ((chapterMap.get(row.id)?.length ?? 0) > 0) continue;
+    const created = await ensureChaptersFromJson(db, {
+      id: row.id,
+      unitType: row.unitType as ResourceWithSubject["unitType"],
+      totalUnits: row.totalUnits,
+      completedUnits: row.completedUnits,
+      chaptersJson: row.chaptersJson,
+    });
+    if (created) backfilled = true;
+  }
+  if (backfilled) {
+    chapterMap = await chaptersByResourceIds(
+      db,
+      resourceRows.map((row) => row.id),
+    );
+  }
   const resourceList: ResourceWithSubject[] = resourceRows.map((row) => ({
     ...row,
     unitType: row.unitType as ResourceWithSubject["unitType"],
+    chapters: chapterMap.get(row.id) ?? [],
   }));
 
   const constraints =
@@ -330,6 +371,22 @@ export async function getWeekReport(
     };
   });
 
+  const db = await getDb();
+  const openedRows = await db
+    .select({ date: dailyLogs.logDate, firstOpenedAt: dailyLogs.firstOpenedAt })
+    .from(dailyLogs)
+    .where(
+      and(
+        eq(dailyLogs.studentId, studentId),
+        inArray(dailyLogs.logDate, dates),
+      ),
+    );
+  const openedByDate = new Map(
+    openedRows
+      .filter((row) => row.firstOpenedAt)
+      .map((row) => [row.date, tehranMinutesOf(row.firstOpenedAt!)]),
+  );
+
   let correctStarts = 0;
   let eligibleDays = 0;
 
@@ -340,10 +397,10 @@ export async function getWeekReport(
     const first = dayTasks[0];
     if (!first) continue;
     eligibleDays += 1;
-    if (first.actualStartedAt) {
-      const planned = new Date(`${date}T00:00:00+03:30`).getTime() + first.plannedStart * 60_000;
-      const diff = first.actualStartedAt.getTime() - planned;
-      if (diff >= -5 * 60_000 && diff <= 30 * 60_000) correctStarts += 1;
+    const opened = openedByDate.get(date);
+    if (opened !== undefined) {
+      const diff = opened - first.plannedStart;
+      if (diff >= -5 && diff <= 30) correctStarts += 1;
     }
   }
 
@@ -359,7 +416,7 @@ export async function getWeekReport(
     activeDays: byDay.filter((day) => day.done > 0).length,
     correctStarts,
     eligibleDays,
-    testsDone: planData.tasks.filter((task) => task.type === "test" && task.status === "done").length,
+    testsDone: planData.tasks.filter((task) => task.status === "done" && (task.type === "test" || task.type === "timed_test" || task.type === "exercise")).length,
     byDay,
   };
 }
@@ -478,6 +535,22 @@ export async function getPeriodReport(
     byWeek.set(row.weekStart, week);
   }
 
+  const openedRows = await db
+    .select({ date: dailyLogs.logDate, firstOpenedAt: dailyLogs.firstOpenedAt })
+    .from(dailyLogs)
+    .where(
+      and(
+        eq(dailyLogs.studentId, studentId),
+        sql`${dailyLogs.logDate} >= ${from}`,
+        sql`${dailyLogs.logDate} <= ${to}`,
+      ),
+    );
+  const openedByDate = new Map(
+    openedRows
+      .filter((row) => row.firstOpenedAt)
+      .map((row) => [row.date, tehranMinutesOf(row.firstOpenedAt!)]),
+  );
+
   let correctStarts = 0;
   let eligibleDays = 0;
 
@@ -485,10 +558,10 @@ export async function getPeriodReport(
     const first = dayRows[0];
     if (!first) continue;
     eligibleDays += 1;
-    if (first.task.actualStartedAt) {
-      const planned = new Date(`${date}T00:00:00+03:30`).getTime() + first.task.plannedStart * 60_000;
-      const diff = first.task.actualStartedAt.getTime() - planned;
-      if (diff >= -5 * 60_000 && diff <= 30 * 60_000) correctStarts += 1;
+    const opened = openedByDate.get(date);
+    if (opened !== undefined) {
+      const diff = opened - first.task.plannedStart;
+      if (diff >= -5 && diff <= 30) correctStarts += 1;
     }
   }
 
@@ -506,7 +579,7 @@ export async function getPeriodReport(
     ).length,
     correctStarts,
     eligibleDays,
-    testsDone: doneRows.filter((row) => row.task.type === "test").length,
+    testsDone: doneRows.filter((row) => row.task.type === "test" || row.task.type === "timed_test" || row.task.type === "exercise").length,
     byWeek: [...byWeek.entries()]
       .map(([weekStart, stats]) => ({ weekStart, ...stats }))
       .sort((a, b) => a.weekStart.localeCompare(b.weekStart)),

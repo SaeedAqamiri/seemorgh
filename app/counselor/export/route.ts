@@ -18,7 +18,13 @@ import { buildTemplateWorkbook } from "@/lib/excel";
 
 export const runtime = "nodejs";
 
-const TYPE_LABELS = { study: "مطالعه", review: "مرور", test: "تست" } as const;
+const TYPE_LABELS: Record<string, string> = {
+  study: "مطالعه",
+  review: "مرور",
+  test: "تست آموزشی",
+  timed_test: "تست زمان‌دار",
+  exercise: "تمرین",
+};
 
 function styleSheet(sheet: ExcelJS.Worksheet) {
   sheet.views = [{ state: "frozen", ySplit: 1, rightToLeft: true }];

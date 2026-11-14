@@ -12,7 +12,8 @@ import {
   normalizePhone,
   verifyPassword,
 } from "@/lib/password";
-import { DEFAULT_SUBJECTS } from "@/lib/subjects";
+import { SUBJECT_CATALOG } from "@/lib/subjects";
+import { seedResourcePool } from "@/lib/resource-pool";
 
 function field(form: FormData, name: string): string {
   return String(form.get(name) ?? "").trim();
@@ -41,6 +42,7 @@ export async function signupAction(formData: FormData): Promise<void> {
   if (existing) fail("/signup", "این شماره قبلاً ثبت‌نام کرده است.");
 
   let userId = "";
+  let workspaceId = "";
   try {
     await db.transaction(async (tx) => {
       const [workspace] = await tx
@@ -60,17 +62,29 @@ export async function signupAction(formData: FormData): Promise<void> {
         .returning();
 
       userId = user.id;
+      workspaceId = workspace.id;
       await tx.update(workspaces).set({ ownerId: user.id }).where(eq(workspaces.id, workspace.id));
 
       await tx.insert(subjects).values(
-        DEFAULT_SUBJECTS.map((title) => ({
+        SUBJECT_CATALOG.map((item) => ({
           workspaceId: workspace.id,
-          title,
+          title: item.title,
+          kind: item.kind,
+          fieldsJson: [...item.fields],
+          color: item.color,
         })),
       );
     });
   } catch {
     fail("/signup", "ثبت‌نام انجام نشد؛ دوباره تلاش کنید.");
+  }
+
+  if (workspaceId) {
+    try {
+      await seedResourcePool(workspaceId);
+    } catch {
+      // Seeding the shared catalog must not block signup.
+    }
   }
 
   await createSession(userId);
@@ -122,6 +136,7 @@ export async function acceptInviteAction(formData: FormData): Promise<void> {
   if (existing) fail(path, "این شماره قبلاً حساب دارد؛ از صفحه ورود استفاده کنید.");
 
   let userId = "";
+  let workspaceId = "";
   try {
     await db.transaction(async (tx) => {
       const [user] = await tx

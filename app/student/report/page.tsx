@@ -3,6 +3,7 @@ import { PerformanceRangeReport } from "@/components/performance-range-report";
 import { ReportRangeForm } from "@/components/report-range-form";
 import { requireStudent } from "@/lib/auth";
 import {
+  addDays,
   formatJalaliNumeric,
   isISODate,
   startOfWeekSaturday,
@@ -25,7 +26,7 @@ export default async function StudentReportPage({
   const { from: fromParam, to: toParam, success, error } = await searchParams;
 
   const today = todayISO();
-  const defaultFrom = startOfWeekSaturday(today);
+  const defaultFrom = addDays(startOfWeekSaturday(today), -21);
   const from =
     fromParam && isISODate(fromParam) ? fromParam : defaultFrom;
   const to = toParam && isISODate(toParam) ? toParam : today;
@@ -70,7 +71,9 @@ export default async function StudentReportPage({
         studentId={student.id}
         from={rangeFrom}
         to={rangeTo}
+        dates={range.dates}
         analysis={range.analysis}
+        subjectDayMatrix={range.subjectDayMatrix}
         narrative={savedNarrative}
         narrativeAt={savedNarrative ? savedReport?.createdAt ?? null : null}
       />

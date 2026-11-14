@@ -32,6 +32,7 @@ export async function AppShell({
                 <Link href="/counselor">دانش‌آموزان</Link>
                 <Link href="/counselor/exams">آزمون‌ها</Link>
                 <Link href="/counselor/questions">بانک سوال</Link>
+                <Link href="/counselor/resources">استخر منابع</Link>
                 <Link href="/counselor/content">محتوا</Link>
                 <Link href="/counselor/audit">تاریخچه</Link>
               </>

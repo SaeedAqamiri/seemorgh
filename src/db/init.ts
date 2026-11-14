@@ -63,10 +63,16 @@ CREATE TABLE IF NOT EXISTS subjects (
   title text NOT NULL,
   grade text,
   field text,
+  kind text NOT NULL DEFAULT 'general',
+  fields_json jsonb,
+  color text NOT NULL DEFAULT '#1f6f4a',
   weight integer NOT NULL DEFAULT 3,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE UNIQUE INDEX IF NOT EXISTS subjects_workspace_title_unique ON subjects(workspace_id, title);
+ALTER TABLE subjects ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'general';
+ALTER TABLE subjects ADD COLUMN IF NOT EXISTS fields_json jsonb;
+ALTER TABLE subjects ADD COLUMN IF NOT EXISTS color text NOT NULL DEFAULT '#1f6f4a';
 
 CREATE TABLE IF NOT EXISTS resources (
   id text PRIMARY KEY,
@@ -82,6 +88,63 @@ CREATE TABLE IF NOT EXISTS resources (
 );
 CREATE INDEX IF NOT EXISTS resources_student_idx ON resources(student_id);
 ALTER TABLE resources ADD COLUMN IF NOT EXISTS chapters_json jsonb;
+
+CREATE TABLE IF NOT EXISTS resource_chapters (
+  id text PRIMARY KEY,
+  resource_id text NOT NULL REFERENCES resources(id) ON DELETE CASCADE,
+  title text NOT NULL,
+  sort_index integer NOT NULL DEFAULT 0,
+  page_start integer,
+  page_end integer,
+  pages integer NOT NULL DEFAULT 0,
+  completed_pages integer NOT NULL DEFAULT 0,
+  test_count integer NOT NULL DEFAULT 0,
+  completed_tests integer NOT NULL DEFAULT 0,
+  exercise_count integer NOT NULL DEFAULT 0,
+  completed_exercises integer NOT NULL DEFAULT 0,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS resource_chapters_resource_idx ON resource_chapters(resource_id);
+
+CREATE TABLE IF NOT EXISTS resource_pool (
+  id text PRIMARY KEY,
+  workspace_id text NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  subject_id text NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+  title text NOT NULL,
+  publisher text NOT NULL DEFAULT '',
+  grade text NOT NULL DEFAULT '',
+  unit_type text NOT NULL DEFAULT 'test',
+  total_units integer NOT NULL DEFAULT 0,
+  priority integer NOT NULL DEFAULT 3,
+  created_by text REFERENCES users(id) ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS resource_pool_workspace_subject_title_unique ON resource_pool(workspace_id, subject_id, title);
+CREATE INDEX IF NOT EXISTS resource_pool_workspace_idx ON resource_pool(workspace_id);
+
+CREATE TABLE IF NOT EXISTS resource_pool_chapters (
+  id text PRIMARY KEY,
+  pool_id text NOT NULL REFERENCES resource_pool(id) ON DELETE CASCADE,
+  title text NOT NULL,
+  sort_index integer NOT NULL DEFAULT 0,
+  page_start integer,
+  page_end integer,
+  pages integer NOT NULL DEFAULT 0,
+  test_count integer NOT NULL DEFAULT 0,
+  exercise_count integer NOT NULL DEFAULT 0,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS resource_pool_chapters_pool_idx ON resource_pool_chapters(pool_id);
+
+CREATE TABLE IF NOT EXISTS bell_schedules (
+  id text PRIMARY KEY,
+  student_id text NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  slot_index integer NOT NULL,
+  start_min integer NOT NULL,
+  end_min integer NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS bell_schedules_student_slot_unique ON bell_schedules(student_id, slot_index);
 
 CREATE TABLE IF NOT EXISTS availability (
   id text PRIMARY KEY,
@@ -158,6 +221,18 @@ CREATE TABLE IF NOT EXISTS tasks (
   note text NOT NULL DEFAULT '',
   created_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS chapter_id text REFERENCES resource_chapters(id) ON DELETE SET NULL;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS resource_text text NOT NULL DEFAULT '';
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS action_kind text NOT NULL DEFAULT 'study';
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS routine_mode text;
+UPDATE tasks SET action_kind = CASE
+  WHEN type = 'test' THEN 'test'
+  WHEN type = 'review' THEN 'review'
+  WHEN type = 'timed_test' THEN 'timedTest'
+  WHEN type = 'exercise' THEN 'exercise'
+  ELSE 'study'
+END
+WHERE action_kind = 'study' AND type <> 'study';
 CREATE INDEX IF NOT EXISTS tasks_plan_idx ON tasks(plan_id);
 CREATE INDEX IF NOT EXISTS tasks_date_idx ON tasks(plan_date);
 
@@ -169,9 +244,15 @@ CREATE TABLE IF NOT EXISTS daily_logs (
   energy integer,
   note text NOT NULL DEFAULT '',
   first_started_at timestamptz,
+  first_opened_at timestamptz,
+  challenge_completed_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE UNIQUE INDEX IF NOT EXISTS daily_logs_student_date_unique ON daily_logs(student_id, log_date);
+ALTER TABLE daily_logs ADD COLUMN IF NOT EXISTS first_opened_at timestamptz;
+ALTER TABLE daily_logs ADD COLUMN IF NOT EXISTS challenge_completed_at timestamptz;
+UPDATE daily_logs SET first_opened_at = first_started_at
+WHERE first_opened_at IS NULL AND first_started_at IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS question_banks (
   id text PRIMARY KEY,

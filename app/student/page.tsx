@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { ContentCard } from "@/components/content-card";
+import { DailyChallengeCard } from "@/components/daily-challenge-card";
 import { requireStudent } from "@/lib/auth";
+import { getDailyChallengeState, recordStudentDailyOpen } from "@/lib/daily";
 import {
   formatJalali,
   formatJalaliNumeric,
@@ -11,20 +13,26 @@ import {
 } from "@/lib/dates";
 import { getStudentTodayData, summarizeWeek } from "@/lib/student";
 
-const TYPE_LABELS = {
+const TYPE_LABELS: Record<string, string> = {
   study: "مطالعه",
   review: "مرور",
-  test: "تست",
-} as const;
+  test: "تست آموزشی",
+  timed_test: "تست زمان‌دار",
+  exercise: "تمرین",
+};
 
 export default async function StudentHomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; success?: string }>;
 }) {
   const { user, student } = await requireStudent();
-  const { error } = await searchParams;
-  const data = await getStudentTodayData(student.id);
+  const { error, success } = await searchParams;
+  await recordStudentDailyOpen(student.id);
+  const [data, challenge] = await Promise.all([
+    getStudentTodayData(student.id),
+    getDailyChallengeState(student.id),
+  ]);
   const week = summarizeWeek(data.weekTasks, data.weekStart);
   const doneToday = data.tasks.filter((task) => task.status === "done").length;
   const totalMinutes = data.tasks.reduce((sum, task) => sum + task.estMinutes, 0);
@@ -54,6 +62,19 @@ export default async function StudentHomePage({
       </div>
 
       {error ? <div className="alert alert-error">{error}</div> : null}
+      {success === "challenge" ? (
+        <div className="alert alert-success">چالش امروز ثبت شد. روز خوبی داشته باشی!</div>
+      ) : null}
+
+      {challenge.challenge ? <DailyChallengeCard question={challenge.challenge.question} /> : null}
+
+      {data.examsToday.length > 0 ? (
+        <div className="alert alert-warn">
+          امروز روز آزمون است:{" "}
+          {data.examsToday.map((exam) => exam.title).join(" · ")}. برنامه امروز به استراحت و
+          جمع‌بندی کوتاه اختصاص داده شده است.
+        </div>
+      ) : null}
 
       {lateStart ? (
         <div className="alert alert-warn">
@@ -126,7 +147,11 @@ export default async function StudentHomePage({
 
           <div className="task-list">
             {data.tasks.map((task) => (
-              <div key={task.id} className={`task ${task.status === "done" ? "is-done" : ""}`}>
+              <div
+                key={task.id}
+                className={`task ${task.status === "done" ? "is-done" : ""} task-action-${task.actionKind}`}
+                style={{ borderInlineStartColor: task.subjectColor || "var(--brand)" }}
+              >
                 <div className="task-time">
                   {formatTime(task.plannedStart)}
                   <br />
@@ -135,7 +160,10 @@ export default async function StudentHomePage({
                 <div>
                   <div className="task-title">{task.subjectTitle}</div>
                   <div className="task-meta">
-                    {TYPE_LABELS[task.type]} · {task.estMinutes} دقیقه
+                    {task.actionKind === "routine"
+                      ? `روتین (${task.routineMode === "study" ? "مطالعه" : "تست"})`
+                      : TYPE_LABELS[task.type] ?? task.type}{" "}
+                    · {task.estMinutes} دقیقه
                     {task.targetUnits > 0
                       ? ` · ${task.targetUnits} ${
                           task.resourceUnitType === "page"
@@ -145,7 +173,11 @@ export default async function StudentHomePage({
                               : "واحد"
                         }`
                       : ""}
-                    {task.topic ? ` · ${task.topic}` : ""}
+                    {task.chapterTitle
+                      ? ` · ${task.chapterTitle}`
+                      : task.topic
+                        ? ` · ${task.topic}`
+                        : ""}
                   </div>
                   {task.resourceTitle ? (
                     <div className="task-meta">{task.resourceTitle}</div>

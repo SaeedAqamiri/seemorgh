@@ -390,10 +390,11 @@ async function main() {
               kind: "test",
               subjectId: subject,
               resourceId,
+              chapterId: null,
               count,
             });
           } else {
-            planRow.push({ kind: "review", subjectId: subject });
+            planRow.push({ kind: "review", subjectId: subject, resourceText: "" });
           }
 
           if (isFutureCurrent) {
@@ -408,20 +409,20 @@ async function main() {
             perfRow.push({ kind: "empty" });
           } else if (isTest) {
             perfRow.push({
-              kind: "practice",
+              kind: "test",
               subjectId: subject,
               resourceId,
+              chapterId: null,
               count: Math.max(5, Math.round(count * (0.55 + random() * 0.45))),
-              startMin,
-              endMin: slotDef.endMin,
+              minutes: Math.max(5, slotDef.endMin - startMin),
               note: random() > 0.8 ? "تمرین زمان‌دار" : "",
             });
           } else {
             perfRow.push({
               kind: "review",
               subjectId: subject,
-              startMin,
-              endMin: slotDef.endMin,
+              resourceText: "",
+              minutes: Math.max(5, slotDef.endMin - startMin),
               note: random() > 0.85 ? "مرور و جمع‌بندی" : "",
             });
           }

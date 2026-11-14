@@ -247,8 +247,12 @@ export function validateAiPlan(input: AiPlannerInput, raw: unknown): {
         plannedEnd: start + minutes,
         subjectId,
         resourceId,
+        chapterId: null,
+        resourceText: "",
         topic: String(block.topic ?? resource.title).slice(0, 200),
         type,
+        actionKind: type,
+        routineMode: null,
         targetUnits,
         estMinutes: minutes,
       });

@@ -9,6 +9,7 @@ import {
   availability,
   examTargets,
   plans,
+  resourceChapters,
   resources,
   studentConstraints,
   students,
@@ -21,7 +22,9 @@ import { logAudit } from "@/lib/audit";
 import { notifyStudentUser } from "@/lib/notifications";
 import { normalizePhone } from "@/lib/password";
 import { aiPlanningConfigured, generateAiPlan } from "@/lib/ai-plan";
-import { parseChapters } from "@/lib/resources";
+import { parseChapterPlan } from "@/lib/resources";
+import { chaptersByResourceIds, recomputeResourceTotals, replaceResourceChapters } from "@/lib/resource-chapters";
+import { copyPoolBookToStudent, ResourcePoolError } from "@/lib/resource-pool";
 import { generatePlan } from "@/lib/planner";
 
 function field(form: FormData, name: string): string {
@@ -38,6 +41,16 @@ function studentPath(studentId: string, suffix = ""): string {
 
 function resourcesPath(studentId: string, suffix = ""): string {
   return `/counselor/students/${studentId}/resources${suffix}`;
+}
+
+function totalFromChapters(
+  chapters: { pages: number; testCount?: number; exerciseCount?: number }[] | null,
+  unitType: string,
+): number | null {
+  if (!chapters?.length) return null;
+  if (unitType === "test") return chapters.reduce((sum, chapter) => sum + (chapter.testCount ?? 0), 0);
+  if (unitType === "page") return chapters.reduce((sum, chapter) => sum + chapter.pages, 0);
+  return chapters.length;
 }
 
 function fail(path: string, message: string): never {
@@ -245,10 +258,12 @@ export async function addResourceAction(formData: FormData): Promise<void> {
   const subjectId = field(formData, "subjectId");
   const title = field(formData, "title");
   const unitType = field(formData, "unitType") || "test";
-  const totalUnits = Math.max(0, numberField(formData, "totalUnits"));
+  const inputTotal = Math.max(0, numberField(formData, "totalUnits"));
   const completedUnits = Math.max(0, numberField(formData, "completedUnits"));
   const priority = Math.max(1, Math.min(5, numberField(formData, "priority") || 3));
-  const parsedChapters = parseChapters(field(formData, "chapters"), totalUnits);
+  const parsedChapters = parseChapterPlan(field(formData, "chapters"), inputTotal);
+  const chapterTotal = totalFromChapters(parsedChapters.chapters, unitType);
+  const totalUnits = chapterTotal ?? inputTotal;
 
   if (!subjectId || !title) fail(context.basePath, "درس و عنوان منبع لازم است.");
   if (completedUnits > totalUnits) fail(context.basePath, "پیشرفت نمی‌تواند بیشتر از کل باشد.");
@@ -262,17 +277,23 @@ export async function addResourceAction(formData: FormData): Promise<void> {
     .limit(1);
   if (!subjectRow) fail(context.basePath, "درس انتخاب‌شده معتبر نیست.");
 
-  await db.insert(resources).values({
-    workspaceId: context.workspaceId,
-    studentId,
-    subjectId,
-    title,
-    unitType: unitType as "test" | "page" | "chapter",
-    totalUnits,
-    completedUnits,
-    chaptersJson: parsedChapters.chapters,
-    priority,
-  });
+  const [created] = await db
+    .insert(resources)
+    .values({
+      workspaceId: context.workspaceId,
+      studentId,
+      subjectId,
+      title,
+      unitType: unitType as "test" | "page" | "chapter",
+      totalUnits,
+      completedUnits,
+      priority,
+    })
+    .returning({ id: resources.id });
+
+  if (parsedChapters.chapters?.length) {
+    await replaceResourceChapters(db, created.id, parsedChapters.chapters);
+  }
 
   revalidateResourceViews(context);
   redirect(`${context.basePath}?success=resource`);
@@ -284,9 +305,11 @@ export async function updateResourceAction(formData: FormData): Promise<void> {
 
   const resourceId = field(formData, "resourceId");
   const completedUnits = Math.max(0, numberField(formData, "completedUnits"));
-  const totalUnits = Math.max(0, numberField(formData, "totalUnits"));
+  const inputTotal = Math.max(0, numberField(formData, "totalUnits"));
   const priority = Math.max(1, Math.min(5, numberField(formData, "priority") || 3));
-  const parsedChapters = parseChapters(field(formData, "chapters"), totalUnits);
+  const parsedChapters = parseChapterPlan(field(formData, "chapters"), inputTotal);
+  const chapterTotal = totalFromChapters(parsedChapters.chapters, field(formData, "unitType") || "test");
+  const totalUnits = chapterTotal ?? inputTotal;
 
   if (completedUnits > totalUnits) fail(context.basePath, "پیشرفت نمی‌تواند بیشتر از کل باشد.");
   if (parsedChapters.error) fail(context.basePath, parsedChapters.error);
@@ -298,7 +321,6 @@ export async function updateResourceAction(formData: FormData): Promise<void> {
       completedUnits,
       totalUnits,
       priority,
-      chaptersJson: parsedChapters.chapters,
     })
     .where(
       and(
@@ -307,6 +329,8 @@ export async function updateResourceAction(formData: FormData): Promise<void> {
         eq(resources.workspaceId, context.workspaceId),
       ),
     );
+
+  await replaceResourceChapters(db, resourceId, parsedChapters.chapters);
 
   revalidateResourceViews(context);
   redirect(`${context.basePath}?success=resource-updated`);
@@ -452,6 +476,8 @@ export async function generatePlanAction(formData: FormData): Promise<void> {
     bufferPct: 15,
   };
 
+  const chapterMap = await chaptersByResourceIds(db, resourceRows.map((row) => row.id));
+
   const plannerInput = {
     weekStart,
     availability: availabilityRows.map((row) => ({
@@ -473,7 +499,17 @@ export async function generatePlanAction(formData: FormData): Promise<void> {
       totalUnits: row.totalUnits,
       completedUnits: row.completedUnits,
       priority: row.priority,
-      chapters: row.chaptersJson,
+      chapters: (chapterMap.get(row.id) ?? []).map((chapter) => ({
+        id: chapter.id,
+        title: chapter.title,
+        pages: chapter.pages,
+        startPage: chapter.pageStart ?? 1,
+        endPage: chapter.pageEnd ?? chapter.pages,
+        testCount: chapter.testCount,
+        completedTests: chapter.completedTests,
+        exerciseCount: chapter.exerciseCount,
+        completedExercises: chapter.completedExercises,
+      })),
     })),
     examTargets: targetRows.map((row) => ({
       title: row.title,
@@ -558,8 +594,12 @@ export async function generatePlanAction(formData: FormData): Promise<void> {
           plannedEnd: task.plannedEnd,
           subjectId: task.subjectId,
           resourceId: task.resourceId,
+          chapterId: task.chapterId,
+          resourceText: task.resourceText,
           topic: task.topic,
           type: task.type,
+          actionKind: task.actionKind,
+          routineMode: task.routineMode,
           targetUnits: task.targetUnits,
           estMinutes: task.estMinutes,
         })),
@@ -773,4 +813,77 @@ export async function deleteTaskAction(formData: FormData): Promise<void> {
 
   revalidatePath(studentPath(studentId));
   redirect(studentPath(studentId, `?week=${plan.weekStart}&success=task-deleted`));
+}
+
+export async function updateChapterProgressAction(formData: FormData): Promise<void> {
+  const context = await resolveResourceContext(formData);
+  const resourceId = field(formData, "resourceId");
+  const chapterId = field(formData, "chapterId");
+  const inputTests = Math.max(0, numberField(formData, "completedTests"));
+  const inputExercises = Math.max(0, numberField(formData, "completedExercises"));
+  const inputPages = Math.max(0, numberField(formData, "completedPages"));
+
+  const db = await getDb();
+  const [chapter] = await db
+    .select({
+      id: resourceChapters.id,
+      resourceId: resourceChapters.resourceId,
+      testCount: resourceChapters.testCount,
+      exerciseCount: resourceChapters.exerciseCount,
+      pages: resourceChapters.pages,
+    })
+    .from(resourceChapters)
+    .where(eq(resourceChapters.id, chapterId))
+    .limit(1);
+  if (!chapter || chapter.resourceId !== resourceId) {
+    fail(context.basePath, "فصل انتخاب‌شده معتبر نیست.");
+  }
+  const [owned] = await db
+    .select({ id: resources.id })
+    .from(resources)
+    .where(
+      and(
+        eq(resources.id, resourceId),
+        eq(resources.studentId, context.studentId),
+        eq(resources.workspaceId, context.workspaceId),
+      ),
+    )
+    .limit(1);
+  if (!owned) fail(context.basePath, "منبع انتخاب‌شده معتبر نیست.");
+
+  await db
+    .update(resourceChapters)
+    .set({
+      completedTests: Math.min(chapter.testCount, inputTests),
+      completedExercises: Math.min(chapter.exerciseCount, inputExercises),
+      completedPages: Math.min(chapter.pages, inputPages),
+    })
+    .where(eq(resourceChapters.id, chapterId));
+
+  await recomputeResourceTotals(db, resourceId);
+  revalidateResourceViews(context);
+  redirect(`${context.basePath}?success=resource-updated`);
+}
+
+export async function addResourceFromPoolAction(formData: FormData): Promise<void> {
+  const context = await resolveResourceContext(formData);
+  const poolId = field(formData, "poolId");
+  const priority = Math.max(1, Math.min(5, numberField(formData, "priority") || 3));
+
+  if (!poolId) fail(context.basePath, "منبعی از استخر انتخاب نشده است.");
+
+  try {
+    await copyPoolBookToStudent(
+      context.workspaceId,
+      context.studentId,
+      poolId,
+      priority,
+    );
+  } catch (error) {
+    if (error instanceof ResourcePoolError) fail(context.basePath, error.message);
+    throw error;
+  }
+
+  revalidateResourceViews(context);
+  redirect(`${context.basePath}?success=resource`);
 }

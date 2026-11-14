@@ -385,7 +385,7 @@ tr:last-child td {
 }
 
 .panel-grid {
-  min-width: 720px;
+  min-width: 1380px;
 }
 
 .panel-grid th,
@@ -409,12 +409,98 @@ tr:last-child td {
 }
 
 .panel-cell {
-  min-width: 118px;
+  min-width: 132px;
   background: var(--surface);
 }
 
 .panel-cell.is-rest {
   background: var(--surface-2);
+}
+
+.panel-total {
+  background: var(--surface-2);
+  font-size: 0.74rem;
+  font-weight: 700;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.panel-action {
+  display: grid;
+  gap: 0.08rem;
+  border-inline-start: 4px solid var(--brand);
+  padding-inline-start: 0.4rem;
+  border-radius: 4px;
+}
+
+.panel-action-subject {
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.action-study {
+  font-weight: 400;
+}
+
+.action-study strong {
+  font-weight: 400;
+}
+
+.action-review {
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  font-style: italic;
+}
+
+.action-test {
+  font-weight: 700;
+}
+
+.action-timedTest {
+  font-weight: 700;
+  letter-spacing: 0.035em;
+}
+
+.action-exercise {
+  font-weight: 500;
+  letter-spacing: 0.015em;
+}
+
+.action-routine {
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.action-rest {
+  font-weight: 400;
+}
+
+.task-action-study {
+  font-weight: 400;
+}
+
+.task-action-review {
+  font-weight: 500;
+  font-style: italic;
+}
+
+.task-action-test,
+.task-action-timed_test,
+.task-action-timedTest {
+  font-weight: 700;
+}
+
+.task-action-exercise {
+  font-weight: 500;
+}
+
+.task-action-routine {
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
 }
 
 .panel-rest {
@@ -637,6 +723,7 @@ tr:last-child td {
   align-items: center;
   padding: 0.75rem;
   border: 1px solid var(--border);
+  border-inline-start-width: 4px;
   border-radius: 12px;
   background: var(--surface);
 }

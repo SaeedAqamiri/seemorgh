@@ -11,7 +11,7 @@ export function StartTimeTable({ days }: { days: DayStartStatus[] }) {
             <th>روز</th>
             <th>تاریخ</th>
             <th>شروع برنامه</th>
-            <th>شروع واقعی</th>
+            <th>اولین ورود</th>
             <th>اختلاف</th>
             <th>وضعیت</th>
           </tr>
@@ -39,9 +39,11 @@ export function StartTimeTable({ days }: { days: DayStartStatus[] }) {
                 </td>
                 <td>
                   {day.status === "onplan" ? (
-                    <span className="badge badge-green">طبق برنامه</span>
+                    <span className="badge badge-green">به‌موقع</span>
                   ) : day.status === "offplan" ? (
-                    <span className="badge badge-danger">خارج از برنامه</span>
+                    <span className="badge badge-danger">دیرتر از برنامه</span>
+                  ) : day.performedStartMin !== null ? (
+                    <span className="muted">بدون برنامه</span>
                   ) : (
                     <span className="muted">بدون فعالیت</span>
                   )}

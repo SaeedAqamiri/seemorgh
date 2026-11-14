@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { saveWeeklyPanelAction } from "@/app/actions/panel";
+import { saveBellSlotsAction, saveWeeklyPanelAction } from "@/app/actions/panel";
+import { BellScheduleEditor } from "@/components/bell-schedule-editor";
 import { WeekGridEditor, type PanelCellState } from "@/components/week-panel";
 import { requireStudent } from "@/lib/auth";
 import {
@@ -11,7 +12,7 @@ import {
   WEEKDAY_LABELS,
   weekDates,
 } from "@/lib/dates";
-import { getPanelOptions, getWeeklyPanelView, PANEL_SLOTS, slotLabel } from "@/lib/panel";
+import { getPanelOptions, getWeeklyPanelView, slotLabel } from "@/lib/panel";
 
 const SUCCESS: Record<string, string> = {
   saved: "پنل هفته با موفقیت ثبت شد.",
@@ -35,7 +36,7 @@ export default async function StudentPanelPage({
 
   const dates = weekDates(weekStart);
   const dayTitles = dates.map((date) => formatJalaliNumeric(date));
-  const slotLabels = PANEL_SLOTS.map((slot) => slotLabel(slot));
+  const slotLabels = panelView.slots.map((slot) => slotLabel(slot));
   const panelHref = (value: string) => `/student/panel?week=${value}`;
 
   return (
@@ -63,6 +64,24 @@ export default async function StudentPanelPage({
       {success && SUCCESS[success] ? <div className="alert alert-success">{SUCCESS[success]}</div> : null}
       {error ? <div className="alert alert-error">{error}</div> : null}
 
+      {panelView.exams.length > 0 ? (
+        <div className="alert alert-warn">
+          آزمون‌های این هفته:{" "}
+          {panelView.exams
+            .map((exam) => `${exam.title} (${formatJalaliNumeric(exam.examDate)})`)
+            .join(" · ")}
+        </div>
+      ) : null}
+
+      <div className="card">
+        <BellScheduleEditor
+          studentId={student.id}
+          weekStart={weekStart}
+          initialSlots={panelView.slots}
+          action={saveBellSlotsAction}
+        />
+      </div>
+
       <div className="card">
         <div className="section-head">
           <h2>جدول هفتگی</h2>
@@ -78,6 +97,7 @@ export default async function StudentPanelPage({
           initialRoutine={panelView.dailyRoutine}
           initialHomework={panelView.nextWeekHomework}
           subjects={options.subjects}
+          subjectGroups={options.subjectGroups}
           resources={options.resources}
           action={saveWeeklyPanelAction}
         />

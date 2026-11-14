@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { getDb } from "../src/db/client";
 import {
   availability,
@@ -9,6 +9,7 @@ import {
   plans,
   questionBanks,
   questions,
+  resourceChapters,
   resources,
   studentConstraints,
   students,
@@ -21,6 +22,7 @@ import { addDays, startOfWeekSaturday, todayISO } from "../src/lib/dates";
 import { hashPassword } from "../src/lib/password";
 import { buildSnapshot, selectExamQuestions } from "../src/lib/exam";
 import { generatePlan } from "../src/lib/planner";
+import { SUBJECT_CATALOG } from "../src/lib/subjects";
 
 const DEMO_PHONE = "09120000000";
 const DEMO_PASSWORD = "seemorgh123";
@@ -81,9 +83,13 @@ async function main() {
   const subjectRows = await db
     .insert(subjects)
     .values(
-      ["ریاضی", "فیزیک", "شیمی", "زیست‌شناسی", "ادبیات فارسی", "زبان انگلیسی", "دین و زندگی"].map(
-        (title) => ({ workspaceId: workspace.id, title }),
-      ),
+      SUBJECT_CATALOG.map((item) => ({
+        workspaceId: workspace.id,
+        title: item.title,
+        kind: item.kind,
+        fieldsJson: [...item.fields],
+        color: item.color,
+      })),
     )
     .returning();
 
@@ -103,9 +109,48 @@ async function main() {
       grade: "دوازدهم",
       field: "تجربی",
       resources: [
-        { subject: "زیست‌شناسی", title: "زیست دوازدهم — تست", unitType: "test" as const, total: 1200, done: 420, priority: 5 },
-        { subject: "شیمی", title: "شیمی دوازدهم — تست", unitType: "test" as const, total: 800, done: 250, priority: 4 },
-        { subject: "ریاضی", title: "ریاضی تجربی — تست", unitType: "test" as const, total: 600, done: 180, priority: 4 },
+        {
+          subject: "زیست‌شناسی",
+          title: "زیست دوازدهم — خیلی سبز",
+          unitType: "test" as const,
+          total: 1200,
+          done: 420,
+          priority: 5,
+          chapters: [
+            { title: "فصل ۱ — مولکول‌های اطلاعاتی", pages: 0, startPage: 1, endPage: 0, testCount: 220, completedTests: 80 },
+            { title: "فصل ۲ — جریان اطلاعات", pages: 0, startPage: 1, endPage: 0, testCount: 240, completedTests: 90 },
+            { title: "فصل ۳ — انتقال اطلاعات", pages: 0, startPage: 1, endPage: 0, testCount: 260, completedTests: 75 },
+            { title: "فصل ۴ — تنظیم بیان ژن", pages: 0, startPage: 1, endPage: 0, testCount: 240, completedTests: 95 },
+            { title: "فصل ۵ — از ماده به انرژی", pages: 0, startPage: 1, endPage: 0, testCount: 240, completedTests: 80 },
+          ],
+        },
+        {
+          subject: "شیمی",
+          title: "شیمی دوازدهم — خیلی سبز",
+          unitType: "test" as const,
+          total: 800,
+          done: 250,
+          priority: 4,
+          chapters: [
+            { title: "فصل ۱ — مولکول‌ها", pages: 0, startPage: 1, endPage: 0, testCount: 220, completedTests: 80 },
+            { title: "فصل ۲ — الکتروشیمی", pages: 0, startPage: 1, endPage: 0, testCount: 240, completedTests: 90 },
+            { title: "فصل ۳ — شیمی آلی", pages: 0, startPage: 1, endPage: 0, testCount: 180, completedTests: 45 },
+            { title: "فصل ۴ — زندگی سالم", pages: 0, startPage: 1, endPage: 0, testCount: 160, completedTests: 35 },
+          ],
+        },
+        {
+          subject: "ریاضی",
+          title: "ریاضی تجربی — خیلی سبز",
+          unitType: "test" as const,
+          total: 600,
+          done: 180,
+          priority: 4,
+          chapters: [
+            { title: "فصل ۱ — تابع", pages: 0, startPage: 1, endPage: 0, testCount: 200, completedTests: 70 },
+            { title: "فصل ۲ — مثلثات", pages: 0, startPage: 1, endPage: 0, testCount: 180, completedTests: 50 },
+            { title: "فصل ۳ — حد", pages: 0, startPage: 1, endPage: 0, testCount: 220, completedTests: 60 },
+          ],
+        },
         {
           subject: "ادبیات فارسی",
           title: "ادبیات دوازدهم — صفحه",
@@ -127,8 +172,33 @@ async function main() {
       grade: "یازدهم",
       field: "ریاضی",
       resources: [
-        { subject: "ریاضی", title: "حسابان ۲ — تست", unitType: "test" as const, total: 900, done: 300, priority: 5 },
-        { subject: "فیزیک", title: "فیزیک یازدهم — تست", unitType: "test" as const, total: 700, done: 210, priority: 4 },
+        {
+          subject: "حسابان",
+          title: "حسابان ۲ — خیلی سبز",
+          unitType: "test" as const,
+          total: 900,
+          done: 300,
+          priority: 5,
+          chapters: [
+            { title: "فصل ۱ — تابع", pages: 0, startPage: 1, endPage: 0, testCount: 240, completedTests: 90 },
+            { title: "فصل ۲ — مثلثات", pages: 0, startPage: 1, endPage: 0, testCount: 220, completedTests: 80 },
+            { title: "فصل ۳ — حد و پیوستگی", pages: 0, startPage: 1, endPage: 0, testCount: 220, completedTests: 70 },
+            { title: "فصل ۴ — مشتق", pages: 0, startPage: 1, endPage: 0, testCount: 220, completedTests: 60 },
+          ],
+        },
+        {
+          subject: "فیزیک",
+          title: "فیزیک یازدهم — خیلی سبز",
+          unitType: "test" as const,
+          total: 700,
+          done: 210,
+          priority: 4,
+          chapters: [
+            { title: "فصل ۱ — الکتریسیته ساکن", pages: 0, startPage: 1, endPage: 0, testCount: 240, completedTests: 80 },
+            { title: "فصل ۲ — جریان الکتریکی", pages: 0, startPage: 1, endPage: 0, testCount: 240, completedTests: 70 },
+            { title: "فصل ۳ — مغناطیس", pages: 0, startPage: 1, endPage: 0, testCount: 220, completedTests: 60 },
+          ],
+        },
         {
           subject: "زبان انگلیسی",
           title: "زبان یازدهم — صفحه",
@@ -206,6 +276,47 @@ async function main() {
       )
       .returning();
 
+    const chapterInputs = resourceRows.flatMap((resource, index) => {
+      const demoResource = demo.resources[index];
+      if (!demoResource?.chapters?.length) return [];
+      return demoResource.chapters.map((chapter, chapterIndex) => ({
+        resourceId: resource.id,
+        title: chapter.title,
+        sortIndex: chapterIndex,
+        pageStart: chapter.pages > 0 ? chapter.startPage : null,
+        pageEnd: chapter.pages > 0 ? chapter.endPage : null,
+        pages: chapter.pages,
+        completedPages: 0,
+        testCount: Number("testCount" in chapter ? chapter.testCount : 0),
+        completedTests: Number("completedTests" in chapter ? chapter.completedTests : 0),
+        exerciseCount: Number("exerciseCount" in chapter ? chapter.exerciseCount : 0),
+        completedExercises: 0,
+      }));
+    });
+    if (chapterInputs.length > 0) {
+      await db.insert(resourceChapters).values(chapterInputs);
+    }
+
+    const chapterRows = await db
+      .select()
+      .from(resourceChapters)
+      .where(inArray(resourceChapters.resourceId, resourceRows.map((resource) => resource.id)));
+    const chaptersFor = (resourceId: string) =>
+      chapterRows
+        .filter((chapter) => chapter.resourceId === resourceId)
+        .sort((a, b) => a.sortIndex - b.sortIndex)
+        .map((chapter) => ({
+          id: chapter.id,
+          title: chapter.title,
+          pages: chapter.pages,
+          startPage: chapter.pageStart ?? 1,
+          endPage: chapter.pageEnd ?? chapter.pages,
+          testCount: "testCount" in chapter ? chapter.testCount : 0,
+          completedTests: "completedTests" in chapter ? chapter.completedTests : 0,
+          exerciseCount: "exerciseCount" in chapter ? chapter.exerciseCount : 0,
+          completedExercises: "completedExercises" in chapter ? chapter.completedExercises : 0,
+        }));
+
     await db.insert(availability).values(
       [0, 1, 2, 3, 4].flatMap((weekday) => [
         { studentId: student.id, weekday, startMin: 16 * 60, endMin: 19 * 60 },
@@ -239,7 +350,7 @@ async function main() {
         totalUnits: resource.totalUnits,
         completedUnits: resource.completedUnits,
         priority: resource.priority,
-        chapters: resource.chaptersJson,
+        chapters: chaptersFor(resource.id),
       })),
       examTargets: [{ title: "کنکور آزمایشی", examDate, weight: 5 }],
     });
@@ -258,8 +369,12 @@ async function main() {
           plannedEnd: task.plannedEnd,
           subjectId: task.subjectId,
           resourceId: task.resourceId,
+          chapterId: task.chapterId,
+          resourceText: task.resourceText,
           topic: task.topic,
           type: task.type,
+          actionKind: task.actionKind,
+          routineMode: task.routineMode,
           targetUnits: task.targetUnits,
           estMinutes: task.estMinutes,
         })),

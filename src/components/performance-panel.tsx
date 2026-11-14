@@ -4,13 +4,30 @@ import { useMemo, useState } from "react";
 import { SubmitButton } from "./submit-button";
 
 export type PerfCellState = {
-  kind: "empty" | "rest" | "review" | "practice";
+  kind: "empty" | "rest" | "study" | "review" | "test" | "timedTest" | "exercise" | "routine";
   subjectId?: string;
+  resourceText?: string;
   resourceId?: string | null;
+  chapterId?: string | null;
   count?: number;
-  startMin?: number;
-  endMin?: number;
+  routineMode?: "study" | "test";
+  minutes?: number;
   note?: string;
+};
+
+type SubjectOption = { id: string; title: string; kind: string; color: string };
+type ResourceOption = {
+  id: string;
+  subjectId: string;
+  title: string;
+  chapters: {
+    id: string;
+    title: string;
+    testCount: number;
+    completedTests: number;
+    exerciseCount: number;
+    completedExercises: number;
+  }[];
 };
 
 export type ViewMode = "both" | "plan" | "perf";
@@ -21,19 +38,36 @@ export type PerformancePanelProps = {
   weekdayLabels: string[];
   dayTitles: string[];
   slotLabels: string[];
+  slotBounds: { startMin: number; endMin: number }[];
   plannedLabels: string[][];
   initialGrid: PerfCellState[][];
-  subjects: { id: string; title: string }[];
-  resources: { id: string; subjectId: string; title: string }[];
+  subjects: SubjectOption[];
+  subjectGroups: { general: string[]; specialized: string[] };
+  resources: ResourceOption[];
   action: (formData: FormData) => Promise<void>;
 };
 
 const KIND_OPTIONS: { value: PerfCellState["kind"]; label: string }[] = [
   { value: "empty", label: "ثبت نشده" },
   { value: "rest", label: "استراحت" },
+  { value: "study", label: "مطالعه" },
   { value: "review", label: "مرور" },
-  { value: "practice", label: "تمرین" },
+  { value: "test", label: "تست آموزشی" },
+  { value: "timedTest", label: "تست زمان‌دار" },
+  { value: "exercise", label: "تمرین" },
+  { value: "routine", label: "روتین" },
 ];
+
+const ACTION_LABELS: Record<PerfCellState["kind"], string> = {
+  empty: "—",
+  rest: "استراحت",
+  study: "مطالعه",
+  review: "مرور",
+  test: "تست آموزشی",
+  timedTest: "تست زمان‌دار",
+  exercise: "تمرین",
+  routine: "روتین",
+};
 
 const VIEW_OPTIONS: { value: ViewMode; label: string }[] = [
   { value: "both", label: "برنامه‌ریزی + عملکرد" },
@@ -41,49 +75,76 @@ const VIEW_OPTIONS: { value: ViewMode; label: string }[] = [
   { value: "perf", label: "فقط عملکرد" },
 ];
 
-function timeOptions(): { value: number; label: string }[] {
-  const options: { value: number; label: string }[] = [];
-  for (let minutes = 5 * 60; minutes <= 23.5 * 60; minutes += 30) {
-    const hh = String(Math.floor(minutes / 60)).padStart(2, "0");
-    const mm = String(minutes % 60).padStart(2, "0");
-    options.push({ value: minutes, label: `${hh}:${mm}` });
-  }
-  return options;
+function isCountKind(kind: PerfCellState["kind"]): boolean {
+  return kind === "test" || kind === "timedTest" || kind === "exercise";
 }
 
-function faTime(minutes?: number): string {
-  if (typeof minutes !== "number" || !Number.isFinite(minutes)) return "—";
-  const hh = String(Math.floor(minutes / 60)).padStart(2, "0");
-  const mm = String(minutes % 60).padStart(2, "0");
-  return `${hh}:${mm}`;
+function countKindFor(cell: PerfCellState): boolean {
+  return isCountKind(cell.kind) || (cell.kind === "routine" && cell.routineMode === "test");
+}
+
+function textKindFor(cell: PerfCellState): boolean {
+  return cell.kind === "study" || cell.kind === "review" || (cell.kind === "routine" && cell.routineMode === "study");
 }
 
 function cloneGrid(grid: PerfCellState[][]): PerfCellState[][] {
   return grid.map((row) => row.map((cell) => ({ ...cell })));
 }
 
+function defaultCell(kind: PerfCellState["kind"], minutes: number, note = ""): PerfCellState {
+  if (kind === "empty") return { kind: "empty" };
+  if (kind === "rest") return { kind: "rest" };
+  if (kind === "study" || kind === "review") {
+    return { kind, subjectId: "", resourceText: "", minutes, note };
+  }
+  if (kind === "routine") {
+    return {
+      kind: "routine",
+      routineMode: "test",
+      subjectId: "",
+      resourceText: "",
+      resourceId: null,
+      chapterId: null,
+      count: 30,
+      minutes,
+      note,
+    };
+  }
+  return {
+    kind,
+    subjectId: "",
+    resourceId: null,
+    chapterId: null,
+    count: 30,
+    minutes,
+    note,
+  };
+}
+
 export function PerformancePanel(props: PerformancePanelProps) {
   const [editing, setEditing] = useState(false);
   const [grid, setGrid] = useState<PerfCellState[][]>(() => cloneGrid(props.initialGrid));
   const [viewMode, setViewMode] = useState<ViewMode>("both");
-  const timeChoices = useMemo(() => timeOptions(), []);
+  const [groups, setGroups] = useState<Record<string, "general" | "specialized">>({});
 
-  const subjectTitles = useMemo(
-    () => new Map(props.subjects.map((subject) => [subject.id, subject.title])),
+  const subjectById = useMemo(
+    () => new Map(props.subjects.map((subject) => [subject.id, subject])),
     [props.subjects],
   );
-  const resourceTitles = useMemo(
-    () => new Map(props.resources.map((resource) => [resource.id, resource.title])),
+  const resourceById = useMemo(
+    () => new Map(props.resources.map((resource) => [resource.id, resource])),
     [props.resources],
   );
 
   const startEdit = () => {
     setGrid(cloneGrid(props.initialGrid));
+    setGroups({});
     setEditing(true);
   };
 
   const cancelEdit = () => {
     setGrid(cloneGrid(props.initialGrid));
+    setGroups({});
     setEditing(false);
   };
 
@@ -95,86 +156,128 @@ export function PerformancePanel(props: PerformancePanelProps) {
     });
   };
 
+  const groupKey = (day: number, slot: number) => `${day}-${slot}`;
+
+  const groupFor = (day: number, slot: number, cell: PerfCellState): "general" | "specialized" => {
+    const subject = cell.subjectId ? subjectById.get(cell.subjectId) : undefined;
+    if (subject) {
+      const inSpecialized = props.subjectGroups.specialized.includes(subject.id);
+      const inGeneral = props.subjectGroups.general.includes(subject.id);
+      if (inSpecialized && !inGeneral) return "specialized";
+      if (inGeneral && !inSpecialized) return "general";
+      if (subject.kind === "specialized") return "specialized";
+    }
+    return groups[groupKey(day, slot)] ?? "general";
+  };
+
+  const setGroup = (day: number, slot: number, group: "general" | "specialized") => {
+    setGroups((current) => ({ ...current, [groupKey(day, slot)]: group }));
+    const cell = grid[day][slot];
+    if (cell.subjectId) {
+      updateCell(day, slot, { ...cell, subjectId: "", resourceId: null, chapterId: null });
+    }
+  };
+
   const setKind = (day: number, slot: number, kind: PerfCellState["kind"]) => {
     const previous = grid[day][slot];
-    const note = previous.note ?? "";
-    const startMin = previous.startMin ?? 480;
-    const endMin = previous.endMin ?? 600;
-    if (kind === "empty") updateCell(day, slot, { kind: "empty" });
-    else if (kind === "rest") updateCell(day, slot, { kind: "rest" });
-    else if (kind === "review")
-      updateCell(day, slot, { kind: "review", subjectId: "", startMin, endMin, note });
-    else
-      updateCell(day, slot, {
-        kind: "practice",
-        subjectId: "",
-        resourceId: null,
-        count: previous.count ?? 10,
-        startMin,
-        endMin,
-        note,
-      });
+    const bounds = props.slotBounds[slot] ?? { startMin: 480, endMin: 570 };
+    updateCell(
+      day,
+      slot,
+      defaultCell(
+        kind,
+        previous.minutes ?? bounds.endMin - bounds.startMin,
+        previous.note ?? "",
+      ),
+    );
   };
 
   const setSubject = (day: number, slot: number, subjectId: string) => {
     setGrid((current) => {
       const copy = cloneGrid(current);
       const cell = copy[day][slot];
-      if (cell.kind === "review") copy[day][slot] = { ...cell, subjectId };
-      else if (cell.kind === "practice")
-        copy[day][slot] = { ...cell, subjectId, resourceId: null };
+      copy[day][slot] = countKindFor(cell)
+        ? { ...cell, subjectId, resourceId: null, chapterId: null }
+        : { ...cell, subjectId };
+      return copy;
+    });
+  };
+
+  const setRoutineMode = (day: number, slot: number, routineMode: "study" | "test") => {
+    setGrid((current) => {
+      const copy = cloneGrid(current);
+      const cell = copy[day][slot];
+      copy[day][slot] = {
+        ...cell,
+        kind: "routine",
+        routineMode,
+        resourceId: null,
+        chapterId: null,
+        count: 30,
+      };
       return copy;
     });
   };
 
   const perfLabel = (cell: PerfCellState) => {
     if (cell.kind === "empty") return <span className="muted">—</span>;
-    if (cell.kind === "rest") return <span className="panel-rest">استراحت</span>;
-    const subject = cell.subjectId ? subjectTitles.get(cell.subjectId) ?? "درس" : "درس";
-    const times = `${faTime(cell.startMin)}–${faTime(cell.endMin)}`;
-    if (cell.kind === "review") {
-      return (
-        <>
-          <strong>مرور · {subject}</strong>
-          <div dir="ltr" className="muted" style={{ fontSize: "0.74rem", textAlign: "right" }}>
-            {times}
-          </div>
-        </>
-      );
-    }
-    const resource = cell.resourceId ? resourceTitles.get(cell.resourceId) : null;
+    if (cell.kind === "rest") return <span className="panel-rest action-rest">استراحت</span>;
+    const subject = cell.subjectId ? subjectById.get(cell.subjectId) : undefined;
+    const title = subject?.title ?? "درس";
+    const color = subject?.color ?? "#1f6f4a";
+    const resource = cell.resourceId ? resourceById.get(cell.resourceId) : undefined;
+    const chapter = resource?.chapters.find((item) => item.id === cell.chapterId);
+
     return (
-      <>
-        <strong>تمرین · {subject}</strong>
-        {resource ? (
-          <div className="muted" style={{ fontSize: "0.74rem" }}>{resource}</div>
+      <div className={`panel-action action-${cell.kind}`} style={{ borderInlineStartColor: color }}>
+        <strong>
+          {cell.kind === "routine"
+            ? `روتین (${cell.routineMode === "test" ? "تست" : "مطالعه"})`
+            : ACTION_LABELS[cell.kind]}
+        </strong>
+        <div className="panel-action-subject" style={{ color }}>{title}</div>
+        {textKindFor(cell) && cell.resourceText ? (
+          <div className="muted" style={{ fontSize: "0.72rem" }}>{cell.resourceText}</div>
         ) : null}
-        <div dir="ltr" className="muted" style={{ fontSize: "0.74rem", textAlign: "right" }}>
-          {times}
+        {countKindFor(cell) && resource ? (
+          <div className="muted" style={{ fontSize: "0.72rem" }}>
+            {resource.title}
+            {chapter ? ` — ${chapter.title}` : ""}
+          </div>
+        ) : null}
+        <div className="muted" style={{ fontSize: "0.72rem" }}>
+          {Number.isFinite(cell.minutes) ? `${(cell.minutes ?? 0).toLocaleString("fa-IR")} دقیقه` : "—"}
         </div>
-        <div style={{ fontSize: "0.74rem" }}>
-          {typeof cell.count === "number" ? cell.count.toLocaleString("fa-IR") : "۰"} تمرین
-        </div>
-      </>
+        {countKindFor(cell) && (cell.count ?? 0) > 0 ? (
+          <div style={{ fontSize: "0.72rem" }}>{(cell.count ?? 0).toLocaleString("fa-IR")} عدد</div>
+        ) : null}
+      </div>
     );
   };
 
   const cellBody = (day: number, slot: number) => {
     const planned = props.plannedLabels[day]?.[slot] ?? "—";
-    const perf = grid[day]?.[slot] ?? { kind: "empty" };
+    const perf = grid[day]?.[slot] ?? { kind: "empty" as const };
     const note = perf.note?.trim();
 
     if (editing) {
+      const group = groupFor(day, slot, perf);
+      const subjectIds = group === "general" ? props.subjectGroups.general : props.subjectGroups.specialized;
+      const availableSubjects = subjectIds
+        .map((id) => subjectById.get(id))
+        .filter((subject): subject is SubjectOption => Boolean(subject));
+      const resource = perf.resourceId ? resourceById.get(perf.resourceId) : undefined;
+      const countMode = countKindFor(perf);
+      const textMode = textKindFor(perf);
+
       return (
         <div className="perf-edit-wrap">
           <span className="perf-tag">برنامه: {planned}</span>
           <div className="panel-edit">
             <select
-              aria-label={`نوع عملکرد ${props.weekdayLabels[day]} بازه ${props.slotLabels[slot]}`}
+              aria-label={`نوع عملکرد ${props.weekdayLabels[day]} زنگ ${slot + 1}`}
               value={perf.kind}
-              onChange={(event) =>
-                setKind(day, slot, event.target.value as PerfCellState["kind"])
-              }
+              onChange={(event) => setKind(day, slot, event.target.value as PerfCellState["kind"])}
             >
               {KIND_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -182,88 +285,132 @@ export function PerformancePanel(props: PerformancePanelProps) {
                 </option>
               ))}
             </select>
-            {(perf.kind === "review" || perf.kind === "practice") && (
+            {perf.kind === "routine" ? (
+              <select
+                aria-label={`نوع روتین ${props.weekdayLabels[day]} زنگ ${slot + 1}`}
+                value={perf.routineMode ?? "test"}
+                onChange={(event) =>
+                  setRoutineMode(day, slot, event.target.value === "study" ? "study" : "test")
+                }
+              >
+                <option value="test">روتین تست</option>
+                <option value="study">روتین مطالعه</option>
+              </select>
+            ) : null}
+            {perf.kind !== "empty" && perf.kind !== "rest" ? (
               <>
                 <select
-                  aria-label={`درس ${props.weekdayLabels[day]} بازه ${props.slotLabels[slot]}`}
+                  aria-label={`گروه درس ${props.weekdayLabels[day]} زنگ ${slot + 1}`}
+                  value={group}
+                  onChange={(event) =>
+                    setGroup(day, slot, event.target.value as "general" | "specialized")
+                  }
+                >
+                  <option value="general">عمومی</option>
+                  <option value="specialized">تخصصی</option>
+                </select>
+                <select
+                  aria-label={`درس ${props.weekdayLabels[day]} زنگ ${slot + 1}`}
                   value={perf.subjectId ?? ""}
                   onChange={(event) => setSubject(day, slot, event.target.value)}
                 >
                   <option value="">درس را انتخاب کنید…</option>
-                  {props.subjects.map((subject) => (
+                  {availableSubjects.map((subject) => (
                     <option key={subject.id} value={subject.id}>
                       {subject.title}
                     </option>
                   ))}
                 </select>
-                {perf.kind === "practice" && perf.subjectId && (
-                  <select
-                    aria-label={`منبع ${props.weekdayLabels[day]} بازه ${props.slotLabels[slot]}`}
-                    value={perf.resourceId ?? ""}
-                    onChange={(event) =>
-                      updateCell(day, slot, {
-                        ...perf,
-                        resourceId: event.target.value || null,
-                      })
-                    }
-                  >
-                    <option value="">منبع (اختیاری)…</option>
-                    {props.resources
-                      .filter((resource) => resource.subjectId === perf.subjectId)
-                      .map((resource) => (
-                        <option key={resource.id} value={resource.id}>
-                          {resource.title}
-                        </option>
-                      ))}
-                  </select>
-                )}
-                {perf.kind === "practice" && (
-                  <input
-                    type="number"
-                    min={0}
-                    max={1000}
-                    aria-label={`تعداد تمرین ${props.weekdayLabels[day]} بازه ${props.slotLabels[slot]}`}
-                    value={perf.count ?? 0}
-                    onChange={(event) =>
-                      updateCell(day, slot, {
-                        ...perf,
-                        count: Math.max(0, Math.round(Number(event.target.value) || 0)),
-                      })
-                    }
-                  />
-                )}
-                <select
-                  aria-label={`شروع ${props.weekdayLabels[day]} بازه ${props.slotLabels[slot]}`}
-                  value={perf.startMin ?? 480}
-                  onChange={(event) =>
-                    updateCell(day, slot, { ...perf, startMin: Number(event.target.value) })
-                  }
-                >
-                  {timeChoices.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      شروع: {option.label}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  aria-label={`پایان ${props.weekdayLabels[day]} بازه ${props.slotLabels[slot]}`}
-                  value={perf.endMin ?? 600}
-                  onChange={(event) =>
-                    updateCell(day, slot, { ...perf, endMin: Number(event.target.value) })
-                  }
-                >
-                  {timeChoices.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      پایان: {option.label}
-                    </option>
-                  ))}
-                </select>
               </>
-            )}
+            ) : null}
+            {textMode ? (
+              <input
+                type="text"
+                placeholder="نام منبع (متن آزاد)…"
+                aria-label={`منبع ${props.weekdayLabels[day]} زنگ ${slot + 1}`}
+                value={perf.resourceText ?? ""}
+                onChange={(event) =>
+                  updateCell(day, slot, { ...perf, resourceText: event.target.value })
+                }
+              />
+            ) : null}
+            {countMode ? (
+              <>
+                <select
+                  aria-label={`منبع ${props.weekdayLabels[day]} زنگ ${slot + 1}`}
+                  value={perf.resourceId ?? ""}
+                  onChange={(event) =>
+                    updateCell(day, slot, {
+                      ...perf,
+                      resourceId: event.target.value || null,
+                      chapterId: null,
+                    })
+                  }
+                >
+                  <option value="">منبع را انتخاب کنید…</option>
+                  {props.resources
+                    .filter((item) => item.subjectId === perf.subjectId)
+                    .map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.title}
+                      </option>
+                    ))}
+                </select>
+                <select
+                  aria-label={`فصل ${props.weekdayLabels[day]} زنگ ${slot + 1}`}
+                  value={perf.chapterId ?? ""}
+                  disabled={!resource}
+                  onChange={(event) =>
+                    updateCell(day, slot, { ...perf, chapterId: event.target.value || null })
+                  }
+                >
+                  <option value="">
+                    {resource ? "فصل/بخش را انتخاب کنید…" : "اول منبع را انتخاب کنید"}
+                  </option>
+                  {(resource?.chapters ?? []).map((chapter) => (
+                    <option key={chapter.id} value={chapter.id}>
+                      {chapter.title} — تست {chapter.completedTests.toLocaleString("fa-IR")}/
+                      {chapter.testCount.toLocaleString("fa-IR")} · تمرین{" "}
+                      {chapter.completedExercises.toLocaleString("fa-IR")}/
+                      {chapter.exerciseCount.toLocaleString("fa-IR")}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  min={0}
+                  max={1000}
+                  aria-label={`تعداد ${props.weekdayLabels[day]} زنگ ${slot + 1}`}
+                  value={perf.count ?? 0}
+                  onChange={(event) =>
+                    updateCell(day, slot, {
+                      ...perf,
+                      count: Math.max(0, Math.round(Number(event.target.value) || 0)),
+                    })
+                  }
+                />
+              </>
+            ) : null}
+            {perf.kind !== "empty" && perf.kind !== "rest" ? (
+              <input
+                type="number"
+                min={0}
+                max={1440}
+                placeholder="مدت (دقیقه)"
+                aria-label={`مدت ${props.weekdayLabels[day]} زنگ ${slot + 1}`}
+                value={perf.minutes ?? 0}
+                onChange={(event) =>
+                  updateCell(day, slot, {
+                    ...perf,
+                    minutes: Math.max(0, Math.round(Number(event.target.value) || 0)),
+                  })
+                }
+              />
+            ) : null}
             <input
               type="text"
               placeholder="توضیحات…"
-              aria-label={`توضیحات ${props.weekdayLabels[day]} بازه ${props.slotLabels[slot]}`}
+              aria-label={`توضیحات ${props.weekdayLabels[day]} زنگ ${slot + 1}`}
               value={perf.note ?? ""}
               onChange={(event) => updateCell(day, slot, { ...perf, note: event.target.value })}
             />
@@ -296,6 +443,31 @@ export function PerformancePanel(props: PerformancePanelProps) {
         {!showPerf && !showPlan ? <span className="muted">—</span> : null}
       </div>
     );
+  };
+
+  const faHours = (minutes: number) =>
+    (minutes / 60).toLocaleString("fa-IR", { maximumFractionDigits: 1 });
+
+  const dayTotals = (cells: PerfCellState[]) => {
+    let study = 0;
+    let review = 0;
+    let test = 0;
+    for (const cell of cells) {
+      const minutes = typeof cell.minutes === "number" ? cell.minutes : 0;
+      if (cell.kind === "study" || (cell.kind === "routine" && cell.routineMode === "study")) {
+        study += minutes;
+      } else if (cell.kind === "review") {
+        review += minutes;
+      } else if (
+        cell.kind === "test" ||
+        cell.kind === "timedTest" ||
+        cell.kind === "exercise" ||
+        (cell.kind === "routine" && cell.routineMode === "test")
+      ) {
+        test += minutes;
+      }
+    }
+    return { study, review, test };
   };
 
   return (
@@ -341,10 +513,13 @@ export function PerformancePanel(props: PerformancePanelProps) {
         <table className="panel-grid">
           <thead>
             <tr>
-              <th>روز / ساعت</th>
+              <th>روز / زنگ</th>
               {props.slotLabels.map((label) => (
                 <th key={label}>{label}</th>
               ))}
+              <th>جمع مطالعه</th>
+              <th>جمع مرور</th>
+              <th>جمع تست/تمرین</th>
             </tr>
           </thead>
           <tbody>
@@ -357,10 +532,29 @@ export function PerformancePanel(props: PerformancePanelProps) {
                   </div>
                 </th>
                 {grid[day].map((cell, slot) => (
-                  <td key={slot} className="panel-cell">
+                  <td
+                    key={slot}
+                    className={[
+                      "panel-cell",
+                      cell.kind === "rest" ? "is-rest" : "",
+                      `cell-action-${cell.kind}`,
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                  >
                     {cellBody(day, slot)}
                   </td>
                 ))}
+                {(() => {
+                  const totals = dayTotals(grid[day]);
+                  return (
+                    <>
+                      <td className="panel-total">{faHours(totals.study)} س</td>
+                      <td className="panel-total">{faHours(totals.review)} س</td>
+                      <td className="panel-total">{faHours(totals.test)} س</td>
+                    </>
+                  );
+                })()}
               </tr>
             ))}
           </tbody>

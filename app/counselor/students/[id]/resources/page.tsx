@@ -4,6 +4,7 @@ import { ResourceManager } from "@/components/resource-manager";
 import { requireCounselor } from "@/lib/auth";
 import { getStudentDetail } from "@/lib/counselor";
 import { summarizeResourceProgress } from "@/lib/resource-progress";
+import { listResourcePool } from "@/lib/resource-pool";
 
 const SUCCESS: Record<string, string> = {
   resource: "منبع اضافه شد.",
@@ -25,7 +26,10 @@ export default async function StudentResourcesPage({
   const detail = await getStudentDetail(counselor.workspaceId, id);
   if (!detail) notFound();
 
-  const summary = summarizeResourceProgress(detail.resources);
+  const [summary, poolResources] = await Promise.all([
+    Promise.resolve(summarizeResourceProgress(detail.resources)),
+    listResourcePool(counselor.workspaceId),
+  ]);
 
   return (
     <div className="stack" style={{ gap: "1rem" }}>
@@ -49,6 +53,7 @@ export default async function StudentResourcesPage({
         studentId={id}
         resources={detail.resources}
         subjects={detail.subjects}
+        poolResources={poolResources}
       />
     </div>
   );

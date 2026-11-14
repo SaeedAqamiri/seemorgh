@@ -283,7 +283,36 @@ export function ResourceProgressDashboard({ summary }: { summary: ResourceProgre
               </div>
               <small className="muted" style={{ fontSize: "0.72rem" }}>
                 {UNIT_TYPE_LABELS[resource.unitType] ?? resource.unitType} — {fa(resource.remainingUnits)} واحد مانده
+                {resource.remainingTests > 0
+                  ? ` · ${fa(resource.remainingTests)} تست باقی‌مانده`
+                  : ""}
+                {resource.remainingExercises > 0
+                  ? ` · ${fa(resource.remainingExercises)} تمرین باقی‌مانده`
+                  : ""}
               </small>
+              {(resource.chapters ?? []).length ? (
+                <details style={{ marginTop: "0.25rem" }}>
+                  <summary className="muted" style={{ fontSize: "0.72rem", cursor: "pointer" }}>
+                    پیشرفت فصل‌ها
+                  </summary>
+                  <ul style={{ margin: "0.25rem 0 0", paddingInlineStart: "1rem", fontSize: "0.72rem" }}>
+                    {(resource.chapters ?? []).map((chapter) => (
+                      <li key={chapter.id}>
+                        {chapter.title}
+                        {chapter.testCount > 0
+                          ? ` — تست ${fa(chapter.completedTests)}/${fa(chapter.testCount)}`
+                          : ""}
+                        {chapter.exerciseCount > 0
+                          ? ` — تمرین ${fa(chapter.completedExercises)}/${fa(chapter.exerciseCount)}`
+                          : ""}
+                        {chapter.pages > 0
+                          ? ` — صفحه ${fa(chapter.completedPages)}/${fa(chapter.pages)}`
+                          : ""}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              ) : null}
             </div>
           ))}
         </div>

@@ -74,6 +74,54 @@ describe("planner", () => {
     expect(byResource.get("res-math") ?? 0).toBeLessThanOrEqual(500);
   });
 
+  it("allocates tests from the remaining count of each chapter", () => {
+    const plan = generatePlan({
+      ...baseInput,
+      resources: [
+        {
+          id: "res-chaptered",
+          subjectId: "sub-bio",
+          subjectTitle: "زیست",
+          title: "زیست دوازدهم",
+          unitType: "test",
+          totalUnits: 100,
+          completedUnits: 40,
+          priority: 5,
+          chapters: [
+            {
+              id: "ch-1",
+              title: "فصل ۱",
+              pages: 0,
+              startPage: 1,
+              endPage: 0,
+              testCount: 60,
+              completedTests: 30,
+            },
+            {
+              id: "ch-2",
+              title: "فصل ۲",
+              pages: 0,
+              startPage: 1,
+              endPage: 0,
+              testCount: 40,
+              completedTests: 10,
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(plan.tasks.length).toBeGreaterThan(0);
+    expect(plan.tasks.every((task) => Boolean(task.chapterId))).toBe(true);
+    const perChapter = new Map<string, number>();
+    for (const task of plan.tasks) {
+      if (!task.chapterId) continue;
+      perChapter.set(task.chapterId, (perChapter.get(task.chapterId) ?? 0) + task.targetUnits);
+    }
+    expect(perChapter.get("ch-1") ?? 0).toBeLessThanOrEqual(30);
+    expect(perChapter.get("ch-2") ?? 0).toBeLessThanOrEqual(30);
+  });
+
   it("returns a warning when there is no availability", () => {
     const plan = generatePlan({
       ...baseInput,

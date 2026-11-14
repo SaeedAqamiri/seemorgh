@@ -18,10 +18,10 @@ export function StartChart({
     <div className="start-chart stack" style={{ gap: "0.45rem" }}>
       <div className="row" style={{ gap: "0.7rem", fontSize: "0.74rem" }}>
         <span className="chart-legend">
-          <span className="chart-dot is-onplan" /> طبق برنامه
+          <span className="chart-dot is-onplan" /> اولین ورود طبق برنامه
         </span>
         <span className="chart-legend">
-          <span className="chart-dot is-offplan" /> خارج از برنامه
+          <span className="chart-dot is-offplan" /> اولین ورود خارج از برنامه
         </span>
         <span className="chart-legend">
           <span className="chart-dot is-none" /> بدون فعالیت
@@ -53,7 +53,11 @@ export function StartChart({
                 <span
                   className={`chart-dot is-${day.status}`}
                   style={{ insetInlineStart: `calc(${frac * 100}% - 7px)` }}
-                  title={day.performedStartMin !== null ? `شروع: ${formatTime(day.performedStartMin)}` : ""}
+                  title={
+                    day.performedStartMin !== null
+                      ? `اولین ورود: ${formatTime(day.performedStartMin)}`
+                      : ""
+                  }
                 />
               ) : null}
             </div>

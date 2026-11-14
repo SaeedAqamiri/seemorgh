@@ -6,17 +6,20 @@ import { redirect } from "next/navigation";
 import { getDb } from "@/db/client";
 import { performancePanels, students, subjects } from "@/db/schema";
 import { getSessionUser } from "@/lib/auth";
-import { isISODate, startOfWeekSaturday } from "@/lib/dates";
+import { isISODate, startOfWeekSaturday, weekDates } from "@/lib/dates";
 import {
   generatePerformanceNarrative,
 } from "@/lib/ai-performance";
 import {
+  buildPlanningInsights,
+  buildSubjectDayMatrix,
   getPerformanceAnalysis,
   getPerformanceRangeData,
   getPerformanceView,
   PerformanceValidationError,
   savePerformancePanel,
 } from "@/lib/performance";
+import { getStudentResourceProgress } from "@/lib/resource-progress";
 import { saveReport } from "@/lib/reports";
 import { getWeeklyPanelView } from "@/lib/panel";
 
@@ -170,6 +173,7 @@ export async function generatePerformanceRangeNarrativeAction(formData: FormData
     );
   }
 
+  const resourceProgress = await getStudentResourceProgress(ctx.studentId);
   const result = await generatePerformanceNarrative({
     workspaceId: ctx.workspaceId,
     studentId: ctx.studentId,
@@ -177,6 +181,19 @@ export async function generatePerformanceRangeNarrativeAction(formData: FormData
     plannedSubjectsByDay: range.plannedSubjectsByDay,
     notes: range.notes,
     dailyRoutine: range.dailyRoutine,
+    subjectSummary: range.subjectDayMatrix.map((row) => ({
+      title: row.title,
+      practiceMinutes: row.totalPracticeMinutes,
+      studyMinutes: row.totalStudyMinutes,
+    })),
+    resourceProgress: resourceProgress.rows.map((row) => ({
+      subjectTitle: row.subjectTitle,
+      title: row.title,
+      percent: row.percent,
+      remainingUnits: row.remainingUnits,
+      remainingTests: row.remainingTests,
+    })),
+    planningInsights: range.planningInsights,
   });
 
   await saveReport({
@@ -235,22 +252,25 @@ export async function generatePerformanceNarrativeAction(formData: FormData): Pr
   ]);
 
   const subjectRows = await db
-    .select({ id: subjects.id, title: subjects.title })
+    .select({ id: subjects.id, title: subjects.title, kind: subjects.kind })
     .from(subjects)
     .where(eq(subjects.workspaceId, studentRow.workspaceId));
   const subjectTitles = new Map(subjectRows.map((row) => [row.id, row.title]));
+  const subjectMeta = new Map(
+    subjectRows.map((row) => [row.id, { title: row.title, kind: row.kind }]),
+  );
 
   const plannedSubjectsByDay = plan.grid.map((row) => [
     ...new Set(
       row
-        .filter((cell) => cell.kind === "review" || cell.kind === "test")
+        .filter((cell) => cell.kind !== "empty" && cell.kind !== "rest")
         .map((cell) => subjectTitles.get(cell.subjectId) ?? "درس"),
     ),
   ]);
 
   const notes = perf.grid.flatMap((row, day) =>
     row.flatMap((cell, slot) => {
-      const note = cell.kind === "review" || cell.kind === "practice" ? cell.note.trim() : "";
+      const note = cell.kind !== "empty" && cell.kind !== "rest" ? cell.note.trim() : "";
       return note
         ? [{ weekday: day, slot, text: note.slice(0, 300) }]
         : [];
@@ -263,6 +283,10 @@ export async function generatePerformanceNarrativeAction(formData: FormData): Pr
     );
   }
 
+  const dates = weekDates(weekStart);
+  const matrix = buildSubjectDayMatrix(perf.grid, dates, subjectMeta);
+  const planningInsights = buildPlanningInsights(plan.grid, dates, plan.slots, subjectMeta);
+  const resourceProgress = await getStudentResourceProgress(studentId);
   const result = await generatePerformanceNarrative({
     workspaceId: studentRow.workspaceId,
     studentId,
@@ -270,6 +294,19 @@ export async function generatePerformanceNarrativeAction(formData: FormData): Pr
     plannedSubjectsByDay,
     notes,
     dailyRoutine: plan.dailyRoutine,
+    subjectSummary: matrix.map((row) => ({
+      title: row.title,
+      practiceMinutes: row.totalPracticeMinutes,
+      studyMinutes: row.totalStudyMinutes,
+    })),
+    resourceProgress: resourceProgress.rows.map((row) => ({
+      subjectTitle: row.subjectTitle,
+      title: row.title,
+      percent: row.percent,
+      remainingUnits: row.remainingUnits,
+      remainingTests: row.remainingTests,
+    })),
+    planningInsights,
   });
 
   await db

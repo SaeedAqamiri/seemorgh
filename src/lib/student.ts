@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/db/client";
-import { dailyLogs, plans, resources, subjects, tasks } from "@/db/schema";
+import { dailyLogs, examTargets, plans, resourceChapters, resources, subjects, tasks } from "@/db/schema";
 import { startOfWeekSaturday, todayISO, weekDates } from "./dates";
 import { contentForResources, type ContentItemView } from "./content";
 
@@ -10,11 +10,17 @@ export type StudentTaskItem = {
   plannedStart: number;
   plannedEnd: number;
   subjectTitle: string;
+  subjectColor: string;
   resourceId: string | null;
   resourceTitle: string | null;
   resourceUnitType: "test" | "page" | "chapter" | null;
   topic: string;
-  type: "study" | "review" | "test";
+  type: "study" | "review" | "test" | "timed_test" | "exercise";
+  actionKind: string;
+  routineMode: "study" | "test" | null;
+  chapterId: string | null;
+  chapterTitle: string | null;
+  resourceText: string;
   targetUnits: number;
   estMinutes: number;
   status: "pending" | "done" | "skipped";
@@ -36,12 +42,15 @@ async function taskItemsForPlan(planId: string): Promise<StudentTaskItem[]> {
     .select({
       task: tasks,
       subjectTitle: subjects.title,
+      subjectColor: subjects.color,
       resourceTitle: resources.title,
       resourceUnitType: resources.unitType,
+      chapterTitle: resourceChapters.title,
     })
     .from(tasks)
     .innerJoin(subjects, eq(tasks.subjectId, subjects.id))
     .leftJoin(resources, eq(tasks.resourceId, resources.id))
+    .leftJoin(resourceChapters, eq(tasks.chapterId, resourceChapters.id))
     .where(eq(tasks.planId, planId))
     .orderBy(asc(tasks.planDate), asc(tasks.plannedStart));
 
@@ -51,11 +60,17 @@ async function taskItemsForPlan(planId: string): Promise<StudentTaskItem[]> {
     plannedStart: row.task.plannedStart,
     plannedEnd: row.task.plannedEnd,
     subjectTitle: row.subjectTitle,
+    subjectColor: row.subjectColor,
     resourceId: row.task.resourceId,
     resourceTitle: row.resourceTitle,
     resourceUnitType: row.resourceUnitType,
     topic: row.task.topic,
     type: row.task.type,
+    actionKind: row.task.actionKind,
+    routineMode: row.task.routineMode,
+    chapterId: row.task.chapterId,
+    chapterTitle: row.chapterTitle,
+    resourceText: row.task.resourceText,
     targetUnits: row.task.targetUnits,
     estMinutes: row.task.estMinutes,
     status: row.task.status,
@@ -83,6 +98,11 @@ export async function getStudentTodayData(studentId: string) {
     )
     .limit(1);
 
+  const examsToday = await db
+    .select({ title: examTargets.title, examType: examTargets.examType, examDate: examTargets.examDate })
+    .from(examTargets)
+    .where(and(eq(examTargets.studentId, studentId), eq(examTargets.examDate, today)));
+
   if (!plan) {
     return {
       today,
@@ -92,6 +112,7 @@ export async function getStudentTodayData(studentId: string) {
       weekTasks: [] as StudentTaskItem[],
       content: [] as ContentItemView[],
       log: null,
+      examsToday,
     };
   }
 
@@ -112,6 +133,7 @@ export async function getStudentTodayData(studentId: string) {
     weekTasks: all,
     content: await contentForResources(resourceIds),
     log: log ?? null,
+    examsToday,
   };
 }
 

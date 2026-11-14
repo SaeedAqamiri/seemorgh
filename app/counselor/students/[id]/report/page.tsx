@@ -5,6 +5,7 @@ import { ReportRangeForm } from "@/components/report-range-form";
 import { requireCounselor } from "@/lib/auth";
 import { getStudentDetail } from "@/lib/counselor";
 import {
+  addDays,
   formatJalaliNumeric,
   isISODate,
   startOfWeekSaturday,
@@ -33,7 +34,7 @@ export default async function StudentPeriodReportPage({
   if (!detail) notFound();
 
   const today = todayISO();
-  const defaultFrom = startOfWeekSaturday(today);
+  const defaultFrom = addDays(startOfWeekSaturday(today), -21);
   const from = fromParam && isISODate(fromParam) ? fromParam : defaultFrom;
   const to = toParam && isISODate(toParam) ? toParam : today;
   const validRange = from <= to;
@@ -80,7 +81,9 @@ export default async function StudentPeriodReportPage({
         studentId={id}
         from={rangeFrom}
         to={rangeTo}
+        dates={range.dates}
         analysis={range.analysis}
+        subjectDayMatrix={range.subjectDayMatrix}
         narrative={savedNarrative}
         narrativeAt={savedNarrative ? savedReport?.createdAt ?? null : null}
       />

@@ -1,6 +1,7 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, lte } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import {
+  examTargets,
   plans,
   resources,
   students,
@@ -8,26 +9,44 @@ import {
   tasks,
   users,
   weeklyPanels,
+  type PanelActionKind,
   type PanelCellJson,
   type WeeklyGridJson,
 } from "@/db/schema";
-import { weekDates } from "./dates";
+import { addDays, weekDates } from "./dates";
+import { chaptersByResourceIds, ensureChaptersFromJson } from "./resource-chapters";
+import {
+  faNumber,
+  getBellSlots,
+  PANEL_DAYS,
+  PANEL_SLOTS,
+  type PanelSlot,
+  slotIndexForStart,
+  slotLabel,
+} from "./schedule";
+import { listSubjectsForField, type SubjectOption } from "./subject-catalog";
 
-export const PANEL_DAYS = 7;
-export const PANEL_SLOTS = [
-  { startMin: 480, endMin: 600 },
-  { startMin: 600, endMin: 720 },
-  { startMin: 720, endMin: 840 },
-  { startMin: 840, endMin: 960 },
-  { startMin: 960, endMin: 1080 },
-  { startMin: 1080, endMin: 1200 },
-] as const;
+export { PANEL_DAYS, PANEL_SLOTS, faNumber, slotLabel };
+export type { PanelSlot };
 
-export type PanelSlot = (typeof PANEL_SLOTS)[number];
+export const PANEL_ACTION_LABELS: Record<PanelActionKind, string> = {
+  empty: "خالی",
+  rest: "استراحت",
+  study: "مطالعه",
+  review: "مرور",
+  test: "تست آموزشی",
+  timedTest: "تست زمان‌دار",
+  exercise: "تمرین",
+  routine: "روتین",
+};
+
+export type PanelExam = { title: string; examDate: string; examType: string };
 
 export type PanelView = {
   weekStart: string;
   grid: WeeklyGridJson;
+  slots: PanelSlot[];
+  exams: PanelExam[];
   dailyRoutine: string;
   nextWeekHomework: string;
   planId: string | null;
@@ -36,40 +55,83 @@ export type PanelView = {
   updatedByName: string | null;
 };
 
-export function slotLabel(slot: { startMin: number; endMin: number }): string {
-  const fa = (minutes: number) =>
-    (minutes / 60).toLocaleString("fa-IR", { maximumFractionDigits: 0 });
-  return `${fa(slot.startMin)} تا ${fa(slot.endMin)}`;
+function isCountAction(
+  cell: PanelCellJson,
+): cell is Extract<PanelCellJson, { kind: "test" | "timedTest" | "exercise" }> {
+  return cell.kind === "test" || cell.kind === "timedTest" || cell.kind === "exercise";
 }
 
-export function faNumber(value: number): string {
-  return value.toLocaleString("fa-IR");
+function isTextAction(
+  cell: PanelCellJson,
+): cell is Extract<PanelCellJson, { kind: "study" | "review" }> {
+  return cell.kind === "study" || cell.kind === "review";
+}
+
+export function actionLabel(cell: PanelCellJson): string {
+  if (cell.kind === "routine") {
+    return `روتین (${cell.routineMode === "test" ? "تست" : "مطالعه"})`;
+  }
+  return PANEL_ACTION_LABELS[cell.kind];
 }
 
 export function plannedCellLabel(
   cell: PanelCellJson | undefined,
   subjectTitles: Map<string, string>,
   resourceTitles: Map<string, string>,
+  chapterTitles?: Map<string, string>,
 ): string {
   if (!cell) return "—";
+  if (cell.kind === "empty") return "—";
   if (cell.kind === "rest") return "استراحت";
-  if (cell.kind === "review") return `مرور · ${subjectTitles.get(cell.subjectId) ?? "درس"}`;
-  if (cell.kind === "test") {
-    const parts = [`تمرین · ${subjectTitles.get(cell.subjectId) ?? "درس"}`];
-    if (cell.resourceId) {
-      const resource = resourceTitles.get(cell.resourceId);
-      if (resource) parts.push(resource);
-    }
-    if (cell.count > 0) parts.push(`${faNumber(cell.count)} تمرین`);
+
+  const subject = subjectTitles.get(cell.subjectId) ?? "درس";
+
+  if (isTextAction(cell)) {
+    return [PANEL_ACTION_LABELS[cell.kind], subject, cell.resourceText]
+      .filter(Boolean)
+      .join(" · ");
+  }
+
+  if (isCountAction(cell)) {
+    const parts = [PANEL_ACTION_LABELS[cell.kind], subject];
+    const resource = cell.resourceId ? resourceTitles.get(cell.resourceId) : null;
+    if (resource) parts.push(resource);
+    const chapter = cell.chapterId ? chapterTitles?.get(cell.chapterId) : null;
+    if (chapter) parts.push(chapter);
+    if (cell.count > 0) parts.push(`${faNumber(cell.count)} عدد`);
     return parts.join(" · ");
   }
-  return "—";
+
+  const parts = [actionLabel(cell), subject];
+  if (cell.routineMode === "study") {
+    if (cell.resourceText) parts.push(cell.resourceText);
+  } else {
+    const resource = cell.resourceId ? resourceTitles.get(cell.resourceId) : null;
+    if (resource) parts.push(resource);
+    const chapter = cell.chapterId ? chapterTitles?.get(cell.chapterId) : null;
+    if (chapter) parts.push(chapter);
+    if (cell.count > 0) parts.push(`${faNumber(cell.count)} عدد`);
+  }
+  return parts.join(" · ");
 }
 
-export function emptyGrid(): WeeklyGridJson {
+export function emptyGrid(slotCount: number = PANEL_SLOTS.length): WeeklyGridJson {
   return Array.from({ length: PANEL_DAYS }, () =>
-    Array.from({ length: PANEL_SLOTS.length }, () => ({ kind: "empty" }) satisfies PanelCellJson),
+    Array.from({ length: slotCount }, () => ({ kind: "empty" }) satisfies PanelCellJson),
   );
+}
+
+function text(value: unknown): string {
+  return typeof value === "string" ? value.trim().slice(0, 500) : "";
+}
+
+function nullableId(value: unknown): string | null {
+  return typeof value === "string" && value ? value : null;
+}
+
+function normalizeCount(value: unknown): number {
+  const raw = Number(value);
+  return Number.isFinite(raw) ? Math.max(0, Math.min(1000, Math.round(raw))) : 0;
 }
 
 export function normalizeCell(value: unknown): PanelCellJson {
@@ -77,29 +139,47 @@ export function normalizeCell(value: unknown): PanelCellJson {
   const cell = value as Record<string, unknown>;
   const kind = cell.kind;
   if (kind === "rest") return { kind: "rest" };
-  if (kind === "review" && typeof cell.subjectId === "string" && cell.subjectId) {
-    return { kind: "review", subjectId: cell.subjectId };
+
+  const subjectId = typeof cell.subjectId === "string" ? cell.subjectId : "";
+  if (!subjectId) return { kind: "empty" };
+
+  if (kind === "study" || kind === "review") {
+    return { kind, subjectId, resourceText: text(cell.resourceText) };
   }
-  if (kind === "test" && typeof cell.subjectId === "string" && cell.subjectId) {
-    const rawCount = Number(cell.count);
-    const count = Number.isFinite(rawCount) ? Math.max(0, Math.min(1000, Math.round(rawCount))) : 0;
+
+  if (kind === "test" || kind === "timedTest" || kind === "exercise") {
     return {
-      kind: "test",
-      subjectId: cell.subjectId,
-      resourceId: typeof cell.resourceId === "string" && cell.resourceId ? cell.resourceId : null,
-      count,
+      kind,
+      subjectId,
+      resourceId: nullableId(cell.resourceId),
+      chapterId: nullableId(cell.chapterId),
+      count: normalizeCount(cell.count),
     };
   }
+
+  if (kind === "routine") {
+    const routineMode = cell.routineMode === "study" ? "study" : "test";
+    return {
+      kind: "routine",
+      routineMode,
+      subjectId,
+      resourceText: text(cell.resourceText),
+      resourceId: nullableId(cell.resourceId),
+      chapterId: nullableId(cell.chapterId),
+      count: normalizeCount(cell.count),
+    };
+  }
+
   return { kind: "empty" };
 }
 
-export function normalizeGrid(value: unknown): WeeklyGridJson {
-  const grid = emptyGrid();
+export function normalizeGrid(value: unknown, slotCount: number = PANEL_SLOTS.length): WeeklyGridJson {
+  const grid = emptyGrid(slotCount);
   if (!Array.isArray(value)) return grid;
   for (let day = 0; day < Math.min(PANEL_DAYS, value.length); day += 1) {
     const row = value[day];
     if (!Array.isArray(row)) continue;
-    for (let slot = 0; slot < Math.min(PANEL_SLOTS.length, row.length); slot += 1) {
+    for (let slot = 0; slot < Math.min(slotCount, row.length); slot += 1) {
       grid[day][slot] = normalizeCell(row[slot]);
     }
   }
@@ -108,12 +188,18 @@ export function normalizeGrid(value: unknown): WeeklyGridJson {
 
 export class PanelValidationError extends Error {}
 
-function assertGrid(value: unknown): asserts value is WeeklyGridJson {
+function assertCountCell(cell: { count: number }): void {
+  if (!Number.isInteger(cell.count) || cell.count < 0) {
+    throw new PanelValidationError("تعداد تست/تمرین باید عدد صحیح و نامنفی باشد.");
+  }
+}
+
+function assertGrid(value: unknown, slotCount: number): asserts value is WeeklyGridJson {
   if (!Array.isArray(value) || value.length !== PANEL_DAYS) {
     throw new PanelValidationError("ساختار جدول نامعتبر است.");
   }
   for (const row of value) {
-    if (!Array.isArray(row) || row.length !== PANEL_SLOTS.length) {
+    if (!Array.isArray(row) || row.length !== slotCount) {
       throw new PanelValidationError("ساختار جدول نامعتبر است.");
     }
     for (const cell of row) {
@@ -121,20 +207,74 @@ function assertGrid(value: unknown): asserts value is WeeklyGridJson {
         throw new PanelValidationError("ساختار خانه‌ها نامعتبر است.");
       }
       const c = cell as PanelCellJson;
-      if (c.kind === "review" && !c.subjectId) {
-        throw new PanelValidationError("برای مرور باید درس انتخاب شود.");
-      }
-      if (c.kind === "test") {
-        if (!c.subjectId) throw new PanelValidationError("برای تست باید درس انتخاب شود.");
-        if (!Number.isInteger(c.count) || c.count < 0) {
-          throw new PanelValidationError("تعداد تست باید عدد صحیح و نامنفی باشد.");
-        }
-      }
+      if (c.kind === "empty" || c.kind === "rest") continue;
+      if (!c.subjectId) throw new PanelValidationError("برای هر اقدام باید درس انتخاب شود.");
+      if (isCountAction(c)) assertCountCell(c);
+      if (c.kind === "routine" && c.routineMode === "test") assertCountCell(c);
     }
   }
 }
 
-async function gridFromTasks(planId: string, weekStart: string): Promise<WeeklyGridJson> {
+export function taskTypeForCell(cell: PanelCellJson): {
+  type: "study" | "review" | "test" | "timed_test" | "exercise";
+  actionKind: PanelActionKind;
+  routineMode: "study" | "test" | null;
+} {
+  switch (cell.kind) {
+    case "review":
+      return { type: "review", actionKind: "review", routineMode: null };
+    case "test":
+      return { type: "test", actionKind: "test", routineMode: null };
+    case "timedTest":
+      return { type: "timed_test", actionKind: "timedTest", routineMode: null };
+    case "exercise":
+      return { type: "exercise", actionKind: "exercise", routineMode: null };
+    case "routine":
+      return {
+        type: cell.routineMode === "test" ? "test" : "study",
+        actionKind: "routine",
+        routineMode: cell.routineMode,
+      };
+    case "study":
+    default:
+      return { type: "study", actionKind: "study", routineMode: null };
+  }
+}
+
+function cellFromTask(task: typeof tasks.$inferSelect): PanelCellJson {
+  const actionKind = (task.actionKind || "study") as PanelActionKind;
+  const count = Math.max(0, task.targetUnits);
+  const base = {
+    subjectId: task.subjectId,
+    resourceId: task.resourceId,
+    chapterId: task.chapterId,
+    resourceText: task.resourceText,
+    count,
+  };
+  switch (actionKind) {
+    case "study":
+    case "review":
+      return { kind: actionKind, subjectId: task.subjectId, resourceText: task.resourceText };
+    case "test":
+    case "timedTest":
+    case "exercise":
+      return { kind: actionKind, ...base };
+    case "routine":
+      return {
+        kind: "routine",
+        routineMode: task.routineMode === "study" ? "study" : "test",
+        ...base,
+      };
+    default:
+      return { kind: task.type === "review" ? "review" : "study", subjectId: task.subjectId, resourceText: task.resourceText };
+  }
+}
+
+async function gridFromTasks(
+  planId: string,
+  weekStart: string,
+  slots: PanelSlot[],
+): Promise<WeeklyGridJson> {
   const db = await getDb();
   const rows = await db
     .select()
@@ -143,27 +283,14 @@ async function gridFromTasks(planId: string, weekStart: string): Promise<WeeklyG
     .orderBy(asc(tasks.planDate), asc(tasks.plannedStart));
 
   const dates = weekDates(weekStart);
-  const grid = emptyGrid();
-
+  const grid = emptyGrid(slots.length);
   for (const task of rows) {
     const day = dates.indexOf(task.planDate);
     if (day < 0) continue;
-    const slotIndex = PANEL_SLOTS.findIndex(
-      (slot) => task.plannedStart >= slot.startMin && task.plannedStart < slot.endMin,
-    );
+    const slotIndex = slotIndexForStart(slots, task.plannedStart);
     if (slotIndex < 0) continue;
     if (grid[day][slotIndex].kind !== "empty") continue;
-
-    if (task.type === "test") {
-      grid[day][slotIndex] = {
-        kind: "test",
-        subjectId: task.subjectId,
-        resourceId: task.resourceId,
-        count: task.targetUnits,
-      };
-    } else {
-      grid[day][slotIndex] = { kind: "review", subjectId: task.subjectId };
-    }
+    grid[day][slotIndex] = cellFromTask(task);
   }
 
   return grid;
@@ -171,23 +298,42 @@ async function gridFromTasks(planId: string, weekStart: string): Promise<WeeklyG
 
 export async function getWeeklyPanelView(studentId: string, weekStart: string): Promise<PanelView> {
   const db = await getDb();
+  const slots = await getBellSlots(studentId);
   const [panel] = await db
     .select()
     .from(weeklyPanels)
     .where(and(eq(weeklyPanels.studentId, studentId), eq(weeklyPanels.weekStart, weekStart)))
     .limit(1);
 
-  const [plan] = await db
-    .select()
-    .from(plans)
-    .where(and(eq(plans.studentId, studentId), eq(plans.weekStart, weekStart)))
-    .limit(1);
+  const [planRows, examRows] = await Promise.all([
+    db
+      .select()
+      .from(plans)
+      .where(and(eq(plans.studentId, studentId), eq(plans.weekStart, weekStart)))
+      .limit(1),
+    db
+      .select({
+        title: examTargets.title,
+        examDate: examTargets.examDate,
+        examType: examTargets.examType,
+      })
+      .from(examTargets)
+      .where(
+        and(
+          eq(examTargets.studentId, studentId),
+          gte(examTargets.examDate, weekStart),
+          lte(examTargets.examDate, addDays(weekStart, 6)),
+        ),
+      )
+      .orderBy(asc(examTargets.examDate)),
+  ]);
 
+  const plan = planRows[0];
   const grid = panel?.gridJson
-    ? normalizeGrid(panel.gridJson)
+    ? normalizeGrid(panel.gridJson, slots.length)
     : plan
-      ? await gridFromTasks(plan.id, weekStart)
-      : emptyGrid();
+      ? await gridFromTasks(plan.id, weekStart, slots)
+      : emptyGrid(slots.length);
 
   let updatedByName: string | null = null;
   if (panel?.updatedBy) {
@@ -202,6 +348,8 @@ export async function getWeeklyPanelView(studentId: string, weekStart: string): 
   return {
     weekStart,
     grid,
+    slots,
+    exams: examRows,
     dailyRoutine: panel?.dailyRoutine ?? "",
     nextWeekHomework: panel?.nextWeekHomework ?? "",
     planId: plan?.id ?? null,
@@ -211,29 +359,137 @@ export async function getWeeklyPanelView(studentId: string, weekStart: string): 
   };
 }
 
-export type PanelOptions = {
-  subjects: { id: string; title: string }[];
-  resources: { id: string; subjectId: string; title: string }[];
+export type PanelChapterOption = {
+  id: string;
+  title: string;
+  testCount: number;
+  completedTests: number;
+  exerciseCount: number;
+  completedExercises: number;
+  pages: number;
+  completedPages: number;
 };
+
+export type PanelResourceOption = {
+  id: string;
+  subjectId: string;
+  title: string;
+  unitType: "test" | "page" | "chapter";
+  totalUnits: number;
+  completedUnits: number;
+  priority: number;
+  chapters: PanelChapterOption[];
+};
+
+export type PanelOptions = {
+  subjects: SubjectOption[];
+  resources: PanelResourceOption[];
+  subjectGroups: { general: string[]; specialized: string[] };
+};
+
+export function subjectsToGroups(subjects: SubjectOption[], field: string): {
+  general: string[];
+  specialized: string[];
+} {
+  const general: string[] = [];
+  const specialized: string[] = [];
+  for (const subject of subjects) {
+    if (subject.kind === "general") general.push(subject.id);
+    else if (subject.kind === "specialized") specialized.push(subject.id);
+    else {
+      general.push(subject.id);
+      if (field === "انسانی") specialized.push(subject.id);
+    }
+  }
+  return { general, specialized };
+}
 
 export async function getPanelOptions(
   workspaceId: string,
   studentId: string,
 ): Promise<PanelOptions> {
   const db = await getDb();
-  const [subjectRows, resourceRows] = await Promise.all([
-    db
-      .select({ id: subjects.id, title: subjects.title })
+  const [student] = await db
+    .select({ field: students.field })
+    .from(students)
+    .where(and(eq(students.workspaceId, workspaceId), eq(students.id, studentId)))
+    .limit(1);
+
+  const subjectRows = await listSubjectsForField(workspaceId, student?.field ?? "تجربی");
+  const resourceRows = await db
+    .select({
+      id: resources.id,
+      subjectId: resources.subjectId,
+      title: resources.title,
+      unitType: resources.unitType,
+      totalUnits: resources.totalUnits,
+      completedUnits: resources.completedUnits,
+      priority: resources.priority,
+      chaptersJson: resources.chaptersJson,
+    })
+    .from(resources)
+    .where(and(eq(resources.workspaceId, workspaceId), eq(resources.studentId, studentId)))
+    .orderBy(asc(resources.title));
+
+  const knownSubjectIds = new Set(subjectRows.map((row) => row.id));
+  const missingSubjectIds = [
+    ...new Set(resourceRows.map((row) => row.subjectId).filter((id) => !knownSubjectIds.has(id))),
+  ];
+  if (missingSubjectIds.length > 0) {
+    const extraSubjects = await db
+      .select({
+        id: subjects.id,
+        title: subjects.title,
+        kind: subjects.kind,
+        color: subjects.color,
+        fieldsJson: subjects.fieldsJson,
+      })
       .from(subjects)
-      .where(eq(subjects.workspaceId, workspaceId))
-      .orderBy(asc(subjects.title)),
-    db
-      .select({ id: resources.id, subjectId: resources.subjectId, title: resources.title })
-      .from(resources)
-      .where(and(eq(resources.workspaceId, workspaceId), eq(resources.studentId, studentId)))
-      .orderBy(asc(resources.title)),
-  ]);
-  return { subjects: subjectRows, resources: resourceRows };
+      .where(inArray(subjects.id, missingSubjectIds));
+    subjectRows.push(...extraSubjects);
+  }
+
+  let chapterMap = await chaptersByResourceIds(
+    db,
+    resourceRows.map((row) => row.id),
+  );
+  let backfilled = false;
+  for (const row of resourceRows) {
+    if ((chapterMap.get(row.id)?.length ?? 0) > 0) continue;
+    const created = await ensureChaptersFromJson(db, {
+      id: row.id,
+      unitType: row.unitType as PanelResourceOption["unitType"],
+      totalUnits: row.totalUnits,
+      completedUnits: row.completedUnits,
+      chaptersJson: row.chaptersJson,
+    });
+    if (created) backfilled = true;
+  }
+  if (backfilled) {
+    chapterMap = await chaptersByResourceIds(
+      db,
+      resourceRows.map((row) => row.id),
+    );
+  }
+
+  return {
+    subjects: subjectRows,
+    resources: resourceRows.map((row) => ({
+      ...row,
+      unitType: row.unitType as PanelResourceOption["unitType"],
+      chapters: (chapterMap.get(row.id) ?? []).map((chapter) => ({
+        id: chapter.id,
+        title: chapter.title,
+        testCount: chapter.testCount,
+        completedTests: chapter.completedTests,
+        exerciseCount: chapter.exerciseCount,
+        completedExercises: chapter.completedExercises,
+        pages: chapter.pages,
+        completedPages: chapter.completedPages,
+      })),
+    })),
+    subjectGroups: subjectsToGroups(subjectRows, student?.field ?? "تجربی"),
+  };
 }
 
 export type SavePanelInput = {
@@ -246,9 +502,6 @@ export type SavePanelInput = {
 };
 
 export async function saveWeeklyPanel(input: SavePanelInput): Promise<void> {
-  assertGrid(input.grid);
-  const grid = normalizeGrid(input.grid);
-
   const db = await getDb();
   const [studentRow] = await db
     .select({ id: students.id, workspaceId: students.workspaceId })
@@ -256,6 +509,10 @@ export async function saveWeeklyPanel(input: SavePanelInput): Promise<void> {
     .where(eq(students.id, input.studentId))
     .limit(1);
   if (!studentRow) throw new PanelValidationError("دانش‌آموز پیدا نشد.");
+
+  const slots = await getBellSlots(input.studentId);
+  assertGrid(input.grid, slots.length);
+  const grid = normalizeGrid(input.grid, slots.length);
 
   const [subjectRows, resourceRows] = await Promise.all([
     db
@@ -270,16 +527,34 @@ export async function saveWeeklyPanel(input: SavePanelInput): Promise<void> {
 
   const subjectIds = new Set(subjectRows.map((row) => row.id));
   const resourceIds = new Set(resourceRows.map((row) => row.id));
+  const chapterMap = await chaptersByResourceIds(db, [...resourceIds]);
+  const chapterById = new Map(
+    [...chapterMap.values()].flat().map((chapter) => [chapter.id, chapter]),
+  );
 
   for (const row of grid) {
     for (const cell of row) {
-      if (cell.kind === "review" || cell.kind === "test") {
-        if (!subjectIds.has(cell.subjectId)) {
-          throw new PanelValidationError("یکی از درس‌های انتخابی معتبر نیست.");
-        }
+      if (cell.kind === "empty" || cell.kind === "rest") continue;
+      if (!subjectIds.has(cell.subjectId)) {
+        throw new PanelValidationError("یکی از درس‌های انتخابی معتبر نیست.");
       }
-      if (cell.kind === "test" && cell.resourceId && !resourceIds.has(cell.resourceId)) {
-        throw new PanelValidationError("یکی از منابع انتخابی معتبر نیست.");
+      if (isTextAction(cell)) continue;
+      if (isCountAction(cell) || cell.kind === "routine") {
+        const isTestMode = cell.kind !== "routine" || cell.routineMode === "test";
+        if (!isTestMode) continue;
+        if (cell.resourceId && !resourceIds.has(cell.resourceId)) {
+          throw new PanelValidationError("یکی از منابع انتخابی معتبر نیست.");
+        }
+        if (cell.resourceId && !cell.chapterId && (chapterMap.get(cell.resourceId)?.length ?? 0) > 0) {
+          throw new PanelValidationError("برای این منبع، فصل/بخش را هم انتخاب کنید.");
+        }
+        if (cell.chapterId) {
+          const chapter = chapterById.get(cell.chapterId);
+          if (!chapter) throw new PanelValidationError("فصل انتخاب‌شده معتبر نیست.");
+          if (cell.resourceId && chapter.resourceId !== cell.resourceId) {
+            throw new PanelValidationError("فصل انتخاب‌شده به منبع انتخابی تعلق ندارد.");
+          }
+        }
       }
     }
   }
@@ -337,18 +612,38 @@ export async function saveWeeklyPanel(input: SavePanelInput): Promise<void> {
     for (let day = 0; day < grid.length; day += 1) {
       for (let slot = 0; slot < grid[day].length; slot += 1) {
         const cell = grid[day][slot];
-        if (cell.kind !== "review" && cell.kind !== "test") continue;
-        const slotDef = PANEL_SLOTS[slot];
+        if (cell.kind === "empty" || cell.kind === "rest") continue;
+        const slotDef = slots[slot];
+        const meta = taskTypeForCell(cell);
+        const countCell = isCountAction(cell)
+          ? cell
+          : cell.kind === "routine" && cell.routineMode === "test"
+            ? cell
+            : null;
+        const textCell = isTextAction(cell)
+          ? cell
+          : cell.kind === "routine" && cell.routineMode === "study"
+            ? cell
+            : null;
+        const chapterId = countCell?.chapterId ?? null;
+        const resourceId = countCell?.resourceId ?? null;
+        const resourceText = textCell?.resourceText ?? "";
+        const count = countCell?.count ?? 0;
+        const chapterTitle = chapterId ? chapterById.get(chapterId)?.title ?? "" : "";
         taskValues.push({
           planId: planId,
           planDate: dates[day],
           plannedStart: slotDef.startMin,
           plannedEnd: slotDef.endMin,
           subjectId: cell.subjectId,
-          resourceId: cell.kind === "test" ? cell.resourceId : null,
-          topic: "",
-          type: cell.kind,
-          targetUnits: cell.kind === "test" ? cell.count : 0,
+          resourceId,
+          chapterId,
+          resourceText,
+          topic: chapterTitle || resourceText,
+          type: meta.type,
+          actionKind: meta.actionKind,
+          routineMode: meta.routineMode,
+          targetUnits: count,
           estMinutes: slotDef.endMin - slotDef.startMin,
         });
       }

@@ -2,6 +2,18 @@ import { addDays, daysBetween, weekDates, weekdayIndex } from "./dates";
 
 export type PlannerUnitType = "test" | "page" | "chapter";
 
+export type PlannerChapter = {
+  id?: string;
+  title: string;
+  pages: number;
+  startPage: number;
+  endPage: number;
+  testCount?: number;
+  completedTests?: number;
+  exerciseCount?: number;
+  completedExercises?: number;
+};
+
 export type PlannerResource = {
   id: string;
   subjectId: string;
@@ -11,7 +23,7 @@ export type PlannerResource = {
   totalUnits: number;
   completedUnits: number;
   priority: number;
-  chapters?: { title: string; pages: number; startPage: number; endPage: number }[] | null;
+  chapters?: PlannerChapter[] | null;
 };
 
 export type PlannerAvailability = {
@@ -40,14 +52,20 @@ export type PlannerInput = {
   examTargets: PlannerExamTarget[];
 };
 
+export type PlannedActionKind = "study" | "review" | "test" | "timedTest" | "exercise";
+
 export type PlannedTask = {
   planDate: string;
   plannedStart: number;
   plannedEnd: number;
   subjectId: string;
   resourceId: string;
+  chapterId: string | null;
+  resourceText: string;
   topic: string;
-  type: "study" | "review" | "test";
+  type: "study" | "review" | "test" | "timed_test" | "exercise";
+  actionKind: PlannedActionKind;
+  routineMode: "study" | "test" | null;
   targetUnits: number;
   estMinutes: number;
 };
@@ -66,11 +84,14 @@ export type GeneratedPlan = {
 
 type Window = { startMin: number; endMin: number };
 
+type ChapterRemaining = { id: string | null; title: string; remaining: number };
+
 type PoolItem = {
   resource: PlannerResource;
   remainingUnits: number;
   remainingMinutes: number;
   totalMinutes: number;
+  chapterRemaining: ChapterRemaining[];
 };
 
 const MIN_BLOCK = 20;
@@ -175,11 +196,25 @@ export function generatePlan(input: PlannerInput): GeneratedPlan {
       const priority = Math.max(1, Math.min(5, resource.priority));
       const demand =
         (remainingUnits * unitWeight(resource.unitType) * priority) / (3 * weeksLeft);
+      const chapterRemaining: ChapterRemaining[] =
+        resource.unitType === "test"
+          ? (resource.chapters ?? [])
+              .filter((chapter) => (chapter.testCount ?? 0) > 0)
+              .map((chapter) => ({
+                id: chapter.id ?? null,
+                title: chapter.title,
+                remaining: Math.max(
+                  0,
+                  (chapter.testCount ?? 0) - (chapter.completedTests ?? 0),
+                ),
+              }))
+          : [];
       return {
         resource: { ...resource, priority },
         remainingUnits,
         remainingMinutes: 0,
         totalMinutes: demand,
+        chapterRemaining,
       } satisfies PoolItem;
     })
     .filter((item): item is PoolItem => item !== null);
@@ -262,14 +297,12 @@ export function generatePlan(input: PlannerInput): GeneratedPlan {
           ? placeBlock(windows, cursor, fallbackDuration)
           : null;
         if (!fallback) break;
-        const units = Math.min(
+        const { task, units } = buildTask(item, date, fallback, Math.min(
           item.remainingUnits,
           unitsForMinutes(fallbackDuration, item.resource.unitType),
-        );
+        ), fallbackDuration);
         if (units <= 0) break;
-        tasks.push(
-          buildTask(item, date, fallback, units, fallbackDuration, topicForBlock(item, units)),
-        );
+        tasks.push(task);
         item.remainingUnits -= units;
         item.remainingMinutes -= fallbackDuration;
         dayRemaining -= fallbackDuration;
@@ -278,14 +311,14 @@ export function generatePlan(input: PlannerInput): GeneratedPlan {
         continue;
       }
 
-      const units = Math.min(
+      const rawUnits = Math.min(
         item.remainingUnits,
         unitsForMinutes(placement.end - placement.start, item.resource.unitType),
       );
+      const { task, units } = buildTask(item, date, placement, rawUnits, duration);
+      if (units <= 0) break;
 
-      tasks.push(
-        buildTask(item, date, placement, units, duration, topicForBlock(item, units)),
-      );
+      tasks.push(task);
       item.remainingUnits -= units;
       item.remainingMinutes -= duration;
       dayRemaining -= duration;
@@ -328,20 +361,51 @@ function buildTask(
   item: PoolItem,
   planDate: string,
   placement: { start: number; end: number },
-  units: number,
+  requestedUnits: number,
   minutes: number,
-  topic: string,
-): PlannedTask {
+): { task: PlannedTask; units: number } {
+  let units = Math.max(1, requestedUnits);
+  let chapterId: string | null = null;
+  let topic = "";
+
+  if (item.resource.unitType === "test" && item.chapterRemaining.length > 0) {
+    const chapter = item.chapterRemaining.find((entry) => entry.remaining > 0);
+    if (chapter) {
+      units = Math.min(units, chapter.remaining);
+      chapter.remaining -= units;
+      chapterId = chapter.id;
+      topic = chapter.title;
+    }
+  }
+
+  if (!chapterId) topic = topicForBlock(item, units);
+
+  if (item.resource.unitType === "page") {
+    const chapter = item.resource.chapters?.find((entry) => {
+      const page = item.resource.completedUnits + 1;
+      return page >= entry.startPage && page <= entry.endPage;
+    });
+    chapterId = chapter?.id ?? null;
+  }
+
+  const isTest = item.resource.unitType === "test";
   return {
-    planDate,
-    plannedStart: placement.start,
-    plannedEnd: placement.end,
-    subjectId: item.resource.subjectId,
-    resourceId: item.resource.id,
-    topic,
-    type: item.resource.unitType === "test" ? "test" : "study",
-    targetUnits: Math.max(1, units),
-    estMinutes: minutes,
+    units,
+    task: {
+      planDate,
+      plannedStart: placement.start,
+      plannedEnd: placement.end,
+      subjectId: item.resource.subjectId,
+      resourceId: item.resource.id,
+      chapterId,
+      resourceText: "",
+      topic,
+      type: isTest ? "test" : "study",
+      actionKind: isTest ? "test" : "study",
+      routineMode: null,
+      targetUnits: units,
+      estMinutes: minutes,
+    },
   };
 }
 

@@ -7,6 +7,7 @@ import { getDb } from "@/db/client";
 import { dailyLogs, plans, tasks } from "@/db/schema";
 import { requireStudent } from "@/lib/auth";
 import { todayISO } from "@/lib/dates";
+import { dailyChallengeFor, normalizeChallengeAnswer } from "@/lib/daily-challenge";
 
 function field(form: FormData, name: string): string {
   return String(form.get(name) ?? "").trim();
@@ -117,4 +118,35 @@ export async function saveDailyLogAction(formData: FormData): Promise<void> {
   revalidatePath("/student");
   revalidatePath("/student/performance");
   redirect("/student/performance?success=log");
+}
+
+export async function submitDailyChallengeAction(formData: FormData): Promise<void> {
+  const { student } = await requireStudent();
+  const date = todayISO();
+  const challenge = dailyChallengeFor(student.id, date);
+  const answer = normalizeChallengeAnswer(field(formData, "answer"));
+
+  if (answer === null || answer !== challenge.answer) {
+    redirect("/student?error=" + encodeURIComponent("پاسخ چالش درست نیست؛ دوباره تلاش کن."));
+  }
+
+  const db = await getDb();
+  await db
+    .insert(dailyLogs)
+    .values({
+      studentId: student.id,
+      logDate: date,
+      firstOpenedAt: new Date(),
+      challengeCompletedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: [dailyLogs.studentId, dailyLogs.logDate],
+      set: { challengeCompletedAt: new Date() },
+    });
+
+  revalidatePath("/student");
+  revalidatePath("/student/performance");
+  revalidatePath("/student/report");
+  revalidatePath(`/counselor/students/${student.id}`);
+  redirect("/student?success=challenge");
 }

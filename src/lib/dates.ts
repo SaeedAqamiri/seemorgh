@@ -129,6 +129,17 @@ export function formatTehranDateTime(date: Date): string {
   }).format(date);
 }
 
+export function tehranMinutesOf(date: Date): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: TEHRAN_TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  const value = (type: string) => Number(parts.find((part) => part.type === type)?.value ?? 0);
+  return value("hour") * 60 + value("minute");
+}
+
 export function tehranMinutesNow(): number {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: TEHRAN_TZ,

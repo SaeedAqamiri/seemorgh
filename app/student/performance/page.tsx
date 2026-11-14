@@ -14,7 +14,6 @@ import {
 import {
   getPanelOptions,
   getWeeklyPanelView,
-  PANEL_SLOTS,
   plannedCellLabel,
   slotLabel,
 } from "@/lib/panel";
@@ -43,13 +42,19 @@ export default async function StudentPerformancePage({
 
   const subjectTitles = new Map(options.subjects.map((s) => [s.id, s.title]));
   const resourceTitles = new Map(options.resources.map((r) => [r.id, r.title]));
+  const chapterTitles = new Map(
+    options.resources.flatMap((resource) =>
+      resource.chapters.map((chapter) => [chapter.id, chapter.title] as const),
+    ),
+  );
   const plannedLabels = plan.grid.map((row) =>
-    row.map((cell) => plannedCellLabel(cell, subjectTitles, resourceTitles)),
+    row.map((cell) => plannedCellLabel(cell, subjectTitles, resourceTitles, chapterTitles)),
   );
 
   const dates = weekDates(weekStart);
   const dayTitles = dates.map((date) => formatJalaliNumeric(date));
-  const slotLabels = PANEL_SLOTS.map((slot) => slotLabel(slot));
+  const slotLabels = (plan.slots ?? perf.slots).map((slot) => slotLabel(slot));
+  const slotBounds = plan.slots ?? perf.slots;
   const perfHref = (value: string) => `/student/performance?week=${value}`;
 
   return (
@@ -81,7 +86,7 @@ export default async function StudentPerformancePage({
         <div className="section-head">
           <h2>ثبت عملکرد هفته</h2>
           <small>
-            سطرها بازه‌های دو ساعت‌اند و ستون‌ها روزهای هفته. با «ثبت عملکرد» همه خانه‌ها قابل نوشتن
+            ستون‌ها ۱۰ زنگ روزانه‌اند و ردیف‌ها روزهای هفته؛ مدت هر اقدام را به دقیقه ثبت کنید. با «ثبت عملکرد» همه خانه‌ها قابل نوشتن
             می‌شوند و با «ثبت گزارش عملکرد» کل جدول یکجا ذخیره می‌شود. تحلیل و گزارش تحلیلی در تب
             «گزارش من» است.
           </small>
@@ -92,9 +97,11 @@ export default async function StudentPerformancePage({
           weekdayLabels={[...WEEKDAY_LABELS]}
           dayTitles={dayTitles}
           slotLabels={slotLabels}
+          slotBounds={slotBounds}
           plannedLabels={plannedLabels}
           initialGrid={perf.grid as unknown as PerfCellState[][]}
           subjects={options.subjects}
+          subjectGroups={options.subjectGroups}
           resources={options.resources}
           action={savePerformancePanelAction}
         />

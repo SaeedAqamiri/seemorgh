@@ -12,6 +12,9 @@
     "db:seed": "tsx scripts/seed.ts",
     "db:reset": "node -e \"require('fs').rmSync('.data',{recursive:true,force:true})\"",
     "db:seed:analysis": "tsx scripts/seed-analysis.ts",
+    "db:plan:all": "tsx scripts/plan-all-students.ts",
+    "db:seed:pool": "tsx scripts/seed-resource-pool.ts",
+    "db:seed:performance": "tsx scripts/seed-performance.ts",
     "db:export:example": "tsx scripts/export-example-data.ts",
     "db:import:example": "tsx scripts/import-example-data.ts"
   },

@@ -35,12 +35,12 @@ function gridWith(count: number, resourceId: string | null): PerformanceGridJson
     return row.map((cell, slot) => {
       if (slot !== 0) return cell;
       return {
-        kind: "practice" as const,
+        kind: "test" as const,
         subjectId: "s-bio",
         resourceId,
+        chapterId: null,
         count,
-        startMin: 480,
-        endMin: 600,
+        minutes: 120,
         note: "",
       };
     });
@@ -77,19 +77,19 @@ describe("resource progress", () => {
   it("counts only practice cells that point to a resource", () => {
     const first = gridWith(25, "bio");
     first[0][1] = {
-      kind: "practice",
+      kind: "test",
       subjectId: "s-bio",
       resourceId: null,
+      chapterId: null,
       count: 10,
-      startMin: 480,
-      endMin: 600,
+      minutes: 120,
       note: "",
     };
     first[0][2] = {
       kind: "review",
       subjectId: "s-bio",
-      startMin: 480,
-      endMin: 600,
+      resourceText: "",
+      minutes: 120,
       note: "",
     };
 
@@ -102,12 +102,12 @@ describe("resource progress", () => {
     const before = gridWith(20, "bio");
     const after = gridWith(35, "bio");
     after[0][1] = {
-      kind: "practice",
+      kind: "test",
       subjectId: "s-chem",
       resourceId: "chem",
+      chapterId: null,
       count: 10,
-      startMin: 480,
-      endMin: 600,
+      minutes: 120,
       note: "",
     };
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chapterForPage, formatChapters, parseChapters } from "./resources";
+import { chapterForPage, formatChapterPlan, formatChapters, parseChapterPlan, parseChapters } from "./resources";
 
 describe("resource chapters", () => {
   it("parses chapter pages and computes ranges", () => {
@@ -12,6 +12,27 @@ describe("resource chapters", () => {
     ]);
     expect(chapterForPage(result.chapters, 25)?.title).toBe("فصل ۲");
     expect(formatChapters(result.chapters)).toContain("فصل ۲ | 30");
+  });
+
+  it("parses test/exercise/page counts per chapter", () => {
+    const result = parseChapterPlan("فصل ۱ | 40 | 12 | 24\nفصل ۲ | 35 | 10 | 30", 0);
+    expect(result.error).toBeNull();
+    expect(result.chapters?.[0]).toMatchObject({
+      title: "فصل ۱",
+      testCount: 40,
+      exerciseCount: 12,
+      pages: 24,
+      startPage: 1,
+      endPage: 24,
+    });
+    expect(result.chapters?.[1]).toMatchObject({
+      title: "فصل ۲",
+      testCount: 35,
+      pages: 30,
+      startPage: 25,
+      endPage: 54,
+    });
+    expect(formatChapterPlan(result.chapters)).toContain("فصل ۱ | 40 | 12 | 24");
   });
 
   it("rejects invalid or overflowing chapters", () => {

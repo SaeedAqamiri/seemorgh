@@ -454,13 +454,19 @@ export async function getStudentTrendAnalysis(input: {
       const date = dates[day];
       if (!date || date < input.from || date > input.to) continue;
       for (const cell of grid[day]) {
-        if (cell.kind !== "review" && cell.kind !== "practice") continue;
+        if (cell.kind === "empty" || cell.kind === "rest") continue;
         const title = subjectTitles.get(cell.subjectId);
         if (!title) continue;
         const key = normalizeTitle(title);
         const current = studyBySubject.get(key) ?? { minutes: 0, practice: 0 };
-        current.minutes += Math.max(0, cell.endMin - cell.startMin);
-        if (cell.kind === "practice") current.practice += Math.max(0, cell.count);
+        current.minutes += Math.max(0, cell.minutes);
+        const count =
+          cell.kind === "test" || cell.kind === "timedTest" || cell.kind === "exercise"
+            ? cell.count
+            : cell.kind === "routine" && cell.routineMode === "test"
+              ? cell.count
+              : 0;
+        current.practice += Math.max(0, count);
         studyBySubject.set(key, current);
       }
     }
