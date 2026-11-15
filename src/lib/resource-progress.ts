@@ -1,6 +1,7 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/db/client";
-import { resourceChapters, resources, subjects, type PerformanceGridJson } from "@/db/schema";
+import { resourceChapters, resources, students, subjects, type PerformanceGridJson } from "@/db/schema";
+import { ensureSubjectCatalog } from "./subject-catalog";
 import type { ActionDelta } from "./resource-chapters";
 
 export type ChapterProgressInput = {
@@ -19,7 +20,7 @@ export type ResourceProgressInput = {
   subjectId: string;
   subjectTitle: string;
   title: string;
-  unitType: "test" | "page" | "chapter";
+  unitType: "test" | "exercise" | "page" | "chapter";
   totalUnits: number;
   completedUnits: number;
   chapters?: ChapterProgressInput[];
@@ -218,6 +219,14 @@ export async function getStudentResourceProgress(
   workspaceId?: string,
 ): Promise<ResourceProgressSummary> {
   const db = await getDb();
+  const [studentRow] = await db
+    .select({ workspaceId: students.workspaceId })
+    .from(students)
+    .where(eq(students.id, studentId))
+    .limit(1);
+  const resolvedWorkspaceId = workspaceId ?? studentRow?.workspaceId;
+  if (resolvedWorkspaceId) await ensureSubjectCatalog(resolvedWorkspaceId);
+
   const conditions = [eq(resources.studentId, studentId)];
   if (workspaceId) conditions.push(eq(resources.workspaceId, workspaceId));
 

@@ -10,6 +10,7 @@ import {
 import { SubmitButton } from "@/components/submit-button";
 import type { ResourceWithSubject } from "@/lib/counselor";
 import { formatChapterPlan } from "@/lib/resources";
+import { subjectSupportsTests } from "@/lib/subjects";
 
 type SubjectOption = { id: string; title: string; kind: string; color?: string };
 
@@ -42,6 +43,7 @@ export function ResourceManager({
   poolResources: PoolResourceOption[];
 }) {
   const groups = subjectGroups(subjects);
+  const subjectById = new Map(subjects.map((subject) => [subject.id, subject]));
   const [subjectId, setSubjectId] = useState(subjects[0]?.id ?? "");
   const [poolId, setPoolId] = useState("");
   const [priority, setPriority] = useState("3");
@@ -59,8 +61,8 @@ export function ResourceManager({
           <div>
             <h2>فهرست منابع</h2>
             <small>
-              پیشرفت هر فصل به صورت تست و تمرین ثبت می‌شود؛ گزارش عملکرد هم این پیشرفت را
-              خودکار به‌روز می‌کند.
+              پیشرفت هر فصل بر اساس تست و تمرین ثبت می‌شود؛ دروس عمومی فقط تمرین دارند و
+              گزارش عملکرد هم این پیشرفت را خودکار به‌روز می‌کند.
             </small>
           </div>
           <small>{resources.length} منبع</small>
@@ -85,6 +87,10 @@ export function ResourceManager({
                     resource.totalUnits === 0
                       ? 0
                       : Math.round((resource.completedUnits / resource.totalUnits) * 100);
+                  const supportsTests = subjectSupportsTests(
+                    subjectById.get(resource.subjectId)?.kind ?? "specialized",
+                  );
+                  const chapterMode = supportsTests ? "test" : "exercise";
                   return (
                     <tr key={resource.id}>
                       <td>
@@ -105,7 +111,7 @@ export function ResourceManager({
                                 <thead>
                                   <tr>
                                     <th>فصل</th>
-                                    <th>تست</th>
+                                    {supportsTests ? <th>تست</th> : null}
                                     <th>تمرین</th>
                                     <th />
                                   </tr>
@@ -114,10 +120,12 @@ export function ResourceManager({
                                   {resource.chapters.map((chapter) => (
                                     <tr key={chapter.id}>
                                       <td>{chapter.title}</td>
-                                      <td>
-                                        {chapter.completedTests.toLocaleString("fa-IR")}/
-                                        {chapter.testCount.toLocaleString("fa-IR")}
-                                      </td>
+                                      {supportsTests ? (
+                                        <td>
+                                          {chapter.completedTests.toLocaleString("fa-IR")}/
+                                          {chapter.testCount.toLocaleString("fa-IR")}
+                                        </td>
+                                      ) : null}
                                       <td>
                                         {chapter.completedExercises.toLocaleString("fa-IR")}/
                                         {chapter.exerciseCount.toLocaleString("fa-IR")}
@@ -131,14 +139,16 @@ export function ResourceManager({
                                           <input type="hidden" name="studentId" value={studentId} />
                                           <input type="hidden" name="resourceId" value={resource.id} />
                                           <input type="hidden" name="chapterId" value={chapter.id} />
-                                          <input
-                                            name="completedTests"
-                                            type="number"
-                                            min={0}
-                                            defaultValue={chapter.completedTests}
-                                            style={{ width: "58px" }}
-                                            aria-label="تست انجام‌شده"
-                                          />
+                                          {supportsTests ? (
+                                            <input
+                                              name="completedTests"
+                                              type="number"
+                                              min={0}
+                                              defaultValue={chapter.completedTests}
+                                              style={{ width: "58px" }}
+                                              aria-label="تست انجام‌شده"
+                                            />
+                                          ) : null}
                                           <input
                                             name="completedExercises"
                                             type="number"
@@ -186,12 +196,14 @@ export function ResourceManager({
                           </div>
                           <div className="field">
                             <label style={{ fontSize: "0.72rem" }}>
-                              فصل‌بندی (هر خط: عنوان | تست | تمرین)
+                              {supportsTests
+                                ? "فصل‌بندی (هر خط: عنوان | تست | تمرین)"
+                                : "فصل‌بندی (هر خط: عنوان | تمرین)"}
                             </label>
                             <textarea
                               name="chapters"
                               rows={3}
-                              defaultValue={formatChapterPlan(resource.chaptersJson)}
+                              defaultValue={formatChapterPlan(resource.chaptersJson, chapterMode)}
                               style={{ minHeight: "62px", fontSize: "0.78rem" }}
                             />
                           </div>

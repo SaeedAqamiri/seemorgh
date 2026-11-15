@@ -18,6 +18,8 @@ import { addDays, startOfWeekSaturday, tehranMinutesOf, weekDates } from "./date
 import { getWeeklyPanelView } from "./panel";
 import { applyActionDeltas, chaptersByResourceIds } from "./resource-chapters";
 import { diffResourceActionCounts } from "./resource-progress";
+import { subjectSupportsTests } from "./subjects";
+import { ensureSubjectCatalog } from "./subject-catalog";
 import {
   getBellSlots,
   PANEL_DAYS,
@@ -139,6 +141,38 @@ export function normalizePerfGrid(value: unknown, slotCount: number = PANEL_SLOT
   return grid;
 }
 
+function normalizePerfGridForSubjectKinds(
+  grid: PerformanceGridJson,
+  kindById: Map<string, string>,
+): PerformanceGridJson {
+  return grid.map((row) =>
+    row.map((cell) => {
+      if (cell.kind === "empty" || cell.kind === "rest") return cell;
+      const kind = kindById.get(cell.subjectId);
+      if (!kind || subjectSupportsTests(kind)) return cell;
+      if (cell.kind === "test" || cell.kind === "timedTest") {
+        return { ...cell, kind: "exercise" };
+      }
+      if (cell.kind === "routine" && cell.routineMode === "test") {
+        return { ...cell, routineMode: "study" };
+      }
+      return cell;
+    }),
+  );
+}
+
+async function loadSubjectKindMap(
+  db: Awaited<ReturnType<typeof getDb>>,
+  studentId: string,
+): Promise<Map<string, string>> {
+  const rows = await db
+    .select({ id: subjects.id, kind: subjects.kind })
+    .from(subjects)
+    .innerJoin(students, eq(students.workspaceId, subjects.workspaceId))
+    .where(eq(students.id, studentId));
+  return new Map(rows.map((row) => [row.id, row.kind]));
+}
+
 function assertPerfGrid(value: unknown, slotCount: number): asserts value is PerformanceGridJson {
   if (!Array.isArray(value) || value.length !== PANEL_DAYS) {
     throw new PerformanceValidationError("ساختار جدول عملکرد نامعتبر است.");
@@ -188,9 +222,15 @@ export async function getPerformanceView(studentId: string, weekStart: string): 
     updatedByName = author?.name ?? null;
   }
 
+  const baseGrid = panel?.cellsJson
+    ? normalizePerfGrid(panel.cellsJson, slots.length)
+    : emptyPerformanceGrid(slots.length);
+  const kindById = await loadSubjectKindMap(db, studentId);
+  const grid = normalizePerfGridForSubjectKinds(baseGrid, kindById);
+
   return {
     weekStart,
-    grid: panel?.cellsJson ? normalizePerfGrid(panel.cellsJson, slots.length) : emptyPerformanceGrid(slots.length),
+    grid,
     slots,
     narrative: panel?.narrative ?? "",
     narrativeAt: panel?.narrativeAt ?? null,
@@ -217,11 +257,11 @@ export async function savePerformancePanel(input: SavePerformanceInput): Promise
 
   const slots = await getBellSlots(input.studentId);
   assertPerfGrid(input.grid, slots.length);
-  const grid = normalizePerfGrid(input.grid, slots.length);
+  let grid = normalizePerfGrid(input.grid, slots.length);
 
   const [subjectRows, resourceRows, existingPanelRows] = await Promise.all([
     db
-      .select({ id: subjects.id })
+      .select({ id: subjects.id, kind: subjects.kind })
       .from(subjects)
       .where(eq(subjects.workspaceId, studentRow.workspaceId)),
     db
@@ -243,6 +283,8 @@ export async function savePerformancePanel(input: SavePerformanceInput): Promise
       .limit(1),
   ]);
 
+  const kindById = new Map(subjectRows.map((row) => [row.id, row.kind]));
+  grid = normalizePerfGridForSubjectKinds(grid, kindById);
   const subjectIds = new Set(subjectRows.map((row) => row.id));
   const resourceById = new Map(resourceRows.map((row) => [row.id, row]));
   const chapterMap = await chaptersByResourceIds(db, [...resourceById.keys()]);
@@ -277,7 +319,10 @@ export async function savePerformancePanel(input: SavePerformanceInput): Promise
   }
 
   const previousGrid = existingPanelRows[0]?.cellsJson
-    ? normalizePerfGrid(existingPanelRows[0].cellsJson, slots.length)
+    ? normalizePerfGridForSubjectKinds(
+        normalizePerfGrid(existingPanelRows[0].cellsJson, slots.length),
+        kindById,
+      )
     : null;
   const deltas = diffResourceActionCounts(previousGrid, grid);
 
@@ -729,6 +774,8 @@ export async function getPerformanceRangeData(
     .limit(1);
 
   if (!studentRow) throw new Error("student not found");
+
+  await ensureSubjectCatalog(studentRow.workspaceId);
 
   const subjectRows = await db
     .select({ id: subjects.id, title: subjects.title, kind: subjects.kind })

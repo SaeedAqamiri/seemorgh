@@ -159,7 +159,7 @@ export const resources = pgTable(
       .notNull()
       .references(() => subjects.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
-    unitType: text("unit_type", { enum: ["test", "page", "chapter"] })
+    unitType: text("unit_type", { enum: ["test", "exercise", "page", "chapter"] })
       .notNull()
       .default("test"),
     totalUnits: integer("total_units").notNull().default(0),
@@ -206,7 +206,7 @@ export const resourcePool = pgTable(
     title: text("title").notNull(),
     publisher: text("publisher").notNull().default(""),
     grade: text("grade").notNull().default(""),
-    unitType: text("unit_type", { enum: ["test", "page", "chapter"] })
+    unitType: text("unit_type", { enum: ["test", "exercise", "page", "chapter"] })
       .notNull()
       .default("test"),
     totalUnits: integer("total_units").notNull().default(0),

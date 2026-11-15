@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { SubmitButton } from "./submit-button";
+import { subjectSupportsTests } from "@/lib/subjects";
 
 export type PerfCellState = {
   kind: "empty" | "rest" | "study" | "review" | "test" | "timedTest" | "exercise" | "routine";
@@ -122,11 +123,6 @@ function defaultCell(kind: PerfCellState["kind"], minutes: number, note = ""): P
 }
 
 export function PerformancePanel(props: PerformancePanelProps) {
-  const [editing, setEditing] = useState(false);
-  const [grid, setGrid] = useState<PerfCellState[][]>(() => cloneGrid(props.initialGrid));
-  const [viewMode, setViewMode] = useState<ViewMode>("both");
-  const [groups, setGroups] = useState<Record<string, "general" | "specialized">>({});
-
   const subjectById = useMemo(
     () => new Map(props.subjects.map((subject) => [subject.id, subject])),
     [props.subjects],
@@ -135,15 +131,43 @@ export function PerformancePanel(props: PerformancePanelProps) {
     () => new Map(props.resources.map((resource) => [resource.id, resource])),
     [props.resources],
   );
+  const kindById = useMemo(
+    () => new Map(props.subjects.map((subject) => [subject.id, subject.kind])),
+    [props.subjects],
+  );
+
+  const supportsTestsFor = (subjectId?: string) =>
+    subjectSupportsTests(kindById.get(subjectId ?? "") ?? "specialized");
+
+  const normalizeCellForKind = (cell: PerfCellState): PerfCellState => {
+    if (!cell.subjectId || supportsTestsFor(cell.subjectId)) return cell;
+    if (cell.kind === "test" || cell.kind === "timedTest") {
+      return { ...cell, kind: "exercise" };
+    }
+    if (cell.kind === "routine" && cell.routineMode === "test") {
+      return { ...cell, routineMode: "study" };
+    }
+    return cell;
+  };
+
+  const normalizeGridForKinds = (grid: PerfCellState[][]): PerfCellState[][] =>
+    grid.map((row) => row.map(normalizeCellForKind));
+
+  const [editing, setEditing] = useState(false);
+  const [grid, setGrid] = useState<PerfCellState[][]>(() =>
+    cloneGrid(normalizeGridForKinds(props.initialGrid)),
+  );
+  const [viewMode, setViewMode] = useState<ViewMode>("both");
+  const [groups, setGroups] = useState<Record<string, "general" | "specialized">>({});
 
   const startEdit = () => {
-    setGrid(cloneGrid(props.initialGrid));
+    setGrid(cloneGrid(normalizeGridForKinds(props.initialGrid)));
     setGroups({});
     setEditing(true);
   };
 
   const cancelEdit = () => {
-    setGrid(cloneGrid(props.initialGrid));
+    setGrid(cloneGrid(normalizeGridForKinds(props.initialGrid)));
     setGroups({});
     setEditing(false);
   };
@@ -181,11 +205,17 @@ export function PerformancePanel(props: PerformancePanelProps) {
   const setKind = (day: number, slot: number, kind: PerfCellState["kind"]) => {
     const previous = grid[day][slot];
     const bounds = props.slotBounds[slot] ?? { startMin: 480, endMin: 570 };
+    const safeKind =
+      previous.subjectId &&
+      !supportsTestsFor(previous.subjectId) &&
+      (kind === "test" || kind === "timedTest")
+        ? "exercise"
+        : kind;
     updateCell(
       day,
       slot,
       defaultCell(
-        kind,
+        safeKind,
         previous.minutes ?? bounds.endMin - bounds.startMin,
         previous.note ?? "",
       ),
@@ -196,9 +226,17 @@ export function PerformancePanel(props: PerformancePanelProps) {
     setGrid((current) => {
       const copy = cloneGrid(current);
       const cell = copy[day][slot];
-      copy[day][slot] = countKindFor(cell)
+      const generalSubject = !supportsTestsFor(subjectId);
+      let next = countKindFor(cell)
         ? { ...cell, subjectId, resourceId: null, chapterId: null }
         : { ...cell, subjectId };
+      if (generalSubject) {
+        if (next.kind === "test" || next.kind === "timedTest") next = { ...next, kind: "exercise" };
+        if (next.kind === "routine" && next.routineMode === "test") {
+          next = { ...next, routineMode: "study" };
+        }
+      }
+      copy[day][slot] = next;
       return copy;
     });
   };
@@ -207,10 +245,14 @@ export function PerformancePanel(props: PerformancePanelProps) {
     setGrid((current) => {
       const copy = cloneGrid(current);
       const cell = copy[day][slot];
+      const safeMode =
+        routineMode === "test" && cell.subjectId && !supportsTestsFor(cell.subjectId)
+          ? "study"
+          : routineMode;
       copy[day][slot] = {
         ...cell,
         kind: "routine",
-        routineMode,
+        routineMode: safeMode,
         resourceId: null,
         chapterId: null,
         count: 30,
@@ -269,6 +311,9 @@ export function PerformancePanel(props: PerformancePanelProps) {
       const resource = perf.resourceId ? resourceById.get(perf.resourceId) : undefined;
       const countMode = countKindFor(perf);
       const textMode = textKindFor(perf);
+      const generalContext = perf.subjectId
+        ? !supportsTestsFor(perf.subjectId)
+        : group === "general";
 
       return (
         <div className="perf-edit-wrap">
@@ -279,7 +324,12 @@ export function PerformancePanel(props: PerformancePanelProps) {
               value={perf.kind}
               onChange={(event) => setKind(day, slot, event.target.value as PerfCellState["kind"])}
             >
-              {KIND_OPTIONS.map((option) => (
+              {(supportsTestsFor(perf.subjectId)
+                ? KIND_OPTIONS
+                : KIND_OPTIONS.filter(
+                    (option) => option.value !== "test" && option.value !== "timedTest",
+                  )
+              ).map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
@@ -288,12 +338,12 @@ export function PerformancePanel(props: PerformancePanelProps) {
             {perf.kind === "routine" ? (
               <select
                 aria-label={`نوع روتین ${props.weekdayLabels[day]} زنگ ${slot + 1}`}
-                value={perf.routineMode ?? "test"}
+                value={generalContext ? "study" : perf.routineMode ?? "test"}
                 onChange={(event) =>
                   setRoutineMode(day, slot, event.target.value === "study" ? "study" : "test")
                 }
               >
-                <option value="test">روتین تست</option>
+                {generalContext ? null : <option value="test">روتین تست</option>}
                 <option value="study">روتین مطالعه</option>
               </select>
             ) : null}

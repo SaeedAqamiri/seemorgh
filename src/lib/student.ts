@@ -13,7 +13,7 @@ export type StudentTaskItem = {
   subjectColor: string;
   resourceId: string | null;
   resourceTitle: string | null;
-  resourceUnitType: "test" | "page" | "chapter" | null;
+  resourceUnitType: "test" | "exercise" | "page" | "chapter" | null;
   topic: string;
   type: "study" | "review" | "test" | "timed_test" | "exercise";
   actionKind: string;

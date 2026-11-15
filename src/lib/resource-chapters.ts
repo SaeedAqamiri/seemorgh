@@ -94,6 +94,9 @@ export async function recomputeResourceTotals(db: DbExec, resourceId: string): P
   if (resource.unitType === "test") {
     totalUnits = rows.reduce((sum, row) => sum + row.testCount, 0);
     completedUnits = rows.reduce((sum, row) => sum + row.completedTests, 0);
+  } else if (resource.unitType === "exercise") {
+    totalUnits = rows.reduce((sum, row) => sum + row.exerciseCount, 0);
+    completedUnits = rows.reduce((sum, row) => sum + row.completedExercises, 0);
   } else if (resource.unitType === "page") {
     totalUnits = rows.reduce((sum, row) => sum + row.pages, 0);
     completedUnits = rows.reduce((sum, row) => sum + row.completedPages, 0);
@@ -154,7 +157,7 @@ export async function applyActionDeltas(db: DbExec, deltas: ActionDelta[]): Prom
           .where(eq(resourceChapters.id, delta.chapterId));
       }
       touched.add(delta.resourceId);
-    } else if (delta.kind === "test") {
+    } else if (delta.kind === "test" || delta.kind === "exercise") {
       await db
         .update(resources)
         .set({
@@ -171,7 +174,7 @@ export async function applyActionDeltas(db: DbExec, deltas: ActionDelta[]): Prom
 
 export type LegacyChapterResource = {
   id: string;
-  unitType: "test" | "page" | "chapter";
+  unitType: "test" | "exercise" | "page" | "chapter";
   totalUnits: number;
   completedUnits: number;
   chaptersJson: ResourceChapter[] | null;
@@ -192,12 +195,29 @@ export async function ensureChaptersFromJson(
   let remainingCompleted = Math.max(0, resource.completedUnits);
   const rows = resource.chaptersJson.map((chapter, index) => {
     const pages = Math.max(0, chapter.pages);
+    const isExercise = resource.unitType === "exercise";
     const testCount =
       resource.unitType === "test" ? Math.max(0, chapter.testCount ?? pages) : Math.max(0, chapter.testCount ?? 0);
-    const exerciseCount = Math.max(0, chapter.exerciseCount ?? 0);
+    const exerciseSeed = Math.max(
+      0,
+      (chapter.exerciseCount ?? 0) + (chapter.testCount ?? 0),
+    );
+    const exerciseCount = isExercise
+      ? exerciseSeed > 0
+        ? exerciseSeed
+        : Math.max(0, pages)
+      : Math.max(0, chapter.exerciseCount ?? 0);
     const completedPages = resource.unitType === "page" ? Math.min(pages, remainingCompleted) : 0;
     const completedTests = resource.unitType === "test" ? Math.min(testCount, remainingCompleted) : 0;
-    remainingCompleted -= resource.unitType === "page" ? completedPages : completedTests;
+    const completedExercises = isExercise
+      ? Math.min(exerciseCount, remainingCompleted)
+      : 0;
+    remainingCompleted -=
+      resource.unitType === "page"
+        ? completedPages
+        : resource.unitType === "exercise"
+          ? completedExercises
+          : completedTests;
     return {
       resourceId: resource.id,
       title: chapter.title,
@@ -209,7 +229,7 @@ export async function ensureChaptersFromJson(
       testCount,
       completedTests,
       exerciseCount,
-      completedExercises: 0,
+      completedExercises,
     };
   });
 

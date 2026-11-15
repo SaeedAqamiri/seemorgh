@@ -1,6 +1,6 @@
 import { addDays, daysBetween, weekDates, weekdayIndex } from "./dates";
 
-export type PlannerUnitType = "test" | "page" | "chapter";
+export type PlannerUnitType = "test" | "exercise" | "page" | "chapter";
 
 export type PlannerChapter = {
   id?: string;
@@ -106,6 +106,7 @@ function unitWeight(unitType: PlannerUnitType): number {
 
 function minutesPerUnit(unitType: PlannerUnitType): number {
   if (unitType === "test") return 1.5;
+  if (unitType === "exercise") return 2;
   if (unitType === "page") return 2;
   return 60;
 }
@@ -197,15 +198,21 @@ export function generatePlan(input: PlannerInput): GeneratedPlan {
       const demand =
         (remainingUnits * unitWeight(resource.unitType) * priority) / (3 * weeksLeft);
       const chapterRemaining: ChapterRemaining[] =
-        resource.unitType === "test"
+        resource.unitType === "test" || resource.unitType === "exercise"
           ? (resource.chapters ?? [])
-              .filter((chapter) => (chapter.testCount ?? 0) > 0)
+              .filter((chapter) =>
+                resource.unitType === "test"
+                  ? (chapter.testCount ?? 0) > 0
+                  : (chapter.exerciseCount ?? 0) > 0,
+              )
               .map((chapter) => ({
                 id: chapter.id ?? null,
                 title: chapter.title,
                 remaining: Math.max(
                   0,
-                  (chapter.testCount ?? 0) - (chapter.completedTests ?? 0),
+                  resource.unitType === "test"
+                    ? (chapter.testCount ?? 0) - (chapter.completedTests ?? 0)
+                    : (chapter.exerciseCount ?? 0) - (chapter.completedExercises ?? 0),
                 ),
               }))
           : [];
@@ -364,7 +371,10 @@ function buildTask(
   let chapterId: string | null = null;
   let topic = "";
 
-  if (item.resource.unitType === "test" && item.chapterRemaining.length > 0) {
+  if (
+    (item.resource.unitType === "test" || item.resource.unitType === "exercise") &&
+    item.chapterRemaining.length > 0
+  ) {
     const chapter = item.chapterRemaining.find((entry) => entry.remaining > 0);
     if (chapter) {
       units = Math.min(units, chapter.remaining);
@@ -385,6 +395,7 @@ function buildTask(
   }
 
   const isTest = item.resource.unitType === "test";
+  const isExercise = item.resource.unitType === "exercise";
   return {
     units,
     task: {
@@ -396,8 +407,8 @@ function buildTask(
       chapterId,
       resourceText: "",
       topic,
-      type: isTest ? "test" : "study",
-      actionKind: isTest ? "test" : "study",
+      type: isTest ? "test" : isExercise ? "exercise" : "study",
+      actionKind: isTest ? "test" : isExercise ? "exercise" : "study",
       routineMode: null,
       targetUnits: units,
       estMinutes: minutes,

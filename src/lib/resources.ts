@@ -73,12 +73,16 @@ export function parseChapters(input: string, totalUnits: number): {
 }
 
 /**
- * Extended chapter parser used by the resources form:
- *   عنوان | تعداد تست | تعداد تمرین
- * Legacy four-field lines (`عنوان | تست | تمرین | صفحه`) are still accepted,
- * but pages are no longer part of the product-facing workflow.
+ * Extended chapter parser used by the resources form.
+ * Specialized (test mode): `عنوان | تعداد تست | تعداد تمرین`
+ * General (exercise mode): `عنوان | تعداد تمرین`
+ * Legacy four-field lines are still accepted, but pages are ignored.
  */
-export function parseChapterPlan(input: string, totalUnits: number): {
+export function parseChapterPlan(
+  input: string,
+  totalUnits: number,
+  mode: "test" | "exercise" = "test",
+): {
   chapters: ResourceChapter[] | null;
   error: string | null;
 } {
@@ -91,6 +95,7 @@ export function parseChapterPlan(input: string, totalUnits: number): {
 
   const chapters: ResourceChapter[] = [];
   let cursor = 1;
+  const exerciseMode = mode === "exercise";
 
   for (const [index, line] of lines.entries()) {
     const parts = line.split(CHAPTER_SPLIT).map((part) => part.trim()).filter(Boolean);
@@ -104,7 +109,13 @@ export function parseChapterPlan(input: string, totalUnits: number): {
     const readCount = (value: string | undefined): number | null => toNumber(value ?? "");
     const range = /^(\d+)\s*(?:[-–—]|تا)\s*(\d+)$/.exec(normalizeDigits(parts[3] ?? ""));
 
-    if (parts.length >= 4) {
+    if (exerciseMode) {
+      if (parts.length >= 3) {
+        exerciseCount = (readCount(parts[1]) ?? 0) + (readCount(parts[2]) ?? 0);
+      } else if (parts.length === 2) {
+        exerciseCount = readCount(parts[1]) ?? 0;
+      }
+    } else if (parts.length >= 4) {
       testCount = readCount(parts[1]) ?? 0;
       exerciseCount = readCount(parts[2]) ?? 0;
       if (range) {
@@ -147,13 +158,18 @@ export function parseChapterPlan(input: string, totalUnits: number): {
   return { chapters, error: null };
 }
 
-export function formatChapterPlan(chapters: ResourceChapter[] | null | undefined): string {
+export function formatChapterPlan(
+  chapters: ResourceChapter[] | null | undefined,
+  mode: "test" | "exercise" = "test",
+): string {
   if (!chapters?.length) return "";
   return chapters
     .map((chapter) => {
       const tests = chapter.testCount ?? 0;
       const exercises = chapter.exerciseCount ?? 0;
-      return `${chapter.title} | ${tests} | ${exercises}`;
+      return mode === "exercise"
+        ? `${chapter.title} | ${exercises}`
+        : `${chapter.title} | ${tests} | ${exercises}`;
     })
     .join("\n");
 }

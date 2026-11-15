@@ -1,9 +1,13 @@
+"use client";
+
+import { useState } from "react";
 import {
   addPoolResourceAction,
   deletePoolResourceAction,
 } from "@/app/actions/resource-pool";
 import { SubmitButton } from "@/components/submit-button";
 import type { PoolBookView } from "@/lib/resource-pool";
+import { subjectSupportsTests } from "@/lib/subjects";
 
 type SubjectOption = { id: string; title: string; kind: string };
 
@@ -16,6 +20,9 @@ export function ResourcePoolManager({
 }) {
   const general = subjects.filter((subject) => subject.kind !== "specialized");
   const specialized = subjects.filter((subject) => subject.kind !== "general");
+  const [subjectId, setSubjectId] = useState(subjects[0]?.id ?? "");
+  const selectedSubject = subjects.find((subject) => subject.id === subjectId);
+  const supportsTests = subjectSupportsTests(selectedSubject?.kind ?? "general");
 
   return (
     <div className="stack" style={{ gap: "1rem" }}>
@@ -42,7 +49,9 @@ export function ResourcePoolManager({
                   <span className="muted" style={{ fontSize: "0.78rem" }}>
                     {" "}
                     · {book.publisher || "بدون ناشر"} · {book.grade || "بدون پایه"} ·{" "}
-                    {book.totalUnits.toLocaleString("fa-IR")} تست · {book.chapters.length} فصل
+                    {book.totalUnits.toLocaleString("fa-IR")}{" "}
+                    {book.unitType === "exercise" ? "تمرین" : "تست"} ·{" "}
+                    {book.chapters.length} فصل
                   </span>
                 </summary>
                 <div className="table-wrap" style={{ marginTop: "0.5rem" }}>
@@ -50,7 +59,7 @@ export function ResourcePoolManager({
                     <thead>
                       <tr>
                         <th>فصل</th>
-                        <th>تست</th>
+                        {book.unitType === "exercise" ? null : <th>تست</th>}
                         <th>تمرین</th>
                       </tr>
                     </thead>
@@ -58,7 +67,9 @@ export function ResourcePoolManager({
                       {book.chapters.map((chapter) => (
                         <tr key={chapter.id}>
                           <td>{chapter.title}</td>
-                          <td>{chapter.testCount.toLocaleString("fa-IR")}</td>
+                          {book.unitType === "exercise" ? null : (
+                            <td>{chapter.testCount.toLocaleString("fa-IR")}</td>
+                          )}
                           <td>{chapter.exerciseCount.toLocaleString("fa-IR")}</td>
                         </tr>
                       ))}
@@ -85,7 +96,12 @@ export function ResourcePoolManager({
         <form action={addPoolResourceAction} className="form-grid">
           <div className="field">
             <label>درس</label>
-            <select name="subjectId" required>
+            <select
+              name="subjectId"
+              required
+              value={subjectId}
+              onChange={(event) => setSubjectId(event.target.value)}
+            >
               <optgroup label="عمومی">
                 {general.map((subject) => (
                   <option key={subject.id} value={subject.id}>
@@ -119,17 +135,26 @@ export function ResourcePoolManager({
               <option value="فارغ‌التحصیل">فارغ‌التحصیل</option>
             </select>
           </div>
-          <input type="hidden" name="unitType" value="test" />
           <div className="field">
-            <label>تعداد کل تست (اگر فصل نمی‌دهید)</label>
+            <label>
+              تعداد کل {supportsTests ? "تست" : "تمرین"} (اگر فصل نمی‌دهید)
+            </label>
             <input name="totalUnits" type="number" min={0} defaultValue={0} />
           </div>
           <div className="field" style={{ gridColumn: "1 / -1" }}>
-            <label>فصل‌بندی — هر خط: عنوان | تست | تمرین</label>
+            <label>
+              {supportsTests
+                ? "فصل‌بندی — هر خط: عنوان | تست | تمرین"
+                : "فصل‌بندی — هر خط: عنوان | تمرین"}
+            </label>
             <textarea
               name="chapters"
               rows={6}
-              placeholder={"فصل ۱ | 120 | 30\nفصل ۲ | 110 | 25\nفصل ۳ | 90 | 20"}
+              placeholder={
+                supportsTests
+                  ? "فصل ۱ | 120 | 30\nفصل ۲ | 110 | 25\nفصل ۳ | 90 | 20"
+                  : "فصل ۱ | 120\nفصل ۲ | 110\nفصل ۳ | 90"
+              }
             />
           </div>
           <div className="field">

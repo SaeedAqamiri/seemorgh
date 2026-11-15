@@ -122,6 +122,40 @@ describe("planner", () => {
     expect(perChapter.get("ch-2") ?? 0).toBeLessThanOrEqual(30);
   });
 
+  it("creates exercise tasks for exercise-based general resources", () => {
+    const plan = generatePlan({
+      ...baseInput,
+      resources: [
+        {
+          id: "res-lit",
+          subjectId: "sub-lit",
+          subjectTitle: "ادبیات",
+          title: "ادبیات دوازدهم",
+          unitType: "exercise",
+          totalUnits: 100,
+          completedUnits: 20,
+          priority: 5,
+          chapters: [
+            {
+              id: "ch-1",
+              title: "درس ۱",
+              pages: 0,
+              startPage: 1,
+              endPage: 0,
+              exerciseCount: 100,
+              completedExercises: 20,
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(plan.tasks.length).toBeGreaterThan(0);
+    expect(plan.tasks.every((task) => task.type === "exercise")).toBe(true);
+    expect(plan.tasks.every((task) => task.actionKind === "exercise")).toBe(true);
+    expect(plan.tasks.every((task) => task.chapterId === "ch-1")).toBe(true);
+  });
+
   it("returns a warning when there is no availability", () => {
     const plan = generatePlan({
       ...baseInput,

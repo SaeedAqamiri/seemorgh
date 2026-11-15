@@ -166,7 +166,11 @@ export default async function StudentHomePage({
                     · {task.estMinutes} دقیقه
                     {task.targetUnits > 0
                       ? ` · ${task.targetUnits} ${
-                          task.resourceUnitType === "test" ? "تست" : "واحد"
+                          task.resourceUnitType === "test"
+                            ? "تست"
+                            : task.resourceUnitType === "exercise"
+                              ? "تمرین"
+                              : "واحد"
                         }`
                       : ""}
                     {task.chapterTitle
@@ -183,7 +187,11 @@ export default async function StudentHomePage({
                       انجام شد{" "}
                       {task.actualUnits > 0
                         ? `· ${task.actualUnits} ${
-                            task.resourceUnitType === "test" ? "تست" : "واحد"
+                            task.resourceUnitType === "test"
+                              ? "تست"
+                              : task.resourceUnitType === "exercise"
+                                ? "تمرین"
+                                : "واحد"
                           }`
                         : ""}
                       {task.note ? ` · ${task.note}` : ""}

@@ -12,7 +12,7 @@ import {
   tasks,
 } from "@/db/schema";
 import { startOfWeekSaturday, tehranMinutesOf, todayISO, weekDates } from "./dates";
-import { listSubjectsForField } from "./subject-catalog";
+import { ensureSubjectCatalog, listSubjectsForField } from "./subject-catalog";
 import { chaptersByResourceIds, ensureChaptersFromJson } from "./resource-chapters";
 import type { ResourceChapterRow } from "@/db/schema";
 
@@ -142,7 +142,7 @@ export type ResourceWithSubject = {
   subjectId: string;
   subjectTitle: string;
   title: string;
-  unitType: "test" | "page" | "chapter";
+  unitType: "test" | "exercise" | "page" | "chapter";
   totalUnits: number;
   completedUnits: number;
   chaptersJson: { title: string; pages: number; startPage: number; endPage: number }[] | null;
@@ -172,6 +172,8 @@ export async function getStudentDetail(
     .limit(1);
 
   if (!student) return null;
+
+  await ensureSubjectCatalog(workspaceId);
 
   const [targetRows, resourceRows, availabilityRows, constraintRows, subjectRows, planRows] =
     await Promise.all([

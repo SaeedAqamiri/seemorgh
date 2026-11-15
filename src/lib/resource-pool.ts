@@ -10,9 +10,10 @@ import {
   type ResourceChapter,
 } from "@/db/schema";
 import { parseChapterPlan } from "./resources";
+import { subjectSupportsTests } from "./subjects";
 import { ensureChaptersFromJson, replaceResourceChapters } from "./resource-chapters";
 import { buildPoolBooks, POOL_PUBLISHERS, type PoolChapterSeed } from "./resource-pool-data";
-import { ensureSubjectCatalog } from "./subject-catalog";
+import { ensureSubjectCatalog, normalizeGeneralSubjectResources } from "./subject-catalog";
 
 export class ResourcePoolError extends Error {}
 
@@ -32,7 +33,7 @@ export type PoolBookView = {
   title: string;
   publisher: string;
   grade: string;
-  unitType: "test" | "page" | "chapter";
+  unitType: "test" | "exercise" | "page" | "chapter";
   totalUnits: number;
   priority: number;
   chapters: PoolChapterView[];
@@ -41,6 +42,7 @@ export type PoolBookView = {
 function totalFor(unitType: string, chapters: { pages: number; testCount: number; exerciseCount: number }[]) {
   if (unitType === "page") return chapters.reduce((sum, chapter) => sum + chapter.pages, 0);
   if (unitType === "chapter") return chapters.length;
+  if (unitType === "exercise") return chapters.reduce((sum, chapter) => sum + chapter.exerciseCount, 0);
   return chapters.reduce((sum, chapter) => sum + chapter.testCount, 0);
 }
 
@@ -121,11 +123,14 @@ export async function seedResourcePool(workspaceId: string): Promise<{ books: nu
     await db.insert(resourcePoolChapters).values(chapterValues.slice(index, index + 500));
   }
 
+  await normalizeGeneralSubjectResources(workspaceId, { force: true });
+
   return { books: insertable.length, chapters: chapterValues.length };
 }
 
 export async function listResourcePool(workspaceId: string): Promise<PoolBookView[]> {
   const db = await getDb();
+  await ensureSubjectCatalog(workspaceId);
   const books = await db
     .select({
       id: resourcePool.id,
@@ -186,7 +191,7 @@ export type AddPoolBookInput = {
   title: string;
   publisher: string;
   grade: string;
-  unitType: "test" | "page" | "chapter";
+  unitType: "test" | "exercise" | "page" | "chapter";
   priority: number;
   chaptersText: string;
   totalUnits: number;
@@ -195,18 +200,24 @@ export type AddPoolBookInput = {
 export async function addPoolBook(input: AddPoolBookInput): Promise<string> {
   const db = await getDb();
   const [subject] = await db
-    .select({ id: subjects.id })
+    .select({ id: subjects.id, kind: subjects.kind })
     .from(subjects)
     .where(and(eq(subjects.id, input.subjectId), eq(subjects.workspaceId, input.workspaceId)))
     .limit(1);
   if (!subject) throw new ResourcePoolError("درس انتخاب‌شده معتبر نیست.");
 
-  const parsed = parseChapterPlan(input.chaptersText, 0);
+  const supportsTests = subjectSupportsTests(subject.kind);
+  const unitType = supportsTests ? "test" : "exercise";
+  const parsed = parseChapterPlan(
+    input.chaptersText,
+    0,
+    supportsTests ? "test" : "exercise",
+  );
   if (parsed.error) throw new ResourcePoolError(parsed.error);
   const chapters = parsed.chapters ?? [];
   const totalUnits =
     chapters.length > 0
-      ? totalFor(input.unitType, chapters.map((chapter) => ({
+      ? totalFor(unitType, chapters.map((chapter) => ({
           pages: chapter.pages,
           testCount: chapter.testCount ?? 0,
           exerciseCount: chapter.exerciseCount ?? 0,
@@ -221,7 +232,7 @@ export async function addPoolBook(input: AddPoolBookInput): Promise<string> {
       title: input.title,
       publisher: input.publisher,
       grade: input.grade,
-      unitType: input.unitType,
+      unitType,
       totalUnits,
       priority: input.priority,
       createdBy: input.actorId,
@@ -345,7 +356,9 @@ function scaleChapters(
         ? chapter.pages
         : unitType === "chapter"
           ? 1
-          : chapter.tests,
+          : unitType === "exercise"
+            ? chapter.exercises
+            : chapter.tests,
   }));
   const rawTotal = raw.reduce((sum, chapter) => sum + chapter.weight, 0);
   if (targetTotal <= 0 || rawTotal <= 0) {
@@ -354,7 +367,7 @@ function scaleChapters(
       pages: chapter.pages,
       startPage: 1,
       endPage: chapter.pages,
-      testCount: chapter.tests,
+      testCount: unitType === "exercise" ? 0 : chapter.tests,
       exerciseCount: chapter.exercises,
     }));
   }
@@ -368,14 +381,15 @@ function scaleChapters(
       : Math.max(0, Math.round((chapter.weight / rawTotal) * targetTotal));
     assigned += scaled;
     const pages = unitType === "page" ? scaled : chapter.pages;
-    const testCount = unitType === "test" ? scaled : chapter.tests;
+    const testCount = unitType === "test" ? scaled : unitType === "exercise" ? 0 : chapter.tests;
+    const exerciseCount = unitType === "exercise" ? scaled : chapter.exercises;
     const result: ResourceChapter = {
       title: chapter.title,
       pages,
       startPage: pages > 0 ? cursor : 1,
       endPage: pages > 0 ? cursor + pages - 1 : 0,
       testCount,
-      exerciseCount: chapter.exercises,
+      exerciseCount,
     };
     cursor += pages;
     return result;
@@ -454,7 +468,7 @@ export async function backfillPersonalResourcesFromPool(workspaceId?: string): P
     await db.update(resources).set({ chaptersJson }).where(eq(resources.id, row.id));
     const created = await ensureChaptersFromJson(db, {
       id: row.id,
-      unitType: row.unitType as "test" | "page" | "chapter",
+      unitType: row.unitType as "test" | "exercise" | "page" | "chapter",
       totalUnits: row.totalUnits,
       completedUnits: row.completedUnits,
       chaptersJson,

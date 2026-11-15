@@ -236,10 +236,14 @@ export function validateAiPlan(input: AiPlannerInput, raw: unknown): {
       }
 
       const typeRaw = String(block.type ?? "study");
-      const type = (["study", "review", "test"].includes(typeRaw) ? typeRaw : "study") as
-        | "study"
-        | "review"
-        | "test";
+      const requestedType = (["study", "review", "test"].includes(typeRaw)
+        ? typeRaw
+        : "study") as "study" | "review" | "test";
+      const type = (
+        requestedType === "test" && resource.unitType === "exercise"
+          ? "exercise"
+          : requestedType
+      ) as "study" | "review" | "test" | "exercise";
 
       tasks.push({
         planDate: date,

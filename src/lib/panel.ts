@@ -25,6 +25,7 @@ import {
   slotLabel,
 } from "./schedule";
 import { listSubjectsForField, type SubjectOption } from "./subject-catalog";
+import { subjectSupportsTests } from "./subjects";
 
 export { PANEL_DAYS, PANEL_SLOTS, faNumber, slotLabel };
 export type { PanelSlot };
@@ -370,6 +371,38 @@ export async function saveGeneratedPanel(input: {
     });
 }
 
+function normalizeGridForSubjectKinds(
+  grid: WeeklyGridJson,
+  kindById: Map<string, string>,
+): WeeklyGridJson {
+  return grid.map((row) =>
+    row.map((cell) => {
+      if (cell.kind === "empty" || cell.kind === "rest" || !cell.subjectId) return cell;
+      const kind = kindById.get(cell.subjectId);
+      if (!kind || subjectSupportsTests(kind)) return cell;
+      if (cell.kind === "test" || cell.kind === "timedTest") {
+        return { ...cell, kind: "exercise" };
+      }
+      if (cell.kind === "routine" && cell.routineMode === "test") {
+        return { ...cell, routineMode: "study" };
+      }
+      return cell;
+    }),
+  );
+}
+
+async function loadSubjectKindMap(
+  db: Awaited<ReturnType<typeof getDb>>,
+  studentId: string,
+): Promise<Map<string, string>> {
+  const rows = await db
+    .select({ id: subjects.id, kind: subjects.kind })
+    .from(subjects)
+    .innerJoin(students, eq(students.workspaceId, subjects.workspaceId))
+    .where(eq(students.id, studentId));
+  return new Map(rows.map((row) => [row.id, row.kind]));
+}
+
 export async function getWeeklyPanelView(studentId: string, weekStart: string): Promise<PanelView> {
   const db = await getDb();
   const slots = await getBellSlots(studentId);
@@ -403,11 +436,13 @@ export async function getWeeklyPanelView(studentId: string, weekStart: string): 
   ]);
 
   const plan = planRows[0];
-  const grid = panel?.gridJson
+  let grid = panel?.gridJson
     ? normalizeGrid(panel.gridJson, slots.length)
     : plan
       ? await gridFromTasks(plan.id, weekStart, slots)
       : emptyGrid(slots.length);
+  const kindById = await loadSubjectKindMap(db, studentId);
+  grid = normalizeGridForSubjectKinds(grid, kindById);
 
   let updatedByName: string | null = null;
   if (panel?.updatedBy) {
@@ -448,7 +483,7 @@ export type PanelResourceOption = {
   id: string;
   subjectId: string;
   title: string;
-  unitType: "test" | "page" | "chapter";
+  unitType: "test" | "exercise" | "page" | "chapter";
   totalUnits: number;
   completedUnits: number;
   priority: number;
@@ -586,11 +621,11 @@ export async function saveWeeklyPanel(input: SavePanelInput): Promise<void> {
 
   const slots = await getBellSlots(input.studentId);
   assertGrid(input.grid, slots.length);
-  const grid = normalizeGrid(input.grid, slots.length);
+  let grid = normalizeGrid(input.grid, slots.length);
 
   const [subjectRows, resourceRows] = await Promise.all([
     db
-      .select({ id: subjects.id })
+      .select({ id: subjects.id, kind: subjects.kind })
       .from(subjects)
       .where(eq(subjects.workspaceId, studentRow.workspaceId)),
     db
@@ -599,6 +634,8 @@ export async function saveWeeklyPanel(input: SavePanelInput): Promise<void> {
       .where(eq(resources.studentId, input.studentId)),
   ]);
 
+  const kindById = new Map(subjectRows.map((row) => [row.id, row.kind]));
+  grid = normalizeGridForSubjectKinds(grid, kindById);
   const subjectIds = new Set(subjectRows.map((row) => row.id));
   const resourceIds = new Set(resourceRows.map((row) => row.id));
   const chapterMap = await chaptersByResourceIds(db, [...resourceIds]);

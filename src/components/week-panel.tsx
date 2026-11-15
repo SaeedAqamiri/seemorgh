@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { SubmitButton } from "./submit-button";
+import { subjectSupportsTests } from "@/lib/subjects";
 
 export type PanelCellState = {
   kind: "empty" | "rest" | "study" | "review" | "test" | "timedTest" | "exercise" | "routine";
@@ -100,12 +101,6 @@ function defaultCell(kind: PanelCellState["kind"]): PanelCellState {
 }
 
 export function WeekGridEditor(props: WeekGridEditorProps) {
-  const [editing, setEditing] = useState(false);
-  const [grid, setGrid] = useState<PanelCellState[][]>(() => cloneGrid(props.initialGrid));
-  const [routine, setRoutine] = useState(props.initialRoutine);
-  const [homework, setHomework] = useState(props.initialHomework);
-  const [groups, setGroups] = useState<Record<string, "general" | "specialized">>({});
-
   const subjectById = useMemo(
     () => new Map(props.subjects.map((subject) => [subject.id, subject])),
     [props.subjects],
@@ -114,9 +109,38 @@ export function WeekGridEditor(props: WeekGridEditorProps) {
     () => new Map(props.resources.map((resource) => [resource.id, resource])),
     [props.resources],
   );
+  const kindById = useMemo(
+    () => new Map(props.subjects.map((subject) => [subject.id, subject.kind])),
+    [props.subjects],
+  );
+
+  const supportsTestsFor = (subjectId?: string) =>
+    subjectSupportsTests(kindById.get(subjectId ?? "") ?? "specialized");
+
+  const normalizeCellForKind = (cell: PanelCellState): PanelCellState => {
+    if (!cell.subjectId || supportsTestsFor(cell.subjectId)) return cell;
+    if (cell.kind === "test" || cell.kind === "timedTest") {
+      return { ...cell, kind: "exercise" };
+    }
+    if (cell.kind === "routine" && cell.routineMode === "test") {
+      return { ...cell, routineMode: "study" };
+    }
+    return cell;
+  };
+
+  const normalizeGridForKinds = (grid: PanelCellState[][]): PanelCellState[][] =>
+    grid.map((row) => row.map(normalizeCellForKind));
+
+  const [editing, setEditing] = useState(false);
+  const [grid, setGrid] = useState<PanelCellState[][]>(() =>
+    cloneGrid(normalizeGridForKinds(props.initialGrid)),
+  );
+  const [routine, setRoutine] = useState(props.initialRoutine);
+  const [homework, setHomework] = useState(props.initialHomework);
+  const [groups, setGroups] = useState<Record<string, "general" | "specialized">>({});
 
   const startEdit = () => {
-    setGrid(cloneGrid(props.initialGrid));
+    setGrid(cloneGrid(normalizeGridForKinds(props.initialGrid)));
     setRoutine(props.initialRoutine);
     setHomework(props.initialHomework);
     setGroups({});
@@ -124,7 +148,7 @@ export function WeekGridEditor(props: WeekGridEditorProps) {
   };
 
   const cancelEdit = () => {
-    setGrid(cloneGrid(props.initialGrid));
+    setGrid(cloneGrid(normalizeGridForKinds(props.initialGrid)));
     setRoutine(props.initialRoutine);
     setHomework(props.initialHomework);
     setGroups({});
@@ -161,6 +185,15 @@ export function WeekGridEditor(props: WeekGridEditorProps) {
   };
 
   const setKind = (day: number, slot: number, kind: PanelCellState["kind"]) => {
+    const cell = grid[day][slot];
+    if (
+      cell.subjectId &&
+      !supportsTestsFor(cell.subjectId) &&
+      (kind === "test" || kind === "timedTest")
+    ) {
+      updateCell(day, slot, defaultCell("exercise"));
+      return;
+    }
     updateCell(day, slot, defaultCell(kind));
   };
 
@@ -168,11 +201,17 @@ export function WeekGridEditor(props: WeekGridEditorProps) {
     setGrid((current) => {
       const copy = cloneGrid(current);
       const cell = copy[day][slot];
-      if (countKindFor(cell)) {
-        copy[day][slot] = { ...cell, subjectId, resourceId: null, chapterId: null };
-      } else {
-        copy[day][slot] = { ...cell, subjectId };
+      const generalSubject = !supportsTestsFor(subjectId);
+      let next = countKindFor(cell)
+        ? { ...cell, subjectId, resourceId: null, chapterId: null }
+        : { ...cell, subjectId };
+      if (generalSubject) {
+        if (next.kind === "test" || next.kind === "timedTest") next = { ...next, kind: "exercise" };
+        if (next.kind === "routine" && next.routineMode === "test") {
+          next = { ...next, routineMode: "study" };
+        }
       }
+      copy[day][slot] = next;
       return copy;
     });
   };
@@ -181,10 +220,14 @@ export function WeekGridEditor(props: WeekGridEditorProps) {
     setGrid((current) => {
       const copy = cloneGrid(current);
       const cell = copy[day][slot];
+      const safeMode =
+        routineMode === "test" && cell.subjectId && !supportsTestsFor(cell.subjectId)
+          ? "study"
+          : routineMode;
       copy[day][slot] = {
         ...cell,
         kind: "routine",
-        routineMode,
+        routineMode: safeMode,
         resourceId: null,
         chapterId: null,
         count: 30,
@@ -238,18 +281,21 @@ export function WeekGridEditor(props: WeekGridEditorProps) {
     const isRoutine = cell.kind === "routine";
     const countMode = countKindFor(cell);
     const textMode = textKindFor(cell);
+    const generalContext = cell.subjectId
+      ? !supportsTestsFor(cell.subjectId)
+      : group === "general";
 
     return (
       <>
         {isRoutine ? (
           <select
             aria-label={`نوع روتین ${props.weekdayLabels[day]} زنگ ${slot + 1}`}
-            value={cell.routineMode ?? "test"}
+            value={generalContext ? "study" : cell.routineMode ?? "test"}
             onChange={(event) =>
               setRoutineMode(day, slot, event.target.value === "study" ? "study" : "test")
             }
           >
-            <option value="test">روتین تست</option>
+            {generalContext ? null : <option value="test">روتین تست</option>}
             <option value="study">روتین مطالعه</option>
           </select>
         ) : null}
@@ -415,7 +461,13 @@ export function WeekGridEditor(props: WeekGridEditorProps) {
                             setKind(day, slot, event.target.value as PanelCellState["kind"])
                           }
                         >
-                          {KIND_OPTIONS.map((option) => (
+                          {(supportsTestsFor(cell.subjectId)
+                            ? KIND_OPTIONS
+                            : KIND_OPTIONS.filter(
+                                (option) =>
+                                  option.value !== "test" && option.value !== "timedTest",
+                              )
+                          ).map((option) => (
                             <option key={option.value} value={option.value}>
                               {option.label}
                             </option>

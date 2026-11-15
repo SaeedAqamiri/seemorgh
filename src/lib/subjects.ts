@@ -129,6 +129,18 @@ export function catalogItemFor(title: string): SubjectCatalogItem | undefined {
   return SUBJECT_CATALOG.find((subject) => subject.title === title);
 }
 
+/**
+ * General subjects only use exercises in their help books; specialized subjects
+ * have both multiple-choice tests and exercises.
+ */
+export function subjectSupportsTests(kind: string): boolean {
+  return kind !== "general";
+}
+
+export function defaultUnitTypeForKind(kind: string): "test" | "exercise" {
+  return subjectSupportsTests(kind) ? "test" : "exercise";
+}
+
 export function subjectAvailableForField(title: string, field: string): boolean {
   const item = catalogItemFor(title);
   if (!item) return true;

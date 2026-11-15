@@ -297,7 +297,7 @@ export function buildDeterministicAllocation(input: AutoPlanInput): AutoAllocati
     }
 
     const testResources = subjectResourceList.filter(
-      (resource) => resource.unitType === "test",
+      (resource) => resource.unitType === "test" || resource.unitType === "exercise",
     );
     const remainingTests = testResources.reduce(
       (sum, resource) => sum + Math.max(0, resource.totalUnits - resource.completedUnits),
@@ -307,9 +307,9 @@ export function buildDeterministicAllocation(input: AutoPlanInput): AutoAllocati
       warnings.push(
         `برای ${item.goal.subjectTitle} حدود ${tests.toLocaleString(
           "fa-IR",
-        )} تست پیش‌بینی شده ولی ${remainingTests.toLocaleString(
+        )} تست/تمرین پیش‌بینی شده ولی ${remainingTests.toLocaleString(
           "fa-IR",
-        )} تست در منابع باقی مانده است؛ ادامه به تمرین آزاد اختصاص می‌یابد.`,
+        )} واحد در منابع باقی مانده است؛ ادامه به تمرین آزاد اختصاص می‌یابد.`,
       );
     }
 
@@ -473,6 +473,7 @@ function placeBlock(
 function minutesPerUnit(resource: PlannerResource | null): number {
   if (!resource) return 0;
   if (resource.unitType === "test") return 1.5;
+  if (resource.unitType === "exercise") return 2;
   if (resource.unitType === "page") return 2;
   return 60;
 }
@@ -576,11 +577,18 @@ function pickResource(
       (state) =>
         state.resource.subjectId === subjectId && state.remaining > 0 && state.resource.totalUnits > 0,
     )
-    .filter((state) => type !== "test" || state.resource.unitType === "test")
+    .filter(
+      (state) =>
+        type !== "test" ||
+        state.resource.unitType === "test" ||
+        state.resource.unitType === "exercise",
+    )
     .sort((a, b) => {
       const typeScore = (state: ResourceState) => {
         if (type === "test") return state.resource.unitType === "test" ? 0 : 1;
-        return state.resource.unitType === "test" ? 1 : 0;
+        return state.resource.unitType === "test" || state.resource.unitType === "exercise"
+          ? 1
+          : 0;
       };
       const diff = typeScore(a) - typeScore(b);
       if (diff !== 0) return diff;
@@ -619,7 +627,11 @@ function unitsForBlock(
   policy: PlanningPolicy,
 ): number {
   if (type === "test") {
-    return Math.max(1, Math.round(minutes / policy.minutesPerTest));
+    const perUnit =
+      resource?.resource.unitType === "exercise"
+        ? minutesPerUnit(resource.resource)
+        : policy.minutesPerTest;
+    return Math.max(1, Math.round(minutes / perUnit));
   }
   if (!resource) return 0;
   return Math.max(1, Math.round(minutes / minutesPerUnit(resource.resource)));
@@ -654,12 +666,12 @@ function routineForWeek(tasks: PlannedTask[], goals: StudyGoalInput[]): string {
 
 function homeworkForWeek(tasks: PlannedTask[]): string {
   const tests = tasks
-    .filter((task) => task.type === "test")
+    .filter((task) => task.type === "test" || task.type === "exercise")
     .reduce((sum, task) => sum + task.targetUnits, 0);
   if (tests > 0) {
-    return `پایان هفته: مرور تست‌های غلط این هفته (حدود ${tests.toLocaleString(
+    return `پایان هفته: مرور تست‌ها و تمرین‌های غلط این هفته (حدود ${tests.toLocaleString(
       "fa-IR",
-    )} تست) و ثبت نتیجه در دفترچه عملکرد.`;
+    )} واحد) و ثبت نتیجه در دفترچه عملکرد.`;
   }
   return "پایان هفته: مرور مباحث خوانده‌شده و ثبت پیشرفت منابع در دفترچه عملکرد.";
 }
@@ -795,7 +807,14 @@ function scheduleWeek(
           ? resourceState?.resource.title ?? chosen.subjectTitle
           : resourceTopic(resourceState, targetUnits, chosen.subjectTitle);
 
-      const actionKind: PlannedTask["actionKind"] = option.type;
+      const isExerciseResource = resourceState?.resource.unitType === "exercise";
+      const taskType =
+        option.type === "test" && !resourceState
+          ? "study"
+          : option.type === "test" && isExerciseResource
+            ? "exercise"
+            : option.type;
+      const actionKind: PlannedTask["actionKind"] = taskType;
 
       tasks.push({
         planDate: date,
@@ -806,7 +825,7 @@ function scheduleWeek(
         chapterId: null,
         resourceText: topic,
         topic,
-        type: option.type,
+        type: taskType,
         actionKind,
         routineMode: null,
         targetUnits,

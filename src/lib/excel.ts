@@ -65,7 +65,7 @@ export type ResourceImportRow = {
   studentPhone: string;
   subject: string;
   title: string;
-  unitType: "test" | "page" | "chapter";
+  unitType: "test" | "exercise" | "page" | "chapter";
   totalUnits: number;
   completedUnits: number;
   priority: number;
@@ -194,7 +194,7 @@ export async function buildTemplateWorkbook(): Promise<Buffer> {
     ["Availability", "بازه آزاد هفتگی. weekday: 0=شنبه تا 6=جمعه."],
     ["Constraints", "محدودیت‌های دانش‌آموز. buffer_pct بین ۰ تا ۵۰."],
     ["Questions", "سوال چهارگزینه‌ای (mcq) یا کوتاه‌پاسخ (short). correct برای MCQ شماره گزینه ۱ تا ۴ است."],
-    ["unit_type", "test / page / chapter"],
+    ["unit_type", "test / exercise / page / chapter"],
     ["track", "konkur / final / both"],
     ["difficulty", "easy / medium / hard"],
   ]);
@@ -262,10 +262,12 @@ function normalizeTrack(value: string): "konkur" | "final" | "both" | null {
   return map[value.trim().toLowerCase()] ?? map[value.trim()] ?? null;
 }
 
-function normalizeUnitType(value: string): "test" | "page" | "chapter" | null {
-  const map: Record<string, "test" | "page" | "chapter"> = {
+function normalizeUnitType(value: string): "test" | "exercise" | "page" | "chapter" | null {
+  const map: Record<string, "test" | "exercise" | "page" | "chapter"> = {
     test: "test",
     تست: "test",
+    exercise: "exercise",
+    تمرین: "exercise",
     page: "page",
     صفحه: "page",
     chapter: "chapter",

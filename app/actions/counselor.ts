@@ -23,6 +23,7 @@ import { notifyStudentUser } from "@/lib/notifications";
 import { normalizePhone } from "@/lib/password";
 import { aiPlanningConfigured, generateAiPlan } from "@/lib/ai-plan";
 import { parseChapterPlan } from "@/lib/resources";
+import { subjectSupportsTests } from "@/lib/subjects";
 import { chaptersByResourceIds, recomputeResourceTotals, replaceResourceChapters } from "@/lib/resource-chapters";
 import { copyPoolBookToStudent, ResourcePoolError } from "@/lib/resource-pool";
 import { generatePlan } from "@/lib/planner";
@@ -49,6 +50,8 @@ function totalFromChapters(
 ): number | null {
   if (!chapters?.length) return null;
   if (unitType === "test") return chapters.reduce((sum, chapter) => sum + (chapter.testCount ?? 0), 0);
+  if (unitType === "exercise")
+    return chapters.reduce((sum, chapter) => sum + (chapter.exerciseCount ?? 0), 0);
   if (unitType === "page") return chapters.reduce((sum, chapter) => sum + chapter.pages, 0);
   return chapters.length;
 }
@@ -257,25 +260,32 @@ export async function addResourceAction(formData: FormData): Promise<void> {
 
   const subjectId = field(formData, "subjectId");
   const title = field(formData, "title");
-  const unitType = field(formData, "unitType") || "test";
   const inputTotal = Math.max(0, numberField(formData, "totalUnits"));
   const completedUnits = Math.max(0, numberField(formData, "completedUnits"));
   const priority = Math.max(1, Math.min(5, numberField(formData, "priority") || 3));
-  const parsedChapters = parseChapterPlan(field(formData, "chapters"), inputTotal);
-  const chapterTotal = totalFromChapters(parsedChapters.chapters, unitType);
-  const totalUnits = chapterTotal ?? inputTotal;
 
   if (!subjectId || !title) fail(context.basePath, "درس و عنوان منبع لازم است.");
-  if (completedUnits > totalUnits) fail(context.basePath, "پیشرفت نمی‌تواند بیشتر از کل باشد.");
-  if (parsedChapters.error) fail(context.basePath, parsedChapters.error);
 
   const db = await getDb();
   const [subjectRow] = await db
-    .select({ id: subjects.id })
+    .select({ id: subjects.id, kind: subjects.kind })
     .from(subjects)
     .where(and(eq(subjects.id, subjectId), eq(subjects.workspaceId, context.workspaceId)))
     .limit(1);
   if (!subjectRow) fail(context.basePath, "درس انتخاب‌شده معتبر نیست.");
+
+  const supportsTests = subjectSupportsTests(subjectRow.kind);
+  const unitType = supportsTests ? "test" : "exercise";
+  const parsedChapters = parseChapterPlan(
+    field(formData, "chapters"),
+    inputTotal,
+    supportsTests ? "test" : "exercise",
+  );
+  const chapterTotal = totalFromChapters(parsedChapters.chapters, unitType);
+  const totalUnits = chapterTotal ?? inputTotal;
+
+  if (completedUnits > totalUnits) fail(context.basePath, "پیشرفت نمی‌تواند بیشتر از کل باشد.");
+  if (parsedChapters.error) fail(context.basePath, parsedChapters.error);
 
   const [created] = await db
     .insert(resources)
@@ -284,7 +294,7 @@ export async function addResourceAction(formData: FormData): Promise<void> {
       studentId,
       subjectId,
       title,
-      unitType: unitType as "test" | "page" | "chapter",
+      unitType: unitType as "test" | "exercise" | "page" | "chapter",
       totalUnits,
       completedUnits,
       priority,
@@ -307,17 +317,44 @@ export async function updateResourceAction(formData: FormData): Promise<void> {
   const completedUnits = Math.max(0, numberField(formData, "completedUnits"));
   const inputTotal = Math.max(0, numberField(formData, "totalUnits"));
   const priority = Math.max(1, Math.min(5, numberField(formData, "priority") || 3));
-  const parsedChapters = parseChapterPlan(field(formData, "chapters"), inputTotal);
-  const chapterTotal = totalFromChapters(parsedChapters.chapters, field(formData, "unitType") || "test");
+  const db = await getDb();
+
+  const [resourceRow] = await db
+    .select({ unitType: resources.unitType, subjectKind: subjects.kind })
+    .from(resources)
+    .innerJoin(subjects, eq(resources.subjectId, subjects.id))
+    .where(
+      and(
+        eq(resources.id, resourceId),
+        eq(resources.studentId, studentId),
+        eq(resources.workspaceId, context.workspaceId),
+      ),
+    )
+    .limit(1);
+  if (!resourceRow) fail(context.basePath, "منبع انتخاب‌شده معتبر نیست.");
+
+  const supportsTests = subjectSupportsTests(resourceRow.subjectKind);
+  const requestedUnitType = field(formData, "unitType") || resourceRow.unitType;
+  const unitType = (supportsTests ? requestedUnitType : "exercise") as
+    | "test"
+    | "exercise"
+    | "page"
+    | "chapter";
+  const parsedChapters = parseChapterPlan(
+    field(formData, "chapters"),
+    inputTotal,
+    supportsTests ? "test" : "exercise",
+  );
+  const chapterTotal = totalFromChapters(parsedChapters.chapters, unitType);
   const totalUnits = chapterTotal ?? inputTotal;
 
   if (completedUnits > totalUnits) fail(context.basePath, "پیشرفت نمی‌تواند بیشتر از کل باشد.");
   if (parsedChapters.error) fail(context.basePath, parsedChapters.error);
 
-  const db = await getDb();
   await db
     .update(resources)
     .set({
+      unitType,
       completedUnits,
       totalUnits,
       priority,
@@ -495,7 +532,7 @@ export async function generatePlanAction(formData: FormData): Promise<void> {
       subjectId: row.subjectId,
       subjectTitle: row.subjectTitle,
       title: row.title,
-      unitType: row.unitType as "test" | "page" | "chapter",
+      unitType: row.unitType as "test" | "exercise" | "page" | "chapter",
       totalUnits: row.totalUnits,
       completedUnits: row.completedUnits,
       priority: row.priority,

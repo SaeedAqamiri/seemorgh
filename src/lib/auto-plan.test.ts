@@ -71,6 +71,53 @@ describe("auto plan allocation", () => {
     expect(math!.tests).toBeGreaterThan(bio!.tests);
   });
 
+  it("turns planned practice into exercise tasks for exercise resources", () => {
+    const input: AutoPlanInput = {
+      ...baseInput,
+      goals: [
+        {
+          subjectId: "sub-lit",
+          subjectTitle: "ادبیات",
+          metric: "percent",
+          currentValue: 20,
+          targetValue: 60,
+          weight: 5,
+        },
+      ],
+      resources: [
+        {
+          id: "res-lit",
+          subjectId: "sub-lit",
+          subjectTitle: "ادبیات",
+          title: "ادبیات دوازدهم",
+          unitType: "exercise",
+          totalUnits: 500,
+          completedUnits: 0,
+          priority: 5,
+          chapters: [
+            {
+              title: "درس ۱",
+              pages: 0,
+              startPage: 1,
+              endPage: 0,
+              exerciseCount: 500,
+              completedExercises: 0,
+            },
+          ],
+        },
+      ],
+    };
+
+    const plan = scheduleAutoPlan(input, buildDeterministicAllocation(input));
+    const practice = plan.weeks
+      .flatMap((week) => week.tasks)
+      .filter((task) => task.type === "test" || task.type === "exercise");
+    expect(practice.length).toBeGreaterThan(0);
+    expect(
+      practice.every((task) => task.type === "exercise" && task.actionKind === "exercise"),
+    ).toBe(true);
+  });
+
   it("warns when the horizon has no free time", () => {
     const allocation = buildDeterministicAllocation({ ...baseInput, availability: [] });
     expect(allocation.subjects).toHaveLength(0);

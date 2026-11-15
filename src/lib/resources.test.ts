@@ -35,6 +35,24 @@ describe("resource chapters", () => {
     expect(formatChapterPlan(result.chapters)).toContain("فصل ۱ | 40 | 12");
   });
 
+  it("parses exercise-only chapters for general subjects", () => {
+    const result = parseChapterPlan("فصل ۱ | 40\nفصل ۲ | 35", 0, "exercise");
+    expect(result.error).toBeNull();
+    expect(result.chapters?.[0]).toMatchObject({
+      title: "فصل ۱",
+      testCount: 0,
+      exerciseCount: 40,
+      pages: 0,
+    });
+    expect(result.chapters?.[1]).toMatchObject({
+      title: "فصل ۲",
+      testCount: 0,
+      exerciseCount: 35,
+    });
+    expect(formatChapterPlan(result.chapters, "exercise")).toContain("فصل ۱ | 40");
+    expect(formatChapterPlan(result.chapters, "exercise")).not.toContain("فصل ۱ | 0 | 40");
+  });
+
   it("rejects invalid or overflowing chapters", () => {
     expect(parseChapters("فصل ۱ | 50", 40).error).toContain("بیشتر");
     expect(parseChapters("فصل ۱ | سلام", 40).error).toContain("نامعتبر");

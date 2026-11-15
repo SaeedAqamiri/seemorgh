@@ -40,7 +40,7 @@ export async function addPoolResourceAction(formData: FormData): Promise<void> {
       title,
       publisher,
       grade,
-      unitType: unitType as "test" | "page" | "chapter",
+      unitType: unitType as "test" | "exercise" | "page" | "chapter",
       priority,
       chaptersText,
       totalUnits,
