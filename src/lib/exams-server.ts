@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, eq, inArray, lt, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import {
   examAnswers,
@@ -15,7 +15,9 @@ import {
   buildSnapshot,
   parseSnapshot,
   sanitizeBlueprint,
+  sanitizeQuestionIds,
   selectExamQuestions,
+  selectManualQuestions,
   type SelectableQuestion,
 } from "./exam";
 
@@ -138,8 +140,18 @@ export async function getExamDetail(workspaceId: string, examId: string) {
   return { exam, assignments, answersByAttempt };
 }
 
-export async function loadSelectableQuestions(workspaceId: string): Promise<SelectableQuestion[]> {
+export async function loadSelectableQuestions(
+  workspaceId: string,
+  ownerId?: string,
+): Promise<SelectableQuestion[]> {
   const db = await getDb();
+  const conditions = [
+    eq(questions.workspaceId, workspaceId),
+    eq(questions.status, "active"),
+    isNotNull(questions.correctJson),
+  ];
+  if (ownerId) conditions.push(eq(questionBanks.ownerId, ownerId));
+
   const rows = await db
     .select({
       id: questions.id,
@@ -156,8 +168,9 @@ export async function loadSelectableQuestions(workspaceId: string): Promise<Sele
       externalKey: questions.externalKey,
     })
     .from(questions)
+    .innerJoin(questionBanks, eq(questions.bankId, questionBanks.id))
     .leftJoin(subjects, eq(questions.subjectId, subjects.id))
-    .where(and(eq(questions.workspaceId, workspaceId), eq(questions.status, "active")));
+    .where(and(...conditions));
 
   return rows.map((row) => ({
     id: row.id,
@@ -175,7 +188,11 @@ export async function loadSelectableQuestions(workspaceId: string): Promise<Sele
   }));
 }
 
-export async function previewExamQuestions(workspaceId: string, examId: string) {
+export async function previewExamQuestions(
+  workspaceId: string,
+  examId: string,
+  ownerId?: string,
+) {
   const db = await getDb();
   const [exam] = await db
     .select()
@@ -184,9 +201,13 @@ export async function previewExamQuestions(workspaceId: string, examId: string) 
     .limit(1);
   if (!exam) return null;
 
+  const manualIds = sanitizeQuestionIds(exam.manualQuestionIdsJson);
   const blueprint = sanitizeBlueprint(exam.blueprintJson);
-  const pool = await loadSelectableQuestions(workspaceId);
-  const selection = selectExamQuestions(blueprint, pool, exam.id);
+  const pool = await loadSelectableQuestions(workspaceId, ownerId);
+  const selection =
+    manualIds.length > 0
+      ? selectManualQuestions(manualIds, pool)
+      : selectExamQuestions(blueprint, pool, exam.id);
   return { exam, blueprint, ...selection };
 }
 
@@ -440,12 +461,20 @@ export async function getExamResults(workspaceId: string, examId: string) {
   };
 }
 
-export async function getBankQuestionCount(workspaceId: string): Promise<number> {
+export async function getBankQuestionCount(
+  workspaceId: string,
+  ownerId?: string,
+): Promise<number> {
   const db = await getDb();
+  const conditions = [
+    eq(questions.workspaceId, workspaceId),
+    eq(questions.status, "active"),
+  ];
+  if (ownerId) conditions.push(eq(questionBanks.ownerId, ownerId));
   const [row] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(questions)
     .innerJoin(questionBanks, eq(questions.bankId, questionBanks.id))
-    .where(and(eq(questions.workspaceId, workspaceId), eq(questions.status, "active")));
+    .where(and(...conditions));
   return row?.count ?? 0;
 }

@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS users (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE UNIQUE INDEX IF NOT EXISTS users_phone_unique ON users(phone);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS import_token text;
+CREATE UNIQUE INDEX IF NOT EXISTS users_import_token_unique ON users(import_token);
 
 CREATE TABLE IF NOT EXISTS sessions (
   id text PRIMARY KEY,
@@ -279,9 +281,13 @@ CREATE TABLE IF NOT EXISTS question_banks (
   title text NOT NULL,
   subject_id text REFERENCES subjects(id) ON DELETE SET NULL,
   created_by text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  owner_id text REFERENCES users(id) ON DELETE CASCADE,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS question_banks_workspace_idx ON question_banks(workspace_id);
+ALTER TABLE question_banks ADD COLUMN IF NOT EXISTS owner_id text REFERENCES users(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS question_banks_owner_idx ON question_banks(owner_id);
+UPDATE question_banks SET owner_id = created_by WHERE owner_id IS NULL;
 
 CREATE TABLE IF NOT EXISTS questions (
   id text PRIMARY KEY,
@@ -298,12 +304,23 @@ CREATE TABLE IF NOT EXISTS questions (
   explanation text NOT NULL DEFAULT '',
   media_key text,
   tags text NOT NULL DEFAULT '',
+  source_type text NOT NULL DEFAULT 'authored',
+  source_title text NOT NULL DEFAULT '',
+  source_year text NOT NULL DEFAULT '',
+  source_date text NOT NULL DEFAULT '',
+  source_ref text NOT NULL DEFAULT '',
   external_key text,
   status text NOT NULL DEFAULT 'active',
   created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS questions_bank_idx ON questions(bank_id);
 CREATE INDEX IF NOT EXISTS questions_workspace_idx ON questions(workspace_id);
+CREATE INDEX IF NOT EXISTS questions_external_key_idx ON questions(workspace_id, external_key);
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS source_type text NOT NULL DEFAULT 'authored';
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS source_title text NOT NULL DEFAULT '';
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS source_year text NOT NULL DEFAULT '';
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS source_date text NOT NULL DEFAULT '';
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS source_ref text NOT NULL DEFAULT '';
 
 CREATE TABLE IF NOT EXISTS exams (
   id text PRIMARY KEY,
@@ -315,6 +332,7 @@ CREATE TABLE IF NOT EXISTS exams (
   end_at timestamptz NOT NULL,
   duration_minutes integer NOT NULL,
   blueprint_json jsonb,
+  manual_question_ids_json jsonb,
   question_snapshot_json jsonb,
   shuffle_questions boolean NOT NULL DEFAULT false,
   shuffle_options boolean NOT NULL DEFAULT false,
@@ -326,6 +344,7 @@ CREATE TABLE IF NOT EXISTS exams (
 );
 CREATE INDEX IF NOT EXISTS exams_workspace_idx ON exams(workspace_id);
 ALTER TABLE exams ADD COLUMN IF NOT EXISTS ai_selection boolean NOT NULL DEFAULT false;
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS manual_question_ids_json jsonb;
 
 CREATE TABLE IF NOT EXISTS exam_assignments (
   id text PRIMARY KEY,

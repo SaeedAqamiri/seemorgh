@@ -1,5 +1,25 @@
-export type Difficulty = "easy" | "medium" | "hard";
+export type Difficulty = "easy" | "medium" | "hard" | "very_hard";
 export type QuestionType = "mcq" | "short";
+
+export const DIFFICULTIES: Difficulty[] = ["easy", "medium", "hard", "very_hard"];
+
+export const DIFFICULTY_LABELS: Record<Difficulty, string> = {
+  easy: "آسان",
+  medium: "متوسط",
+  hard: "سخت",
+  very_hard: "خیلی سخت",
+};
+
+export type SourceType = "konkur" | "mock" | "authored" | "other";
+
+export const SOURCE_TYPES: SourceType[] = ["konkur", "mock", "authored", "other"];
+
+export const SOURCE_TYPE_LABELS: Record<SourceType, string> = {
+  konkur: "کنکور سراسری",
+  mock: "آزمون آزمایشی",
+  authored: "تالیف",
+  other: "سایر",
+};
 
 export type BlueprintItem = {
   subjectId: string;
@@ -93,7 +113,7 @@ export function sanitizeBlueprint(raw: unknown): ExamBlueprint {
         return {
           subjectId: String(record.subjectId ?? ""),
           topic: String(record.topic ?? "").trim(),
-          difficulty: (["easy", "medium", "hard"].includes(difficulty)
+          difficulty: (DIFFICULTIES.includes(difficulty as Difficulty)
             ? difficulty
             : "") as BlueprintItem["difficulty"],
           count,
@@ -250,4 +270,32 @@ export function shuffleExamSnapshot(
   }
 
   return { ...snapshot, items };
+}
+
+export function selectManualQuestions(
+  questionIds: string[],
+  pool: SelectableQuestion[],
+): SelectionResult {
+  const byId = new Map(pool.map((question) => [question.id, question]));
+  const selected: SelectableQuestion[] = [];
+  const used = new Set<string>();
+  const shortages: string[] = [];
+
+  for (const questionId of questionIds) {
+    if (used.has(questionId)) continue;
+    const question = byId.get(questionId);
+    if (!question) {
+      shortages.push(`سوال انتخاب‌شده پیدا نشد یا بایگانی شده است: ${questionId.slice(0, 8)}`);
+      continue;
+    }
+    used.add(questionId);
+    selected.push(question);
+  }
+
+  return { selected, shortages, warnings: [] };
+}
+
+export function sanitizeQuestionIds(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return [...new Set(raw.map((value) => String(value ?? "").trim()).filter(Boolean))];
 }

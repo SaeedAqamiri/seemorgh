@@ -42,9 +42,13 @@ export const users = pgTable(
     status: text("status", { enum: ["active", "disabled"] })
       .notNull()
       .default("active"),
+    importToken: text("import_token"),
     createdAt: createdAt(),
   },
-  (table) => [uniqueIndex("users_phone_unique").on(table.phone)],
+  (table) => [
+    uniqueIndex("users_phone_unique").on(table.phone),
+    uniqueIndex("users_import_token_unique").on(table.importToken),
+  ],
 );
 
 export const sessions = pgTable(
@@ -531,9 +535,13 @@ export const questionBanks = pgTable(
     createdBy: text("created_by")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    ownerId: text("owner_id").references(() => users.id, { onDelete: "cascade" }),
     createdAt: createdAt(),
   },
-  (table) => [index("question_banks_workspace_idx").on(table.workspaceId)],
+  (table) => [
+    index("question_banks_workspace_idx").on(table.workspaceId),
+    index("question_banks_owner_idx").on(table.ownerId),
+  ],
 );
 
 export const questions = pgTable(
@@ -551,7 +559,9 @@ export const questions = pgTable(
     type: text("type", { enum: ["mcq", "short"] })
       .notNull()
       .default("mcq"),
-    difficulty: text("difficulty", { enum: ["easy", "medium", "hard"] })
+    difficulty: text("difficulty", {
+      enum: ["easy", "medium", "hard", "very_hard"],
+    })
       .notNull()
       .default("medium"),
     body: text("body").notNull(),
@@ -561,6 +571,15 @@ export const questions = pgTable(
     explanation: text("explanation").notNull().default(""),
     mediaKey: text("media_key"),
     tags: text("tags").notNull().default(""),
+    sourceType: text("source_type", {
+      enum: ["konkur", "mock", "authored", "other"],
+    })
+      .notNull()
+      .default("authored"),
+    sourceTitle: text("source_title").notNull().default(""),
+    sourceYear: text("source_year").notNull().default(""),
+    sourceDate: text("source_date").notNull().default(""),
+    sourceRef: text("source_ref").notNull().default(""),
     externalKey: text("external_key"),
     status: text("status", { enum: ["active", "archived"] })
       .notNull()
@@ -570,6 +589,7 @@ export const questions = pgTable(
   (table) => [
     index("questions_bank_idx").on(table.bankId),
     index("questions_workspace_idx").on(table.workspaceId),
+    index("questions_external_key_idx").on(table.workspaceId, table.externalKey),
   ],
 );
 
@@ -593,6 +613,7 @@ export const exams = pgTable(
     endAt: timestamp("end_at", { withTimezone: true, mode: "date" }).notNull(),
     durationMinutes: integer("duration_minutes").notNull(),
     blueprintJson: jsonb("blueprint_json"),
+    manualQuestionIdsJson: jsonb("manual_question_ids_json").$type<string[]>(),
     questionSnapshotJson: jsonb("question_snapshot_json"),
     shuffleQuestions: boolean("shuffle_questions").notNull().default(false),
     shuffleOptions: boolean("shuffle_options").notNull().default(false),

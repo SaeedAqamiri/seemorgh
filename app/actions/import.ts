@@ -200,6 +200,7 @@ export async function applyImportAction(formData: FormData): Promise<void> {
         .where(
           and(
             eq(questionBanks.workspaceId, counselor.workspaceId),
+            eq(questionBanks.ownerId, counselor.id),
             eq(questionBanks.title, row.data.bank),
           ),
         )
@@ -215,6 +216,7 @@ export async function applyImportAction(formData: FormData): Promise<void> {
               title: row.data.bank,
               subjectId: row.data.subject ? subjectByTitle.get(row.data.subject) ?? null : null,
               createdBy: counselor.id,
+              ownerId: counselor.id,
             })
             .returning()
         )[0];

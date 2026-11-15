@@ -396,6 +396,7 @@ async function main() {
         title: "بانک نمونه زیست",
         subjectId: subjectId("زیست‌شناسی"),
         createdBy: counselor.id,
+        ownerId: counselor.id,
       })
       .returning();
 

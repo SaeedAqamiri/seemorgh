@@ -20,7 +20,7 @@ const STATUS: Record<string, { label: string; className: string }> = {
   graded: { label: "تصحیح‌شده", className: "badge-green" },
 };
 
-const DIFFICULTY: Record<string, string> = { easy: "آسان", medium: "متوسط", hard: "سخت" };
+const DIFFICULTY: Record<string, string> = { easy: "آسان", medium: "متوسط", hard: "سخت", very_hard: "خیلی سخت" };
 
 export default async function ExamDetailPage({
   params,
@@ -33,7 +33,7 @@ export default async function ExamDetailPage({
   const { id } = await params;
   const { success, error, ai } = await searchParams;
 
-  const preview = await previewExamQuestions(counselor.workspaceId, id);
+  const preview = await previewExamQuestions(counselor.workspaceId, id, counselor.id);
   if (!preview) notFound();
 
   const results = preview.exam.status === "draft" ? null : await getExamResults(counselor.workspaceId, id);

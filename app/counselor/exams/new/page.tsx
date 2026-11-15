@@ -7,22 +7,36 @@ import { subjects } from "@/db/schema";
 import { requireCounselor } from "@/lib/auth";
 import { listStudents } from "@/lib/counselor";
 import { tehranDateTimeInput } from "@/lib/dates";
-import { getBankQuestionCount } from "@/lib/exams-server";
+import { getBankQuestionCount, loadSelectableQuestions } from "@/lib/exams-server";
+import { DIFFICULTY_LABELS } from "@/lib/exam";
 import { aiSelectionConfigured } from "@/lib/ai-exam";
 
 export default async function NewExamPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; questionIds?: string | string[] }>;
 }) {
   const counselor = await requireCounselor();
-  const { error } = await searchParams;
+  const { error, questionIds } = await searchParams;
+  const selectedIds = [
+    ...new Set(
+      (Array.isArray(questionIds) ? questionIds : [questionIds ?? ""])
+        .flatMap((value) => value.split(","))
+        .map((value) => value.trim())
+        .filter(Boolean),
+    ),
+  ];
   const db = await getDb();
-  const [subjectRows, students, questionCount] = await Promise.all([
+  const [subjectRows, students, questionCount, pool] = await Promise.all([
     db.select().from(subjects).where(eq(subjects.workspaceId, counselor.workspaceId)),
     listStudents(counselor.workspaceId, counselor.id),
-    getBankQuestionCount(counselor.workspaceId),
+    getBankQuestionCount(counselor.workspaceId, counselor.id),
+    loadSelectableQuestions(counselor.workspaceId, counselor.id),
   ]);
+  const selectedPool = new Map(pool.map((item) => [item.id, item]));
+  const selectedQuestions = selectedIds
+    .map((id) => selectedPool.get(id))
+    .filter((item): item is NonNullable<typeof item> => Boolean(item));
 
   const start = new Date(Date.now() + 60 * 60_000);
   const end = new Date(Date.now() + 3 * 60 * 60_000);
@@ -47,7 +61,46 @@ export default async function NewExamPage({
         </div>
       ) : null}
 
-      <form action={createExamAction} className="stack">
+      {selectedQuestions.length > 0 ? (
+        <div className="card">
+          <div className="section-head">
+            <h2>سوال‌های انتخاب‌شده</h2>
+            <small>{selectedQuestions.length.toLocaleString("fa-IR")} سوال از بانک شما</small>
+          </div>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>درس</th>
+                  <th>مبحث</th>
+                  <th>سختی</th>
+                  <th>متن</th>
+                </tr>
+              </thead>
+              <tbody>
+                {selectedQuestions.map((question, index) => (
+                  <tr key={question.id}>
+                    <td>{index + 1}</td>
+                    <td>{question.subjectTitle || "—"}</td>
+                    <td>{question.topic || "—"}</td>
+                    <td>{DIFFICULTY_LABELS[question.difficulty]}</td>
+                    <td>{question.body.length > 80 ? `${question.body.slice(0, 80)}…` : question.body}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="muted" style={{ fontSize: "0.82rem", marginTop: "0.5rem" }}>
+            در این حالت گزینش بر اساس همان سوال‌های انتخاب‌شده انجام می‌شود و ردیف‌های blueprint لازم نیست.
+          </div>
+        </div>
+      ) : null}
+
+      <form id="createExamForm" action={createExamAction} className="stack">
+        {selectedQuestions.map((question) => (
+          <input key={question.id} type="hidden" name="questionIds" value={question.id} />
+        ))}
         <div className="card stack">
           <h2>مشخصات آزمون</h2>
           <div className="form-grid">
@@ -137,7 +190,7 @@ export default async function NewExamPage({
           )}
         </div>
 
-        <div className="card">
+        <div className="card" style={{ display: selectedQuestions.length > 0 ? "none" : undefined }}>
           <div className="section-head">
             <h2>Blueprint سوالات</h2>
             <small>درس/مبحث/سختی و تعداد؛ ردیف‌های خالی نادیده گرفته می‌شوند.</small>
@@ -167,6 +220,7 @@ export default async function NewExamPage({
                     <option value="easy">آسان</option>
                     <option value="medium">متوسط</option>
                     <option value="hard">سخت</option>
+                    <option value="very_hard">خیلی سخت</option>
                   </select>
                 </div>
                 <div className="field">

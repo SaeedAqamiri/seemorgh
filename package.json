@@ -16,7 +16,8 @@
     "db:seed:pool": "tsx scripts/seed-resource-pool.ts",
     "db:seed:performance": "tsx scripts/seed-performance.ts",
     "db:export:example": "tsx scripts/export-example-data.ts",
-    "db:import:example": "tsx scripts/import-example-data.ts"
+    "db:import:example": "tsx scripts/import-example-data.ts",
+    "db:seed:questions": "tsx scripts/seed-question-bank.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.11",

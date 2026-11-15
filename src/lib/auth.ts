@@ -91,6 +91,16 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   };
 });
 
+export async function requireUser(): Promise<SessionUser> {
+  const user = await getSessionUser();
+  if (!user) redirect("/login");
+  return user;
+}
+
+export function areaPath(user: SessionUser): string {
+  return user.role === "counselor" ? "/counselor" : "/student";
+}
+
 export async function requireCounselor(): Promise<SessionUser> {
   const user = await getSessionUser();
   if (!user) redirect("/login");

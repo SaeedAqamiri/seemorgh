@@ -18,7 +18,9 @@ import {
   buildSnapshot,
   parseSnapshot,
   sanitizeBlueprint,
+  sanitizeQuestionIds,
   selectExamQuestions,
+  selectManualQuestions,
   shuffleExamSnapshot,
   type BlueprintItem,
 } from "@/lib/exam";
@@ -60,6 +62,7 @@ export async function createExamAction(formData: FormData): Promise<void> {
   const shuffleQuestions = field(formData, "shuffleQuestions") === "on";
   const shuffleOptions = field(formData, "shuffleOptions") === "on";
   const aiSelection = field(formData, "aiSelection") === "on";
+  const manualQuestionIds = sanitizeQuestionIds(formData.getAll("questionIds"));
 
   if (title.length < 2) fail("/counselor/exams/new", "عنوان آزمون را کامل وارد کنید.");
   if (!startsAt || !endsAt) fail("/counselor/exams/new", "زمان شروع و پایان را وارد کنید.");
@@ -85,18 +88,27 @@ export async function createExamAction(formData: FormData): Promise<void> {
     items.push({
       subjectId: subjects[index],
       topic: String(topics[index] ?? "").trim(),
-      difficulty: (["easy", "medium", "hard"].includes(difficulty)
+      difficulty: (["easy", "medium", "hard", "very_hard"].includes(difficulty)
         ? difficulty
         : "") as BlueprintItem["difficulty"],
       count,
     });
   }
 
-  if (items.length === 0) fail("/counselor/exams/new", "حداقل یک ردیف blueprint با تعداد سوال اضافه کنید.");
-  const totalRequested = items.reduce((sum, item) => sum + item.count, 0);
+  if (manualQuestionIds.length === 0 && items.length === 0) {
+    fail("/counselor/exams/new", "سوال‌ها را انتخاب کنید یا حداقل یک ردیف blueprint با تعداد سوال اضافه کنید.");
+  }
+  const totalRequested = manualQuestionIds.length || items.reduce((sum, item) => sum + item.count, 0);
   if (totalRequested > 200) fail("/counselor/exams/new", "حداکثر ۲۰۰ سوال در هر آزمون مجاز است.");
 
   const db = await getDb();
+  if (manualQuestionIds.length > 0) {
+    const pool = await loadSelectableQuestions(counselor.workspaceId, counselor.id);
+    const available = new Set(pool.map((question) => question.id));
+    if (manualQuestionIds.some((id) => !available.has(id))) {
+      fail("/counselor/exams/new", "برخی سوال‌های انتخاب‌شده پیدا نشدند یا بایگانی شده‌اند.");
+    }
+  }
   const validStudents = await db
     .select({ id: students.id })
     .from(students)
@@ -123,9 +135,10 @@ export async function createExamAction(formData: FormData): Promise<void> {
       endAt: endsAt,
       durationMinutes,
       blueprintJson: { items },
+      manualQuestionIdsJson: manualQuestionIds.length > 0 ? manualQuestionIds : null,
       shuffleQuestions,
       shuffleOptions,
-      aiSelection,
+      aiSelection: manualQuestionIds.length > 0 ? false : aiSelection,
       maxAttempts: 1,
     })
     .returning();
@@ -165,8 +178,12 @@ export async function publishExamAction(formData: FormData): Promise<void> {
   }
 
   const blueprint = sanitizeBlueprint(exam.blueprintJson);
-  const pool = await loadSelectableQuestions(counselor.workspaceId);
-  const selection = selectExamQuestions(blueprint, pool, exam.id);
+  const manualIds = sanitizeQuestionIds(exam.manualQuestionIdsJson);
+  const pool = await loadSelectableQuestions(counselor.workspaceId, counselor.id);
+  const selection =
+    manualIds.length > 0
+      ? selectManualQuestions(manualIds, pool)
+      : selectExamQuestions(blueprint, pool, exam.id);
 
   if (selection.shortages.length > 0) {
     fail(
@@ -181,7 +198,7 @@ export async function publishExamAction(formData: FormData): Promise<void> {
   let selectedQuestions = selection.selected;
   let aiNote: "ai" | "fallback" | null = null;
 
-  if (exam.aiSelection && aiSelectionConfigured()) {
+  if (manualIds.length === 0 && exam.aiSelection && aiSelectionConfigured()) {
     const aiResult = await generateAiSelection({
       workspaceId: counselor.workspaceId,
       examId: exam.id,
@@ -512,7 +529,75 @@ export async function gradeShortAnswerAction(formData: FormData): Promise<void> 
 export async function previewSelectionAction(formData: FormData): Promise<void> {
   const counselor = await requireCounselor();
   const examId = field(formData, "examId");
-  const preview = await previewExamQuestions(counselor.workspaceId, examId);
+  const preview = await previewExamQuestions(counselor.workspaceId, examId, counselor.id);
   if (!preview) fail("/counselor/exams", "آزمون پیدا نشد.");
   redirect(`/counselor/exams/${examId}`);
+}
+
+export async function createPracticeExamAction(formData: FormData): Promise<void> {
+  const { user, student } = await requireStudent();
+  const title = field(formData, "title") || "آزمون تمرینی";
+  const durationMinutes = Math.floor(numberField(formData, "durationMinutes"));
+  const questionIds = sanitizeQuestionIds(formData.getAll("questionIds"));
+  const shuffleQuestions = field(formData, "shuffleQuestions") === "on";
+  const shuffleOptions = field(formData, "shuffleOptions") === "on";
+
+  if (questionIds.length === 0) fail("/student/questions", "حداقل یک سوال انتخاب کنید.");
+  if (questionIds.length > 200) fail("/student/questions", "حداکثر ۲۰۰ سوال در هر آزمون مجاز است.");
+  if (!Number.isFinite(durationMinutes) || durationMinutes < 5 || durationMinutes > 300) {
+    fail("/student/questions", "مدت آزمون باید بین ۵ تا ۳۰۰ دقیقه باشد.");
+  }
+
+  const pool = await loadSelectableQuestions(user.workspaceId, user.id);
+  const selection = selectManualQuestions(questionIds, pool);
+  if (selection.shortages.length > 0) {
+    fail("/student/questions", selection.shortages.join(" "));
+  }
+
+  const now = new Date();
+  const endAt = new Date(now.getTime() + (durationMinutes + 10) * 60_000);
+  const snapshot = shuffleExamSnapshot(
+    buildSnapshot(selection.selected),
+    `practice:${user.id}:${now.toISOString()}`,
+    shuffleQuestions,
+    shuffleOptions,
+  );
+
+  const db = await getDb();
+  const [exam] = await db
+    .insert(exams)
+    .values({
+      workspaceId: user.workspaceId,
+      title,
+      createdBy: user.id,
+      status: "scheduled",
+      startAt: now,
+      endAt,
+      durationMinutes,
+      blueprintJson: { items: [] },
+      manualQuestionIdsJson: questionIds,
+      questionSnapshotJson: snapshot,
+      totalScore: snapshot.totalScore,
+      shuffleQuestions,
+      shuffleOptions,
+      aiSelection: false,
+      maxAttempts: 1,
+      publishedAt: now,
+    })
+    .returning();
+
+  await db.insert(examAssignments).values({ examId: exam.id, studentId: student.id });
+
+  await logAudit({
+    workspaceId: user.workspaceId,
+    actorId: user.id,
+    action: "exam.practice.create",
+    entity: "exam",
+    entityId: exam.id,
+    diff: { questions: snapshot.items.length, durationMinutes },
+  });
+
+  revalidatePath("/student/exams");
+  revalidatePath("/student/questions");
+  redirect("/student/exams");
 }
