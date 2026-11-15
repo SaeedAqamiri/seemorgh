@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ContentCard } from "@/components/content-card";
 import { requireStudent } from "@/lib/auth";
 import { listStudentContent } from "@/lib/content";
@@ -22,6 +23,20 @@ export default async function StudentContentPage({
       <div>
         <h1>محتوا</h1>
         <small>فیلم‌ها داخل همین صفحه پخش می‌شوند؛ متن‌ها هم همین‌جا هستند.</small>
+      </div>
+
+      <div className="card">
+        <div className="row between" style={{ flexWrap: "wrap" }}>
+          <div>
+            <strong>آزمون‌های روان‌شناسی</strong>
+            <div className="muted" style={{ fontSize: "0.82rem" }}>
+              آزمون‌های سوالی مشاور را شرکت کن و نتیجهٔ امتیازی‌ات را ببین.
+            </div>
+          </div>
+          <Link className="btn btn-secondary" href="/student/psych-tests">
+            مشاهدهٔ آزمون‌ها
+          </Link>
+        </div>
       </div>
 
       <div className="content-kind-tabs">

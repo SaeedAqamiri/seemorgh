@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { addContentAction, deleteContentAction } from "@/app/actions/content";
 import { ContentCard } from "@/components/content-card";
@@ -35,6 +36,21 @@ export default async function CounselorContentPage({
           فیلم، متن و تست روان‌شناسی را با لینک اضافه کنید؛ فیلم‌های آپارات داخل سایت پخش
           می‌شوند.
         </small>
+      </div>
+
+      <div className="card">
+        <div className="row between" style={{ flexWrap: "wrap" }}>
+          <div>
+            <strong>آزمون روان‌شناسی سوالی</strong>
+            <div className="muted" style={{ fontSize: "0.82rem" }}>
+              برای ساخت آزمون با سوال، گزینه و تحلیل امتیازی، از بخش آزمون‌های روان‌شناسی
+              استفاده کنید.
+            </div>
+          </div>
+          <Link className="btn btn-secondary" href="/counselor/psych-tests">
+            مدیریت آزمون‌های روان‌شناسی
+          </Link>
+        </div>
       </div>
 
       {success === "created" ? <div className="alert alert-success">محتوا اضافه شد.</div> : null}

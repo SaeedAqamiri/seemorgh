@@ -33,6 +33,7 @@ export async function AppShell({
                 <Link href="/counselor/exams">آزمون‌ها</Link>
                 <Link href="/counselor/questions">بانک سوال</Link>
                 <Link href="/counselor/resources">استخر منابع</Link>
+                <Link href="/counselor/psych-tests">آزمون روانشناسی</Link>
                 <Link href="/counselor/content">محتوا</Link>
                 <Link href="/counselor/audit">تاریخچه</Link>
               </>
@@ -47,6 +48,7 @@ export async function AppShell({
                 <Link href="/student/exam-analysis">تحلیل آزمون</Link>
                 <Link href="/student/questions">بانک سوال</Link>
                 <Link href="/student/exams">آزمون‌ها</Link>
+                <Link href="/student/psych-tests">آزمون روانشناسی</Link>
                 <Link href="/student/content">محتوا</Link>
               </>
             )}

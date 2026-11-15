@@ -835,6 +835,136 @@ export const contentItems = pgTable(
   (table) => [index("content_items_workspace_idx").on(table.workspaceId, table.createdAt)],
 );
 
+export type PsychDimensionScores = Record<string, number>;
+
+export type PsychBand = {
+  min: number;
+  max: number | null;
+  label: string;
+  code: string;
+  analysis: string;
+};
+
+export type PsychResultRule = {
+  code: string;
+  title: string;
+  body: string;
+};
+
+export const psychTests = pgTable(
+  "psych_tests",
+  {
+    id: id(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    description: text("description").notNull().default(""),
+    status: text("status", { enum: ["draft", "published", "archived"] })
+      .notNull()
+      .default("draft"),
+    resultRulesJson: jsonb("result_rules_json").$type<PsychResultRule[]>(),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    publishedAt: timestamp("published_at", { withTimezone: true, mode: "date" }),
+    createdAt: createdAt(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("psych_tests_workspace_idx").on(table.workspaceId, table.createdAt)],
+);
+
+export const psychDimensions = pgTable(
+  "psych_dimensions",
+  {
+    id: id(),
+    testId: text("test_id")
+      .notNull()
+      .references(() => psychTests.id, { onDelete: "cascade" }),
+    sortOrder: integer("sort_order").notNull().default(0),
+    title: text("title").notNull(),
+    description: text("description").notNull().default(""),
+    bandsJson: jsonb("bands_json").$type<PsychBand[]>(),
+  },
+  (table) => [index("psych_dimensions_test_idx").on(table.testId)],
+);
+
+export const psychQuestions = pgTable(
+  "psych_questions",
+  {
+    id: id(),
+    testId: text("test_id")
+      .notNull()
+      .references(() => psychTests.id, { onDelete: "cascade" }),
+    sortOrder: integer("sort_order").notNull().default(0),
+    body: text("body").notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [index("psych_questions_test_idx").on(table.testId)],
+);
+
+export const psychOptions = pgTable(
+  "psych_options",
+  {
+    id: id(),
+    questionId: text("question_id")
+      .notNull()
+      .references(() => psychQuestions.id, { onDelete: "cascade" }),
+    sortOrder: integer("sort_order").notNull().default(0),
+    body: text("body").notNull(),
+    scoresJson: jsonb("scores_json").$type<PsychDimensionScores>(),
+  },
+  (table) => [index("psych_options_question_idx").on(table.questionId)],
+);
+
+export const psychAttempts = pgTable(
+  "psych_attempts",
+  {
+    id: id(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    testId: text("test_id")
+      .notNull()
+      .references(() => psychTests.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    studentId: text("student_id").references(() => students.id, { onDelete: "cascade" }),
+    participantRole: text("participant_role", { enum: ["counselor", "student"] }).notNull(),
+    status: text("status", { enum: ["in_progress", "submitted"] })
+      .notNull()
+      .default("in_progress"),
+    startedAt: timestamp("started_at", { withTimezone: true, mode: "date" }).notNull(),
+    submittedAt: timestamp("submitted_at", { withTimezone: true, mode: "date" }),
+    scoresJson: jsonb("scores_json").$type<PsychDimensionScores>(),
+    resultCode: text("result_code").notNull().default(""),
+    resultTitle: text("result_title").notNull().default(""),
+    resultBody: text("result_body").notNull().default(""),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index("psych_attempts_test_idx").on(table.testId, table.createdAt),
+    index("psych_attempts_user_idx").on(table.userId, table.createdAt),
+  ],
+);
+
+export const psychAnswers = pgTable(
+  "psych_answers",
+  {
+    id: id(),
+    attemptId: text("attempt_id")
+      .notNull()
+      .references(() => psychAttempts.id, { onDelete: "cascade" }),
+    questionId: text("question_id").notNull(),
+    optionId: text("option_id").notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [uniqueIndex("psych_answers_unique").on(table.attemptId, table.questionId)],
+);
+
 export type Workspace = typeof workspaces.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type Student = typeof students.$inferSelect;
@@ -855,3 +985,8 @@ export type PerformancePanel = typeof performancePanels.$inferSelect;
 export type Question = typeof questions.$inferSelect;
 export type Exam = typeof exams.$inferSelect;
 export type ExternalExam = typeof externalExams.$inferSelect;
+export type PsychTest = typeof psychTests.$inferSelect;
+export type PsychDimension = typeof psychDimensions.$inferSelect;
+export type PsychQuestion = typeof psychQuestions.$inferSelect;
+export type PsychOption = typeof psychOptions.$inferSelect;
+export type PsychAttempt = typeof psychAttempts.$inferSelect;

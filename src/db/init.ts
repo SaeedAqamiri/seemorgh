@@ -468,6 +468,84 @@ CREATE TABLE IF NOT EXISTS content_items (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS content_items_workspace_idx ON content_items(workspace_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS psych_tests (
+  id text PRIMARY KEY,
+  workspace_id text NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  title text NOT NULL,
+  description text NOT NULL DEFAULT '',
+  status text NOT NULL DEFAULT 'draft',
+  result_rules_json jsonb,
+  created_by text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  published_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS psych_tests_workspace_idx ON psych_tests(workspace_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS psych_dimensions (
+  id text PRIMARY KEY,
+  test_id text NOT NULL REFERENCES psych_tests(id) ON DELETE CASCADE,
+  sort_order integer NOT NULL DEFAULT 0,
+  title text NOT NULL,
+  description text NOT NULL DEFAULT '',
+  bands_json jsonb
+);
+CREATE INDEX IF NOT EXISTS psych_dimensions_test_idx ON psych_dimensions(test_id);
+ALTER TABLE psych_dimensions ADD COLUMN IF NOT EXISTS description text NOT NULL DEFAULT '';
+ALTER TABLE psych_dimensions ADD COLUMN IF NOT EXISTS bands_json jsonb;
+ALTER TABLE psych_dimensions DROP COLUMN IF EXISTS key_a;
+ALTER TABLE psych_dimensions DROP COLUMN IF EXISTS label_a;
+ALTER TABLE psych_dimensions DROP COLUMN IF EXISTS key_b;
+ALTER TABLE psych_dimensions DROP COLUMN IF EXISTS label_b;
+ALTER TABLE psych_dimensions DROP COLUMN IF EXISTS analysis_a;
+ALTER TABLE psych_dimensions DROP COLUMN IF EXISTS analysis_b;
+
+CREATE TABLE IF NOT EXISTS psych_questions (
+  id text PRIMARY KEY,
+  test_id text NOT NULL REFERENCES psych_tests(id) ON DELETE CASCADE,
+  sort_order integer NOT NULL DEFAULT 0,
+  body text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS psych_questions_test_idx ON psych_questions(test_id);
+
+CREATE TABLE IF NOT EXISTS psych_options (
+  id text PRIMARY KEY,
+  question_id text NOT NULL REFERENCES psych_questions(id) ON DELETE CASCADE,
+  sort_order integer NOT NULL DEFAULT 0,
+  body text NOT NULL,
+  scores_json jsonb
+);
+CREATE INDEX IF NOT EXISTS psych_options_question_idx ON psych_options(question_id);
+
+CREATE TABLE IF NOT EXISTS psych_attempts (
+  id text PRIMARY KEY,
+  workspace_id text NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  test_id text NOT NULL REFERENCES psych_tests(id) ON DELETE CASCADE,
+  user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  student_id text REFERENCES students(id) ON DELETE CASCADE,
+  participant_role text NOT NULL,
+  status text NOT NULL DEFAULT 'in_progress',
+  started_at timestamptz NOT NULL,
+  submitted_at timestamptz,
+  scores_json jsonb,
+  result_code text NOT NULL DEFAULT '',
+  result_title text NOT NULL DEFAULT '',
+  result_body text NOT NULL DEFAULT '',
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS psych_attempts_test_idx ON psych_attempts(test_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS psych_attempts_user_idx ON psych_attempts(user_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS psych_answers (
+  id text PRIMARY KEY,
+  attempt_id text NOT NULL REFERENCES psych_attempts(id) ON DELETE CASCADE,
+  question_id text NOT NULL,
+  option_id text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS psych_answers_unique ON psych_answers(attempt_id, question_id);
 `;
 
 let initPromise: Promise<void> | null = null;
