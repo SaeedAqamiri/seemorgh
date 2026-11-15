@@ -10,7 +10,6 @@ import {
 import { SubmitButton } from "@/components/submit-button";
 import type { ResourceWithSubject } from "@/lib/counselor";
 import { formatChapterPlan } from "@/lib/resources";
-import { UNIT_TYPE_LABELS } from "@/lib/subjects";
 
 type SubjectOption = { id: string; title: string; kind: string; color?: string };
 
@@ -60,8 +59,8 @@ export function ResourceManager({
           <div>
             <h2>فهرست منابع</h2>
             <small>
-              پیشرفت هر فصل به صورت تست، تمرین و صفحه جداگانه ثبت می‌شود؛ گزارش عملکرد هم این
-              پیشرفت را خودکار به‌روز می‌کند.
+              پیشرفت هر فصل به صورت تست و تمرین ثبت می‌شود؛ گزارش عملکرد هم این پیشرفت را
+              خودکار به‌روز می‌کند.
             </small>
           </div>
           <small>{resources.length} منبع</small>
@@ -75,7 +74,6 @@ export function ResourceManager({
               <thead>
                 <tr>
                   <th>منبع</th>
-                  <th>نوع</th>
                   <th>پیشرفت</th>
                   <th>اولویت</th>
                   <th />
@@ -109,7 +107,6 @@ export function ResourceManager({
                                     <th>فصل</th>
                                     <th>تست</th>
                                     <th>تمرین</th>
-                                    <th>صفحه</th>
                                     <th />
                                   </tr>
                                 </thead>
@@ -124,10 +121,6 @@ export function ResourceManager({
                                       <td>
                                         {chapter.completedExercises.toLocaleString("fa-IR")}/
                                         {chapter.exerciseCount.toLocaleString("fa-IR")}
-                                      </td>
-                                      <td>
-                                        {chapter.completedPages.toLocaleString("fa-IR")}/
-                                        {chapter.pages.toLocaleString("fa-IR")}
                                       </td>
                                       <td>
                                         <form
@@ -154,14 +147,6 @@ export function ResourceManager({
                                             style={{ width: "58px" }}
                                             aria-label="تمرین انجام‌شده"
                                           />
-                                          <input
-                                            name="completedPages"
-                                            type="number"
-                                            min={0}
-                                            defaultValue={chapter.completedPages}
-                                            style={{ width: "58px" }}
-                                            aria-label="صفحه انجام‌شده"
-                                          />
                                           <SubmitButton className="btn-secondary btn-sm" pendingLabel="…">
                                             ثبت
                                           </SubmitButton>
@@ -175,7 +160,6 @@ export function ResourceManager({
                           </details>
                         ) : null}
                       </td>
-                      <td>{UNIT_TYPE_LABELS[resource.unitType]}</td>
                       <td>
                         <form action={updateResourceAction} className="stack" style={{ gap: "0.25rem" }}>
                           <input type="hidden" name="studentId" value={studentId} />
@@ -202,7 +186,7 @@ export function ResourceManager({
                           </div>
                           <div className="field">
                             <label style={{ fontSize: "0.72rem" }}>
-                              فصل‌بندی (هر خط: عنوان | تست | تمرین | صفحه)
+                              فصل‌بندی (هر خط: عنوان | تست | تمرین)
                             </label>
                             <textarea
                               name="chapters"

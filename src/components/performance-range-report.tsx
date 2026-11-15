@@ -3,12 +3,45 @@ import {
 } from "@/app/actions/performance";
 import { PrintButton } from "@/components/print-button";
 import { StartChart } from "@/components/start-chart";
-import { StartTimeTable } from "@/components/start-time-table";
 import { SubmitButton } from "@/components/submit-button";
 import { aiPerformanceConfigured } from "@/lib/ai-performance";
-import { formatJalaliNumeric } from "@/lib/dates";
+import { formatJalaliNumeric, WEEKDAY_LABELS, weekdayIndex } from "@/lib/dates";
 import { faNumber } from "@/lib/panel";
 import type { PerformanceAnalysis, SubjectDayRow } from "@/lib/performance";
+
+function faHours(minutes: number): string {
+  return (minutes / 60).toLocaleString("fa-IR", { maximumFractionDigits: 1 });
+}
+
+function PulseCell({
+  study,
+  test,
+  exercise,
+}: {
+  study: number;
+  test: number;
+  exercise: number;
+}) {
+  const metrics = [
+    { key: "study", label: "مطالعه", value: study },
+    { key: "test", label: "تست", value: test },
+    { key: "exercise", label: "تمرین", value: exercise },
+  ].filter((metric) => metric.value > 0);
+
+  if (metrics.length === 0) {
+    return <span className="pulse-empty">—</span>;
+  }
+
+  return (
+    <div className="pulse-cell">
+      {metrics.map((metric) => (
+        <span key={metric.key} className="pulse-metric">
+          <i className={`pulse-dot is-${metric.key}`} /> {metric.label} {faHours(metric.value)}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 export function PerformanceRangeReport({
   studentId,
@@ -29,19 +62,71 @@ export function PerformanceRangeReport({
   narrative: string;
   narrativeAt: Date | null;
 }) {
-  const faHours = (minutes: number) =>
-    (minutes / 60).toLocaleString("fa-IR", { maximumFractionDigits: 1 });
+  const onplanRate =
+    analysis.activeDays > 0
+      ? Math.round((analysis.onplanDays / analysis.activeDays) * 100)
+      : 0;
+  const totalStudyMinutes = analysis.days.reduce(
+    (sum, day) => sum + day.studyMinutes + day.reviewMinutes,
+    0,
+  );
+  const totalPracticeMinutes = analysis.days.reduce((sum, day) => sum + day.testMinutes, 0);
+  const narrativeParagraphs = narrative
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean);
 
   return (
-    <div className="stack" style={{ gap: "1rem" }}>
-      <div className="card">
+    <div className="stack report-tab" style={{ gap: "1rem" }}>
+      <div className="card report-hero">
         <div className="section-head">
           <div>
             <h2>تحلیل عملکرد</h2>
             <small>
               {analysis.hasAnyData
-                ? `${faNumber(analysis.onplanDays)} روز طبق برنامه، ${faNumber(analysis.offplanDays)} روز خارج از برنامه — ${faNumber(analysis.totalMinutes)} دقیقه و ${faNumber(analysis.totalPractice)} تمرین`
+                ? `${faNumber(analysis.onplanDays)} روز طبق برنامه و ${faNumber(analysis.offplanDays)} روز خارج از برنامه`
                 : "در این بازه عملکردی ثبت نشده است."}
+            </small>
+          </div>
+        </div>
+        <div className="grid grid-4 report-kpis">
+          <div className="stat report-kpi">
+            <div className="stat-value">{faNumber(analysis.activeDays)}</div>
+            <div className="stat-label">روز فعال</div>
+          </div>
+          <div className="stat report-kpi">
+            <div className="stat-value">
+              {faNumber(onplanRate)}
+              <span className="report-kpi-unit">٪</span>
+            </div>
+            <div className="stat-label">شروع طبق برنامه</div>
+          </div>
+          <div className="stat report-kpi">
+            <div className="stat-value">
+              {faHours(totalStudyMinutes)}
+              <span className="report-kpi-unit">ساعت</span>
+            </div>
+            <div className="stat-label">مطالعه و مرور</div>
+          </div>
+          <div className="stat report-kpi">
+            <div className="stat-value">
+              {faHours(totalPracticeMinutes)}
+              <span className="report-kpi-unit">ساعت</span>
+            </div>
+            <div className="stat-label">
+              تست و تمرین · {faNumber(analysis.totalPractice)} عدد
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="section-head">
+          <div>
+            <h2>ساعت شروع روز</h2>
+            <small>
+              مقایسهٔ ساعت واقعی شروع با ساعت برنامه. نقطه‌های سبز به‌موقع، قرمز خارج از برنامه و
+              خاکستری بدون برنامه بوده‌اند.
             </small>
           </div>
         </div>
@@ -55,108 +140,109 @@ export function PerformanceRangeReport({
       <div className="card">
         <div className="section-head">
           <div>
-            <h2>ساعت شروع هر روز</h2>
-            <small>
-              معیار: اولین بار باز شدن صفحه دانش‌آموز در آن روز؛ اختلاف تا ۳۰ دقیقه از برنامه سبز و
-              بیشتر از آن قرمز است.
-            </small>
-          </div>
-        </div>
-        <StartTimeTable days={analysis.days} />
-      </div>
-
-      <div className="card">
-        <div className="section-head">
-          <div>
             <h2>ضربان هفته</h2>
             <small>
-              تست/تمرین و مطالعه هر درس، روز به روز. عدد اول ساعت تست/تمرین و عدد دوم ساعت
-              مطالعه/مرور است.
+              هر درس یک ردیف و هر روز یک ستون؛ عددها ساعت مطالعه، تست و تمرین همان درس در آن روز
+              هستند. برای دیدن روزهای بیشتر جدول را افقی بکشید.
             </small>
           </div>
         </div>
         {subjectDayMatrix.length === 0 ? (
           <div className="empty">برای این بازه داده‌ای ثبت نشده است.</div>
         ) : (
-          <div className="table-wrap">
-            <table>
+          <div className="table-wrap pulse-wrap">
+            <table
+              className="pulse-table"
+              style={{ minWidth: `${170 + dates.length * 152}px` }}
+            >
               <thead>
                 <tr>
-                  <th>روز</th>
-                  {subjectDayMatrix.map((subject) => (
-                    <th key={subject.subjectId}>{subject.title}</th>
+                  <th className="pulse-subject">درس / روز</th>
+                  {dates.map((date) => (
+                    <th key={date} className="pulse-day">
+                      <span>{WEEKDAY_LABELS[weekdayIndex(date)]}</span>
+                      <small>{formatJalaliNumeric(date)}</small>
+                    </th>
                   ))}
-                  <th>جمع روز</th>
+                  <th className="pulse-total">جمع بازه</th>
                 </tr>
               </thead>
               <tbody>
-                {dates.map((date) => {
-                  const dayCells = subjectDayMatrix.map(
-                    (subject) =>
-                      subject.days.find((day) => day.date === date) ?? {
+                {subjectDayMatrix.map((subject) => (
+                  <tr key={subject.subjectId}>
+                    <th scope="row" className="pulse-subject">
+                      {subject.title}
+                    </th>
+                    {dates.map((date) => {
+                      const cell = subject.days.find((day) => day.date === date) ?? {
                         date,
                         practiceMinutes: 0,
                         studyMinutes: 0,
-                      },
-                  );
-                  const dayPractice = dayCells.reduce(
-                    (sum, cell) => sum + cell.practiceMinutes,
-                    0,
-                  );
-                  const dayStudy = dayCells.reduce((sum, cell) => sum + cell.studyMinutes, 0);
-                  return (
-                    <tr key={date}>
-                      <td>
-                        <strong>{formatJalaliNumeric(date)}</strong>
-                      </td>
-                      {dayCells.map((cell, index) => (
-                        <td key={subjectDayMatrix[index].subjectId} dir="rtl">
-                          <div style={{ fontSize: "0.74rem" }}>
-                            تست/تمرین: {faHours(cell.practiceMinutes)} س
-                          </div>
-                          <div className="muted" style={{ fontSize: "0.74rem" }}>
-                            مطالعه: {faHours(cell.studyMinutes)} س
-                          </div>
+                        testMinutes: 0,
+                        exerciseMinutes: 0,
+                      };
+                      return (
+                        <td key={date}>
+                          <PulseCell
+                            study={cell.studyMinutes}
+                            test={cell.testMinutes}
+                            exercise={cell.exerciseMinutes}
+                          />
                         </td>
-                      ))}
-                      <td className="panel-total">
-                        <div>تست/تمرین: {faHours(dayPractice)} س</div>
-                        <div className="muted">مطالعه: {faHours(dayStudy)} س</div>
-                      </td>
-                    </tr>
-                  );
-                })}
-                <tr>
-                  <td>
-                    <strong>جمع بازه</strong>
-                  </td>
-                  {subjectDayMatrix.map((subject) => (
-                    <td key={subject.subjectId} className="panel-total">
-                      <div>تست/تمرین: {faHours(subject.totalPracticeMinutes)} س</div>
-                      <div className="muted">مطالعه: {faHours(subject.totalStudyMinutes)} س</div>
+                      );
+                    })}
+                    <td className="pulse-total">
+                      <PulseCell
+                        study={subject.totalStudyMinutes}
+                        test={subject.totalTestMinutes}
+                        exercise={subject.totalExerciseMinutes}
+                      />
                     </td>
-                  ))}
-                  <td className="panel-total">
-                    <div>
-                      تست/تمرین:{" "}
-                      {faHours(
-                        subjectDayMatrix.reduce(
-                          (sum, subject) => sum + subject.totalPracticeMinutes,
-                          0,
-                        ),
-                      )}{" "}
-                      س
-                    </div>
-                    <div className="muted">
-                      مطالعه:{" "}
-                      {faHours(
-                        subjectDayMatrix.reduce(
-                          (sum, subject) => sum + subject.totalStudyMinutes,
-                          0,
-                        ),
-                      )}{" "}
-                      س
-                    </div>
+                  </tr>
+                ))}
+                <tr className="pulse-sumrow">
+                  <th scope="row" className="pulse-subject">
+                    جمع روز
+                  </th>
+                  {dates.map((date) => {
+                    const study = subjectDayMatrix.reduce(
+                      (sum, subject) =>
+                        sum +
+                        (subject.days.find((day) => day.date === date)?.studyMinutes ?? 0),
+                      0,
+                    );
+                    const test = subjectDayMatrix.reduce(
+                      (sum, subject) =>
+                        sum + (subject.days.find((day) => day.date === date)?.testMinutes ?? 0),
+                      0,
+                    );
+                    const exercise = subjectDayMatrix.reduce(
+                      (sum, subject) =>
+                        sum +
+                        (subject.days.find((day) => day.date === date)?.exerciseMinutes ?? 0),
+                      0,
+                    );
+                    return (
+                      <td key={date}>
+                        <PulseCell study={study} test={test} exercise={exercise} />
+                      </td>
+                    );
+                  })}
+                  <td className="pulse-total">
+                    <PulseCell
+                      study={subjectDayMatrix.reduce(
+                        (sum, subject) => sum + subject.totalStudyMinutes,
+                        0,
+                      )}
+                      test={subjectDayMatrix.reduce(
+                        (sum, subject) => sum + subject.totalTestMinutes,
+                        0,
+                      )}
+                      exercise={subjectDayMatrix.reduce(
+                        (sum, subject) => sum + subject.totalExerciseMinutes,
+                        0,
+                      )}
+                    />
                   </td>
                 </tr>
               </tbody>
@@ -169,7 +255,10 @@ export function PerformanceRangeReport({
         <div className="section-head">
           <div>
             <h2>گزارش تحلیلی</h2>
-            <small>گزارش این بازه بر اساس اولین ورود روز، حجم تست/تمرین و مطالعه، پیشرفت منابع، برنامه و یادداشت‌ها ساخته می‌شود.</small>
+            <small>
+              گزارش این بازه بر اساس ساعت شروع، حجم مطالعه و تست، پیشرفت منابع، برنامه و
+              یادداشت‌ها ساخته می‌شود.
+            </small>
           </div>
           <div className="row">
             {analysis.hasAnyData ? (
@@ -188,7 +277,15 @@ export function PerformanceRangeReport({
         </div>
         {narrative ? (
           <div className="narrative" id="performance-narrative">
-            <p style={{ margin: 0, lineHeight: 1.9 }}>{narrative}</p>
+            {narrativeParagraphs.length > 1 ? (
+              narrativeParagraphs.map((paragraph, index) => (
+                <p key={index} style={{ margin: 0, lineHeight: 1.9 }}>
+                  {paragraph}
+                </p>
+              ))
+            ) : (
+              <p style={{ margin: 0, lineHeight: 1.9 }}>{narrative}</p>
+            )}
             <small className="muted">
               تاریخ ساخت:{" "}
               {narrativeAt

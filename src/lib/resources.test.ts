@@ -32,7 +32,7 @@ describe("resource chapters", () => {
       startPage: 25,
       endPage: 54,
     });
-    expect(formatChapterPlan(result.chapters)).toContain("فصل ۱ | 40 | 12 | 24");
+    expect(formatChapterPlan(result.chapters)).toContain("فصل ۱ | 40 | 12");
   });
 
   it("rejects invalid or overflowing chapters", () => {

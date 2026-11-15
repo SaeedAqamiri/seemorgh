@@ -1,4 +1,3 @@
-import { UNIT_TYPE_LABELS } from "@/lib/subjects";
 import type { ResourceProgressSummary } from "@/lib/resource-progress";
 
 const PIE_COLORS = [
@@ -254,7 +253,7 @@ export function ResourceProgressDashboard({ summary }: { summary: ResourceProgre
             <h2>نکتهٔ مسابقه</h2>
           </div>
           <p className="muted" style={{ margin: 0, lineHeight: 1.9 }}>
-            هر تست و هر صفحه مثل یک قدم برای لاک‌پشت است. لازم نیست سریع‌ترین باشی؛ فقط هر روز یک
+            هر تست و هر تمرین مثل یک قدم برای لاک‌پشت است. لازم نیست سریع‌ترین باشی؛ فقط هر روز یک
             قدم جلو برو. 🐢🏁
           </p>
         </div>
@@ -282,7 +281,7 @@ export function ResourceProgressDashboard({ summary }: { summary: ResourceProgre
                 <span style={{ width: `${Math.min(100, resource.percent)}%` }} />
               </div>
               <small className="muted" style={{ fontSize: "0.72rem" }}>
-                {UNIT_TYPE_LABELS[resource.unitType] ?? resource.unitType} — {fa(resource.remainingUnits)} واحد مانده
+                {fa(resource.remainingUnits)} واحد مانده
                 {resource.remainingTests > 0
                   ? ` · ${fa(resource.remainingTests)} تست باقی‌مانده`
                   : ""}
@@ -304,9 +303,6 @@ export function ResourceProgressDashboard({ summary }: { summary: ResourceProgre
                           : ""}
                         {chapter.exerciseCount > 0
                           ? ` — تمرین ${fa(chapter.completedExercises)}/${fa(chapter.exerciseCount)}`
-                          : ""}
-                        {chapter.pages > 0
-                          ? ` — صفحه ${fa(chapter.completedPages)}/${fa(chapter.pages)}`
                           : ""}
                       </li>
                     ))}

@@ -55,7 +55,7 @@ export const SUBJECT_CATALOG: readonly SubjectCatalogItem[] = [
   // ── عمومی ──────────────────────────────────────────────────────────────
   { title: "ادبیات فارسی", kind: "general", fields: ALL_FIELDS, color: SUBJECT_COLORS.literature },
   { title: "نگارش", kind: "general", fields: ALL_FIELDS, color: SUBJECT_COLORS.writing },
-  { title: "عربی", kind: "both", fields: ALL_FIELDS, color: SUBJECT_COLORS.arabic },
+  { title: "عربی", kind: "general", fields: ALL_FIELDS, color: SUBJECT_COLORS.arabic },
   { title: "دین و زندگی", kind: "general", fields: ALL_FIELDS, color: SUBJECT_COLORS.religion },
   { title: "زبان انگلیسی", kind: "general", fields: ALL_FIELDS, color: SUBJECT_COLORS.english },
   { title: "هنر", kind: "general", fields: ALL_FIELDS, color: SUBJECT_COLORS.art },
@@ -81,7 +81,7 @@ export const SUBJECT_CATALOG: readonly SubjectCatalogItem[] = [
   { title: "زیست‌شناسی", kind: "specialized", fields: ["تجربی"], color: SUBJECT_COLORS.biology },
   { title: "ریاضی", kind: "specialized", fields: ["تجربی"], color: SUBJECT_COLORS.math },
   { title: "زمین‌شناسی", kind: "specialized", fields: ["تجربی", "ریاضی"], color: SUBJECT_COLORS.geology },
-  { title: "آزمایشگاه علوم تجربی", kind: "specialized", fields: ["تجربی", "ریاضی"], color: SUBJECT_COLORS.lab },
+  { title: "آزمایشگاه علوم تجربی", kind: "general", fields: ["تجربی", "ریاضی"], color: SUBJECT_COLORS.lab },
 
   // ── مشترک ریاضی و تجربی ────────────────────────────────────────────────
   { title: "فیزیک", kind: "specialized", fields: ["ریاضی", "تجربی"], color: SUBJECT_COLORS.physics },
@@ -137,8 +137,8 @@ export function subjectAvailableForField(title: string, field: string): boolean 
 
 /**
  * Splits subjects for a student's field into the two groups used by the panel
- * picker (عمومی / تخصصی). Subjects marked `both` (e.g. عربی for انسانی) appear
- * in both groups, otherwise they appear once under their own group.
+ * picker (عمومی / تخصصی). Subjects marked `both` appear in both groups, otherwise
+ * they appear once under their own group.
  */
 export function groupSubjectsForField<T extends { title: string; kind: string }>(
   subjects: readonly T[],

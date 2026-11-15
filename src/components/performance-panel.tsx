@@ -369,10 +369,7 @@ export function PerformancePanel(props: PerformancePanelProps) {
                   </option>
                   {(resource?.chapters ?? []).map((chapter) => (
                     <option key={chapter.id} value={chapter.id}>
-                      {chapter.title} — تست {chapter.completedTests.toLocaleString("fa-IR")}/
-                      {chapter.testCount.toLocaleString("fa-IR")} · تمرین{" "}
-                      {chapter.completedExercises.toLocaleString("fa-IR")}/
-                      {chapter.exerciseCount.toLocaleString("fa-IR")}
+                      {chapter.title}
                     </option>
                   ))}
                 </select>

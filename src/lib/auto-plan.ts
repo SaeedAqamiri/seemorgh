@@ -606,8 +606,7 @@ function resourceTopic(
       (entry) => startPage >= entry.startPage && startPage <= entry.endPage,
     );
     if (chapter) {
-      const endPage = Math.min(chapter.endPage, startPage + units - 1);
-      return `${chapter.title} — صفحه ${startPage} تا ${endPage}`;
+      return chapter.title;
     }
   }
   return resource.title || fallback;

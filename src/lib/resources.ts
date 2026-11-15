@@ -74,8 +74,9 @@ export function parseChapters(input: string, totalUnits: number): {
 
 /**
  * Extended chapter parser used by the resources form:
- *   عنوان | تعداد تست | تعداد تمرین | تعداد صفحه
- * Two-field lines keep the legacy meaning (عنوان | تعداد صفحه).
+ *   عنوان | تعداد تست | تعداد تمرین
+ * Legacy four-field lines (`عنوان | تست | تمرین | صفحه`) are still accepted,
+ * but pages are no longer part of the product-facing workflow.
  */
 export function parseChapterPlan(input: string, totalUnits: number): {
   chapters: ResourceChapter[] | null;
@@ -98,7 +99,7 @@ export function parseChapterPlan(input: string, totalUnits: number): {
 
     let testCount = 0;
     let exerciseCount = 0;
-    let pages: number | null = null;
+    let pages = 0;
 
     const readCount = (value: string | undefined): number | null => toNumber(value ?? "");
     const range = /^(\d+)\s*(?:[-–—]|تا)\s*(\d+)$/.exec(normalizeDigits(parts[3] ?? ""));
@@ -114,31 +115,14 @@ export function parseChapterPlan(input: string, totalUnits: number): {
     } else if (parts.length === 3) {
       testCount = readCount(parts[1]) ?? 0;
       exerciseCount = readCount(parts[2]) ?? 0;
-      pages = 0;
-    } else {
-      const rawSize = parts[1] ?? "";
-      const pageRange = /^(\d+)\s*(?:[-–—]|تا)\s*(\d+)$/.exec(normalizeDigits(rawSize));
-      pages = pageRange
-        ? Number(pageRange[2]) - Number(pageRange[1]) + 1
-        : toNumber(rawSize);
+    } else if (parts.length === 2) {
+      testCount = readCount(parts[1]) ?? 0;
     }
 
-    if (pages === null || pages < 0) {
-      return {
-        chapters: null,
-        error: `خط ${index + 1}: تعداد صفحات فصل «${title}» نامعتبر است. قالب: عنوان | تست | تمرین | صفحه`,
-      };
-    }
     if (testCount < 0 || exerciseCount < 0) {
       return {
         chapters: null,
         error: `خط ${index + 1}: تعداد تست/تمرین فصل «${title}» نامعتبر است.`,
-      };
-    }
-    if (pages === 0 && testCount === 0 && exerciseCount === 0) {
-      return {
-        chapters: null,
-        error: `خط ${index + 1}: برای فصل «${title}» حداقل یک مقدار (تست، تمرین یا صفحه) لازم است.`,
       };
     }
 
@@ -169,10 +153,7 @@ export function formatChapterPlan(chapters: ResourceChapter[] | null | undefined
     .map((chapter) => {
       const tests = chapter.testCount ?? 0;
       const exercises = chapter.exerciseCount ?? 0;
-      if (tests > 0 || exercises > 0) {
-        return `${chapter.title} | ${tests} | ${exercises} | ${chapter.pages}`;
-      }
-      return `${chapter.title} | ${chapter.pages}`;
+      return `${chapter.title} | ${tests} | ${exercises}`;
     })
     .join("\n");
 }

@@ -177,7 +177,8 @@ describe("auto plan scheduler", () => {
     };
     const plan = scheduleAutoPlan(input, buildDeterministicAllocation(input));
     const topics = plan.weeks.flatMap((week) => week.tasks).map((task) => task.topic);
-    expect(topics.some((topic) => topic.includes("فصل") && topic.includes("صفحه"))).toBe(true);
+    expect(topics.some((topic) => topic.includes("فصل"))).toBe(true);
+    expect(topics.every((topic) => !topic.includes("صفحه"))).toBe(true);
   });
 
   it("keeps test counts finite and positive for percent goals", () => {

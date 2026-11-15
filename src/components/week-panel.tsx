@@ -322,10 +322,7 @@ export function WeekGridEditor(props: WeekGridEditorProps) {
               <option value="">{resource ? "فصل/بخش را انتخاب کنید…" : "اول منبع را انتخاب کنید"}</option>
               {(resource?.chapters ?? []).map((chapter) => (
                 <option key={chapter.id} value={chapter.id}>
-                  {chapter.title} — تست {chapter.completedTests.toLocaleString("fa-IR")}/
-                  {chapter.testCount.toLocaleString("fa-IR")} · تمرین{" "}
-                  {chapter.completedExercises.toLocaleString("fa-IR")}/
-                  {chapter.exerciseCount.toLocaleString("fa-IR")}
+                  {chapter.title}
                 </option>
               ))}
             </select>

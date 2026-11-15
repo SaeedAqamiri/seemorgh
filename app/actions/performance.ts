@@ -185,6 +185,8 @@ export async function generatePerformanceRangeNarrativeAction(formData: FormData
       title: row.title,
       practiceMinutes: row.totalPracticeMinutes,
       studyMinutes: row.totalStudyMinutes,
+      testMinutes: row.totalTestMinutes,
+      exerciseMinutes: row.totalExerciseMinutes,
     })),
     resourceProgress: resourceProgress.rows.map((row) => ({
       subjectTitle: row.subjectTitle,
@@ -298,6 +300,8 @@ export async function generatePerformanceNarrativeAction(formData: FormData): Pr
       title: row.title,
       practiceMinutes: row.totalPracticeMinutes,
       studyMinutes: row.totalStudyMinutes,
+      testMinutes: row.totalTestMinutes,
+      exerciseMinutes: row.totalExerciseMinutes,
     })),
     resourceProgress: resourceProgress.rows.map((row) => ({
       subjectTitle: row.subjectTitle,

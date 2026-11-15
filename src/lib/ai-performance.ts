@@ -6,7 +6,7 @@ import { formatTime } from "./dates";
 import { WEEKDAY_LABELS } from "./dates";
 import type { PerformanceAnalysis, PlanningInsights } from "./performance";
 
-const PROMPT_VERSION = "performance-analysis-v2";
+const PROMPT_VERSION = "performance-analysis-v3";
 
 export function aiPerformanceConfigured(): boolean {
   return Boolean(process.env.AI_BASE_URL && process.env.AI_MODEL);
@@ -19,7 +19,13 @@ export type PerformanceNarrativeInput = {
   plannedSubjectsByDay: string[][];
   notes: { weekday: number; slot: number; text: string }[];
   dailyRoutine: string;
-  subjectSummary?: { title: string; practiceMinutes: number; studyMinutes: number }[];
+  subjectSummary?: {
+    title: string;
+    practiceMinutes: number;
+    studyMinutes: number;
+    testMinutes?: number;
+    exerciseMinutes?: number;
+  }[];
   resourceProgress?: {
     subjectTitle: string;
     title: string;
@@ -30,136 +36,243 @@ export type PerformanceNarrativeInput = {
   planningInsights?: PlanningInsights;
 };
 
+function average(values: number[]): number {
+  if (values.length === 0) return 0;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
 export function deterministicPerformanceNarrative(input: PerformanceNarrativeInput): string {
   const { analysis } = input;
-  const lines: string[] = [];
 
   if (!analysis.hasAnyData) {
-    return "برای این هفته عملکردی ثبت نشده است. با ثبت ساعت شروع و پایان هر خانه، پایه تحلیل هفته‌های بعد ساخته می‌شود.";
+    return "برای این بازه عملکردی ثبت نشده است. با ثبت ساعت شروع و حجم کار هر خانه، پایه تحلیل بازه‌های بعدی ساخته می‌شود.";
   }
 
-  const startRate = Math.round((analysis.onplanDays / analysis.activeDays) * 100);
-  const startedDays = analysis.days.filter((day) => day.performedStartMin !== null);
-  const avgStart =
-    startedDays.length === 0
-      ? null
-      : Math.round(
-          startedDays.reduce((sum, day) => sum + (day.performedStartMin ?? 0), 0) /
-            startedDays.length,
-        );
+  const fa = (value: number) => Math.round(value).toLocaleString("fa-IR");
+  const faTime = (minutes: number) =>
+    formatTime(minutes).replace(/\d/g, (digit) => "۰۱۲۳۴۵۶۷۸۹"[Number(digit)]);
+  const dayLabel = (day: PerformanceAnalysis["days"][number]) =>
+    `${WEEKDAY_LABELS[day.weekday]}`;
+  const paragraphs: string[] = [];
 
-  lines.push(
-    `در ${analysis.activeDays} روز فعال، نرخ شروع طبق برنامه ${startRate}٪ بوده و مجموع ${analysis.totalMinutes.toLocaleString("fa-IR")} دقیقه فعالیت با ${analysis.totalPractice.toLocaleString("fa-IR")} تمرین ثبت شده است.`,
+  const startedDays = analysis.days.filter((day) => day.performedStartMin !== null);
+  const startValues = startedDays.map((day) => day.performedStartMin as number);
+  const avgStart = startValues.length > 0 ? average(startValues) : null;
+  const startSpread =
+    startValues.length > 1 ? Math.max(...startValues) - Math.min(...startValues) : 0;
+  const startRate =
+    analysis.activeDays > 0
+      ? Math.round((analysis.onplanDays / analysis.activeDays) * 100)
+      : 0;
+
+  const studyMinutes = analysis.days.reduce(
+    (sum, day) => sum + day.studyMinutes + day.reviewMinutes,
+    0,
+  );
+  const testMinutes = analysis.days.reduce((sum, day) => sum + day.testMinutes, 0);
+  const workMinutes = Math.max(1, studyMinutes + testMinutes);
+  const testShare = Math.round((testMinutes / workMinutes) * 100);
+
+  const startSentence =
+    avgStart === null
+      ? "برای بخشی از روزها ساعت شروع ثبت نشده است."
+      : startSpread <= 45
+        ? `شروع روز پایدار است؛ میانگین ${faTime(avgStart)} و فاصلهٔ زودترین و دیرترین شروع فقط ${fa(startSpread)} دقیقه است.`
+        : `شروع روز ناپایدار است؛ میانگین ${faTime(avgStart)} است اما بین زودترین و دیرترین شروع ${fa(startSpread)} دقیقه فاصله هست.`;
+  paragraphs.push(
+    `در ${fa(analysis.activeDays)} روز فعال، ${fa(analysis.totalMinutes)} دقیقه کار ثبت شده و ${fa(analysis.onplanDays)} روز طبق برنامه شروع شده است (${fa(startRate)}٪). ${startSentence}`,
   );
 
-  if (avgStart !== null) {
-    lines.push(`میانگین ساعت اولین ورود به برنامه حدود ${formatTime(avgStart)} است.`);
-  }
-
-  const lateDays = analysis.days.filter((day) => day.status === "offplan");
-  if (lateDays.length > 0) {
-    const labels = lateDays.map((day) => WEEKDAY_LABELS[day.weekday]).join("، ");
-    lines.push(`اولین ورود خارج از برنامه در ${labels} دیده می‌شود؛ ساعت شروع روز را ثابت‌تر کنید و اولین بلوک را کوتاه بگذارید.`);
-  } else {
-    lines.push("اولین ورود روزها هماهنگ با برنامه بوده است؛ همین لنگر زمانی را برای هفته بعد حفظ کنید.");
-  }
-
-  const strongDays = analysis.days
-    .filter((day) => day.practiceCount > 0)
-    .sort((a, b) => b.practiceCount - a.practiceCount)
-    .slice(0, 2);
-  if (strongDays.length > 0) {
-    const labels = strongDays
-      .map((day) => `${WEEKDAY_LABELS[day.weekday]} (${day.practiceCount.toLocaleString("fa-IR")} تمرین)`)
-      .join(" و ");
-    lines.push(`بیشترین حجم تمرین در ${labels} بوده است؛ الگوی موفق آن روزها را به روزهای ضعیف‌تر بکشید.`);
-  }
-
-  if (input.notes.length > 0) {
-    lines.push(
-      `${input.notes.length.toLocaleString("fa-IR")} یادداشت از دانش‌آموز ثبت شده است؛ این توضیحات را در جلسه مشاوره مرور کنید.`,
+  if (testShare < 25) {
+    paragraphs.push(
+      `فقط حدود ${fa(testShare)}٪ از زمان کار صرف تست و تمرین شده و باقی آن مطالعه بوده است. این الگو می‌تواند تسلط کاغذی بسازد بدون این‌که سرعت و دقت آزمون بالا برود؛ اولین جای اصلاح، تبدیل بخشی از بلوک‌های مطالعه به تست هدفمند از همان مبحث است.`,
+    );
+  } else if (testShare > 55) {
+    paragraphs.push(
+      `حدود ${fa(testShare)}٪ زمان به تست و تمرین گذشته و سهم مطالعه پایین است. اگر دقت آزمون‌ها هم‌زمان بالا نرفته، احتمالاً جای فهم اولیه با تمرین زیاد پر شده؛ یک بلوک کوتاه مطالعهٔ مفهومی قبل از تست‌های هر درس می‌تواند بازده را بهتر کند.`,
     );
   } else {
-    lines.push("هیچ یادداشتی ثبت نشده است؛ نوشتن یک خط توضیح برای هر خانه، کیفیت تحلیل را بالا می‌برد.");
+    paragraphs.push(
+      `تعادل مطالعه و تست حدود ${fa(testShare)} به ${fa(100 - testShare)} است؛ این نسبت برای تثبیت و سنجش هم‌زمان مناسب است و بهتر است به‌جای تغییر کلی، فقط برای درس‌های عقب‌تر جابه‌جا شود.`,
+    );
   }
 
-  const subjectSummary = input.subjectSummary ?? [];
-  if (subjectSummary.length > 0) {
-    const topPractice = [...subjectSummary].sort(
-      (a, b) => b.practiceMinutes - a.practiceMinutes,
+  const activeWithMinutes = analysis.days.filter((day) => day.performedMinutes > 0);
+  const strongestDay = [...activeWithMinutes].sort(
+    (a, b) => b.performedMinutes - a.performedMinutes,
+  )[0];
+  const weakestDay = [...activeWithMinutes].sort(
+    (a, b) => a.performedMinutes - b.performedMinutes,
+  )[0];
+  if (
+    strongestDay &&
+    weakestDay &&
+    weakestDay.performedMinutes > 0 &&
+    strongestDay.performedMinutes >= weakestDay.performedMinutes * 1.8
+  ) {
+    paragraphs.push(
+      `حجم کار روزها یکدست نیست: ${dayLabel(strongestDay)} با ${fa(strongestDay.performedMinutes)} دقیقه حدود ${fa(strongestDay.performedMinutes / weakestDay.performedMinutes)} برابر ${dayLabel(weakestDay)} است. این نوسان معمولاً نشانهٔ برنامهٔ واقع‌بینانه‌نبودن یا خستگی انباشته است، نه کم‌کاری یک روز خاص.`,
+    );
+  }
+
+  const onplanDays = analysis.days.filter((day) => day.status === "onplan");
+  const offplanDays = analysis.days.filter((day) => day.status === "offplan");
+  if (onplanDays.length > 0 && offplanDays.length > 0) {
+    const onplanAvg = average(onplanDays.map((day) => day.performedMinutes));
+    const offplanAvg = average(offplanDays.map((day) => day.performedMinutes));
+    if (offplanAvg > onplanAvg * 1.2) {
+      paragraphs.push(
+        `نکتهٔ غیربدیهی این است که روزهای دیرشروع، به‌طور میانگین ${fa(offplanAvg)} دقیقه کار داشته‌اند در برابر ${fa(onplanAvg)} دقیقه در روزهای به‌موقع؛ یعنی دیر شروع‌کردن لزوماً کم‌کاری نبوده. اگر برنامه عقب می‌افتد، احتمالاً ظرفیت روز بیش از حد خوش‌بینانه بسته شده است.`,
+      );
+    } else if (onplanAvg > offplanAvg * 1.2) {
+      paragraphs.push(
+        `روزهایی که طبق برنامه شروع شده‌اند به‌طور میانگین ${fa(onplanAvg)} دقیقه کار داشته‌اند در برابر ${fa(offplanAvg)} دقیقه در روزهای دیرشروع. لنگر ساعت شروع، ظاهراً فقط نظم نیست و روی حجم کار هم اثر می‌گذارد.`,
+      );
+    }
+  }
+
+  const subjects = (input.subjectSummary ?? [])
+    .map((row) => ({
+      ...row,
+      total: row.practiceMinutes + row.studyMinutes,
+    }))
+    .filter((row) => row.total > 0)
+    .sort((a, b) => b.total - a.total);
+  if (subjects.length > 0) {
+    const top = subjects[0];
+    const topShare = Math.round((top.total / workMinutes) * 100);
+    if (topShare >= 45 && subjects.length > 1) {
+      paragraphs.push(
+        `حدود ${fa(topShare)}٪ از کل زمان روی ${top.title} متمرکز شده است. تمرکز زیاد روی یک درس وقتی بقیهٔ درس‌ها هم عقب‌اند، می‌تواند هزینهٔ فرصت باشد؛ بهتر است سهم ${top.title} کمی کم و به دروس کم‌کارتر اضافه شود.`,
+      );
+    }
+    const topTest = [...subjects].sort(
+      (a, b) => (b.testMinutes ?? b.practiceMinutes) - (a.testMinutes ?? a.practiceMinutes),
     )[0];
-    const topStudy = [...subjectSummary].sort((a, b) => b.studyMinutes - a.studyMinutes)[0];
-    if (topPractice && topPractice.practiceMinutes > 0) {
-      lines.push(
-        `بیشترین حجم تست/تمرین مربوط به ${topPractice.title} بوده و بیشترین زمان مطالعه هم روی ${topStudy?.title ?? topPractice.title} گذشته است.`,
+    if (topTest && topTest.title !== top.title) {
+      paragraphs.push(
+        `بیشترین حجم تست/تمرین روی ${topTest.title} بوده است، در حالی که بیشترین زمان مطالعه روی ${top.title} گذشته است. این تفاوت نشان می‌دهد روش کار با این دو درس یکسان نیست و ارزش دارد آگاهانه انتخاب شود.`,
       );
     }
   }
 
-  const planning = input.planningInsights;
-  if (planning && planning.subjectTimes.length > 0) {
-    const evening = [...planning.subjectTimes].sort((a, b) => b.evening - a.evening)[0];
-    const morning = [...planning.subjectTimes].sort((a, b) => b.morning - a.morning)[0];
-    if (evening && evening.evening >= 3) {
-      lines.push(
-        `${evening.title} بیشتر در ساعت‌های پایانی روز برنامه‌ریزی شده است؛ اگر در عمل هم همان‌جا بماند، احتمال خستگی و عقب افتادنش بیشتر است.`,
-      );
-    }
-    if (morning && morning.morning >= 3) {
-      lines.push(
-        `${morning.title} بیشترین حضور را در ساعت‌های اول روز دارد؛ این الگو می‌تواند نشانه تمرکز یا عادت شروع با همین درس باشد.`,
-      );
-    }
-    if (planning.firstSubjectByDay.length >= 3) {
-      const counts = new Map<string, number>();
-      for (const item of planning.firstSubjectByDay) {
-        counts.set(item.title, (counts.get(item.title) ?? 0) + 1);
-      }
-      const [firstTitle, firstCount] = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
-      if (firstCount >= 3) {
-        lines.push(
-          `در ${firstCount.toLocaleString("fa-IR")} روز، روز با ${firstTitle} شروع شده است؛ یعنی شروع روز تا حدی به همین درس گره خورده است.`,
-        );
-      }
-    }
+  const plannedSet = new Set(input.plannedSubjectsByDay.flat());
+  const performedSet = new Set(subjects.map((row) => row.title));
+  const plannedButMissing = [...plannedSet].filter((title) => title && !performedSet.has(title));
+  const performedButUnplanned = [...performedSet].filter((title) => !plannedSet.has(title));
+  if (plannedButMissing.length > 0) {
+    paragraphs.push(
+      `این درس‌ها در برنامه آمده‌اند ولی در عمل اثری از آن‌ها نیست: ${plannedButMissing.slice(0, 3).join("، ")}. تکرار این شکاف نشان می‌دهد برنامه در بخش‌هایی آرزومحور است، نه ظرفیت‌محور.`,
+    );
+  } else if (performedButUnplanned.length > 0) {
+    paragraphs.push(
+      `برخی کارها خارج از برنامه انجام شده‌اند: ${performedButUnplanned.slice(0, 3).join("، ")}. این انعطاف بد نیست، ولی اگر زیاد شود یعنی برنامه با واقعیت روزانه هم‌خوان نیست.`,
+    );
   }
 
   const progress = input.resourceProgress ?? [];
   if (progress.length > 0) {
-    const bySubject = new Map<string, { remaining: number; totalPercent: number; count: number }>();
+    const bySubject = new Map<string, { percentSum: number; count: number; remaining: number }>();
     for (const row of progress) {
       const current = bySubject.get(row.subjectTitle) ?? {
-        remaining: 0,
-        totalPercent: 0,
+        percentSum: 0,
         count: 0,
+        remaining: 0,
       };
-      current.remaining += row.remainingUnits;
-      current.totalPercent += row.percent;
+      current.percentSum += row.percent;
       current.count += 1;
+      current.remaining += row.remainingUnits;
       bySubject.set(row.subjectTitle, current);
     }
     const ranked = [...bySubject.entries()]
       .map(([title, value]) => ({
         title,
+        percent: value.count ? Math.round(value.percentSum / value.count) : 0,
         remaining: value.remaining,
-        percent: value.count ? Math.round(value.totalPercent / value.count) : 0,
       }))
       .sort((a, b) => a.percent - b.percent);
     const weakest = ranked[0];
     const strongest = ranked.at(-1);
     if (weakest && strongest && weakest.title !== strongest.title) {
-      lines.push(
-        `در منابع، ${strongest.title} وضعیت جلوتری دارد (حدود ${strongest.percent.toLocaleString("fa-IR")}٪) و ${weakest.title} عقب‌تر است (حدود ${weakest.percent.toLocaleString("fa-IR")}٪)؛ این شکاف را با یک بلوک ثابت هفتگی برای ${weakest.title} کم کنید.`,
+      paragraphs.push(
+        `در منابع، ${strongest.title} جلوتر است (حدود ${fa(strongest.percent)}٪) و ${weakest.title} عقب‌تر (حدود ${fa(weakest.percent)}٪). این شکاف با یک بلوک ثابت هفتگی برای ${weakest.title} بهتر جمع می‌شود تا با چند روز فشرده و پراکنده.`,
+      );
+    }
+
+    const overallPercent = average(ranked.map((row) => row.percent));
+    const timeBySubject = new Map(subjects.map((row) => [row.title, row.total]));
+    const mismatch = ranked.find((row) => {
+      const minutes = timeBySubject.get(row.title) ?? 0;
+      return (
+        minutes / workMinutes >= 0.15 &&
+        row.percent + 10 < overallPercent &&
+        row.remaining > 0
+      );
+    });
+    if (mismatch) {
+      paragraphs.push(
+        `زمان قابل‌توجهی صرف ${mismatch.title} شده اما پیشرفت منبعش فقط حدود ${fa(mismatch.percent)}٪ است. این معمولاً یعنی زمان صرف مرور پراکنده یا کار بدون ثبت پیشرفت شده؛ یا روش مطالعه کارآمد نیست یا پیشرفت منبع به‌روز ثبت نمی‌شود.`,
+      );
+    }
+  }
+
+  const planning = input.planningInsights;
+  if (planning && planning.firstSubjectByDay.length >= 3) {
+    const counts = new Map<string, number>();
+    for (const item of planning.firstSubjectByDay) {
+      counts.set(item.title, (counts.get(item.title) ?? 0) + 1);
+    }
+    const [firstTitle, firstCount] = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+    if (firstCount >= 3) {
+      paragraphs.push(
+        `در ${fa(firstCount)} روز، روز با ${firstTitle} شروع شده است؛ یعنی موفقیت شروع روز به یک درس خاص گره خورده. اگر آن درس سنگین باشد، کل روز شکننده می‌شود.`,
       );
     }
   }
 
   if (input.dailyRoutine.trim()) {
-    lines.push("روتین روزانه ثبت شده است؛ پایبندی به آن را جدا از بلوک‌های مطالعه بسنجید.");
+    paragraphs.push(
+      "روتین روزانه ثبت شده است؛ اثر آن را جدا از بلوک‌های مطالعه بسنجید. روتین فقط وقتی مفید است که روزهای شلوغ هم بدون تصمیم‌گیری اضافی اجرا شود.",
+    );
   }
 
-  lines.push("اقدام هفته بعد: ساعت شروع ثابت، اولین بلوک کوتاه، و ثبت به‌موقع عملکرد در همان روز.");
-  return lines.join(" ");
+  if (input.notes.length > 0) {
+    paragraphs.push(
+      `${fa(input.notes.length)} یادداشت از دانش‌آموز ثبت شده است؛ این یادداشت‌ها معمولاً دلیل واقعی نوسان‌ها را نشان می‌دهند و ارزش مرور در جلسهٔ مشاوره را دارند.`,
+    );
+  } else {
+    paragraphs.push(
+      "هیچ یادداشتی ثبت نشده است؛ یک خط توضیح برای هر خانه، تفاوت بین «کم‌کاری» و «خستگی» را در تحلیل بعدی روشن می‌کند.",
+    );
+  }
+
+  const actions: string[] = [];
+  if (startSpread > 45) {
+    actions.push("ساعت شروع را برای یک هفته روی یک عدد ثابت قفل کنید و اختلاف شروع را زیر ۳۰ دقیقه نگه دارید");
+  } else if (avgStart !== null) {
+    actions.push(`ساعت شروع فعلی (حدود ${faTime(avgStart)}) را به‌عنوان لنگر ثابت هفتهٔ بعد حفظ کنید`);
+  }
+  if (testShare < 25) {
+    actions.push("دست‌کم یک‌سوم بلوک‌های مطالعه را به تست هدفمند از همان مبحث تبدیل کنید");
+  }
+  if (plannedButMissing.length > 0) {
+    actions.push(`برای ${plannedButMissing[0]} یک بلوک کوچک اما ثابت در برنامه بگذارید`);
+  }
+  if (actions.length < 3) {
+    actions.push("حجم کار روزهای ضعیف را با نصف کردن بلوک‌ها بالا ببرید، نه با طولانی‌کردن یک بلوک");
+  }
+  if (actions.length < 3) {
+    actions.push("پیشرفت منابع را همان روز ثبت کنید تا تحلیل بعدی با واقعیت هم‌خوان باشد");
+  }
+  const actionNumbers = ["۱", "۲", "۳"];
+  paragraphs.push(
+    `اقدام هفتهٔ بعد: ${actions
+      .slice(0, 3)
+      .map((item, index) => `${actionNumbers[index]}) ${item}`)
+      .join(" ")}.`,
+  );
+
+  return paragraphs.join("\n\n");
 }
 
 async function logRun(input: {
@@ -259,7 +372,7 @@ export async function generatePerformanceNarrative(
           {
             role: "system",
             content:
-              "تو مشاور تحصیلی و تحلیلگر عملکرد دانش‌آموز هستی. فقط یک JSON با کلید narrative برگردان. متن فارسی، حداکثر ۲۴۰ کلمه. فقط آمار خام را تکرار نکن؛ الگوهای عمیق‌تر را پیدا کن: درس‌هایی که بیشترین/کمترین زمان گرفته‌اند، ترتیب شروع روز، دروس برنامه‌ریزی‌شده در ساعت‌های خسته‌کننده (مثلاً آخر شب)، تعادل تست/تمرین و مطالعه، شکاف بین پیشرفت منابع و زمانی که صرفشان شده، و اثر روتین روزانه. اگر داده منابع و برنامه و عملکرد با هم تناقض دارند آن را صریح بگو و علت محتمل را حدس بزن. در پایان ۳ اقدام مشخص و قابل اندازه‌گیری برای هفته بعد بده. بدون نام یا داده هویتی.",
+              "تو مشاور تحصیلی و تحلیلگر عملکرد دانش‌آموز هستی. فقط یک JSON با کلید narrative برگردان. متن فارسی، بین ۲۰۰ تا ۳۰۰ کلمه، در ۳ تا ۵ پاراگراف که با \\n\\n از هم جدا شده‌اند. قاعدهٔ اصلی: آمار خام جدول‌ها را بازگو نکن؛ به‌جای آن ۲ تا ۴ نکتهٔ غیربدیهی و رابطه‌محور پیدا کن، مثلاً رابطهٔ ساعت شروع با حجم کار، تمرکز بیش از حد روی یک درس، فاصلهٔ بین برنامه و عملکرد واقعی، تناسب مطالعه با تست، یا ناهم‌خوانی زمان صرف‌شده با پیشرفت منابع. حداقل یک تناقض یا هزینهٔ پنهان را صریح نام ببر و علت محتمل آن را حدس بزن. اگر داده‌ها کم است، صادقانه بگو و از حدس قطعی پرهیز کن. در پایان دقیقاً ۳ اقدام مشخص، عددی و قابل اندازه‌گیری برای بازهٔ بعد بده. بدون نام یا داده هویتی.",
           },
           { role: "user", content: JSON.stringify(payload) },
         ],

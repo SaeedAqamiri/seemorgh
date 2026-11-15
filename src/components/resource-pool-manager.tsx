@@ -4,7 +4,6 @@ import {
 } from "@/app/actions/resource-pool";
 import { SubmitButton } from "@/components/submit-button";
 import type { PoolBookView } from "@/lib/resource-pool";
-import { UNIT_TYPE_LABELS } from "@/lib/subjects";
 
 type SubjectOption = { id: string; title: string; kind: string };
 
@@ -53,7 +52,6 @@ export function ResourcePoolManager({
                         <th>فصل</th>
                         <th>تست</th>
                         <th>تمرین</th>
-                        <th>صفحه</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -62,7 +60,6 @@ export function ResourcePoolManager({
                           <td>{chapter.title}</td>
                           <td>{chapter.testCount.toLocaleString("fa-IR")}</td>
                           <td>{chapter.exerciseCount.toLocaleString("fa-IR")}</td>
-                          <td>{chapter.pages.toLocaleString("fa-IR")}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -122,26 +119,17 @@ export function ResourcePoolManager({
               <option value="فارغ‌التحصیل">فارغ‌التحصیل</option>
             </select>
           </div>
+          <input type="hidden" name="unitType" value="test" />
           <div className="field">
-            <label>نوع واحد</label>
-            <select name="unitType" defaultValue="test">
-              {Object.entries(UNIT_TYPE_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label>تعداد کل (اگر فصل نمی‌دهید)</label>
+            <label>تعداد کل تست (اگر فصل نمی‌دهید)</label>
             <input name="totalUnits" type="number" min={0} defaultValue={0} />
           </div>
           <div className="field" style={{ gridColumn: "1 / -1" }}>
-            <label>فصل‌بندی — هر خط: عنوان | تست | تمرین | صفحه</label>
+            <label>فصل‌بندی — هر خط: عنوان | تست | تمرین</label>
             <textarea
               name="chapters"
               rows={6}
-              placeholder={"فصل ۱ | 120 | 30 | 24\nفصل ۲ | 110 | 25 | 30\nفصل ۳ | 90 | 20 | 18"}
+              placeholder={"فصل ۱ | 120 | 30\nفصل ۲ | 110 | 25\nفصل ۳ | 90 | 20"}
             />
           </div>
           <div className="field">

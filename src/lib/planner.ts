@@ -350,11 +350,7 @@ function topicForBlock(item: PoolItem, units: number): string {
   );
   if (!chapter) return item.resource.title;
 
-  const endPage = Math.min(
-    chapter.endPage,
-    startPage + Math.max(0, units) - 1,
-  );
-  return `${chapter.title} — صفحه ${startPage} تا ${endPage}`;
+  return chapter.title;
 }
 
 function buildTask(

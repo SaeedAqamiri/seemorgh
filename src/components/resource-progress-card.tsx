@@ -1,4 +1,3 @@
-import { UNIT_TYPE_LABELS } from "@/lib/subjects";
 import type { ResourceProgressSummary } from "@/lib/resource-progress";
 
 function fa(value: number): string {
@@ -56,7 +55,6 @@ export function ResourceProgressCard({
                 <tr>
                   <th>درس</th>
                   <th>منبع</th>
-                  <th>نوع</th>
                   <th>پیشرفت</th>
                   <th>انجام‌شده / کل</th>
                   <th>باقی‌مانده</th>
@@ -72,7 +70,6 @@ export function ResourceProgressCard({
                         <span style={{ width: `${Math.min(100, resource.percent)}%` }} />
                       </div>
                     </td>
-                    <td>{UNIT_TYPE_LABELS[resource.unitType] ?? resource.unitType}</td>
                     <td>{resource.percent}٪</td>
                     <td>
                       {fa(resource.completedUnits)} / {fa(resource.totalUnits)}

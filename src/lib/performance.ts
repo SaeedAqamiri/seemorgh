@@ -386,6 +386,8 @@ export type SubjectDayCell = {
   date: string;
   practiceMinutes: number;
   studyMinutes: number;
+  testMinutes: number;
+  exerciseMinutes: number;
 };
 
 export type SubjectDayRow = {
@@ -395,6 +397,8 @@ export type SubjectDayRow = {
   days: SubjectDayCell[];
   totalPracticeMinutes: number;
   totalStudyMinutes: number;
+  totalTestMinutes: number;
+  totalExerciseMinutes: number;
 };
 
 export type SubjectTimeRow = {
@@ -409,16 +413,23 @@ export type PlanningInsights = {
   firstSubjectByDay: { date: string; title: string }[];
 };
 
-function reportBucket(cell: PerfActivityCell): { practice: number; study: number } {
+function reportBucket(cell: PerfActivityCell): {
+  study: number;
+  test: number;
+  exercise: number;
+} {
   if (cell.kind === "study" || cell.kind === "review") {
-    return { practice: 0, study: cell.minutes };
+    return { study: cell.minutes, test: 0, exercise: 0 };
   }
   if (cell.kind === "routine") {
     return cell.routineMode === "study"
-      ? { practice: 0, study: cell.minutes }
-      : { practice: cell.minutes, study: 0 };
+      ? { study: cell.minutes, test: 0, exercise: 0 }
+      : { study: 0, test: cell.minutes, exercise: 0 };
   }
-  return { practice: cell.minutes, study: 0 };
+  if (cell.kind === "exercise") {
+    return { study: 0, test: 0, exercise: cell.minutes };
+  }
+  return { study: 0, test: cell.minutes, exercise: 0 };
 }
 
 export function buildSubjectDayMatrix(
@@ -435,6 +446,8 @@ export function buildSubjectDayMatrix(
       days: Map<string, SubjectDayCell>;
       totalPracticeMinutes: number;
       totalStudyMinutes: number;
+      totalTestMinutes: number;
+      totalExerciseMinutes: number;
     }
   >();
 
@@ -446,7 +459,8 @@ export function buildSubjectDayMatrix(
       const meta = subjectMeta.get(activity.subjectId);
       if (!meta) continue;
       const bucket = reportBucket(activity);
-      if (bucket.practice === 0 && bucket.study === 0) continue;
+      const practice = bucket.test + bucket.exercise;
+      if (practice === 0 && bucket.study === 0) continue;
       const row =
         bySubject.get(activity.subjectId) ??
         {
@@ -456,13 +470,26 @@ export function buildSubjectDayMatrix(
           days: new Map<string, SubjectDayCell>(),
           totalPracticeMinutes: 0,
           totalStudyMinutes: 0,
+          totalTestMinutes: 0,
+          totalExerciseMinutes: 0,
         };
-      const dayCell = row.days.get(date) ?? { date, practiceMinutes: 0, studyMinutes: 0 };
-      dayCell.practiceMinutes += bucket.practice;
+      const dayCell =
+        row.days.get(date) ?? {
+          date,
+          practiceMinutes: 0,
+          studyMinutes: 0,
+          testMinutes: 0,
+          exerciseMinutes: 0,
+        };
+      dayCell.practiceMinutes += practice;
       dayCell.studyMinutes += bucket.study;
+      dayCell.testMinutes += bucket.test;
+      dayCell.exerciseMinutes += bucket.exercise;
       row.days.set(date, dayCell);
-      row.totalPracticeMinutes += bucket.practice;
+      row.totalPracticeMinutes += practice;
       row.totalStudyMinutes += bucket.study;
+      row.totalTestMinutes += bucket.test;
+      row.totalExerciseMinutes += bucket.exercise;
       bySubject.set(activity.subjectId, row);
     }
   }
@@ -473,10 +500,19 @@ export function buildSubjectDayMatrix(
       title: row.title,
       kind: row.kind,
       days: dates.map(
-        (date) => row.days.get(date) ?? { date, practiceMinutes: 0, studyMinutes: 0 },
+        (date) =>
+          row.days.get(date) ?? {
+            date,
+            practiceMinutes: 0,
+            studyMinutes: 0,
+            testMinutes: 0,
+            exerciseMinutes: 0,
+          },
       ),
       totalPracticeMinutes: row.totalPracticeMinutes,
       totalStudyMinutes: row.totalStudyMinutes,
+      totalTestMinutes: row.totalTestMinutes,
+      totalExerciseMinutes: row.totalExerciseMinutes,
     }))
     .sort((a, b) => a.title.localeCompare(b.title, "fa"));
 }
@@ -785,7 +821,8 @@ export async function getPerformanceRangeData(
           const meta = subjectMeta.get(activity.subjectId);
           if (!meta) return;
           const bucket = reportBucket(activity);
-          if (bucket.practice === 0 && bucket.study === 0) return;
+          const practice = bucket.test + bucket.exercise;
+          if (practice === 0 && bucket.study === 0) return;
           const entry =
             matrixCells.get(activity.subjectId) ??
             {
@@ -794,9 +831,17 @@ export async function getPerformanceRangeData(
               cells: new Map<string, SubjectDayCell>(),
             };
           const dayCell =
-            entry.cells.get(date) ?? { date, practiceMinutes: 0, studyMinutes: 0 };
-          dayCell.practiceMinutes += bucket.practice;
+            entry.cells.get(date) ?? {
+              date,
+              practiceMinutes: 0,
+              studyMinutes: 0,
+              testMinutes: 0,
+              exerciseMinutes: 0,
+            };
+          dayCell.practiceMinutes += practice;
           dayCell.studyMinutes += bucket.study;
+          dayCell.testMinutes += bucket.test;
+          dayCell.exerciseMinutes += bucket.exercise;
           entry.cells.set(date, dayCell);
           matrixCells.set(activity.subjectId, entry);
         });
@@ -843,7 +888,14 @@ export async function getPerformanceRangeData(
       title: entry.title,
       kind: entry.kind,
       days: rangeDates.map(
-        (date) => entry.cells.get(date) ?? { date, practiceMinutes: 0, studyMinutes: 0 },
+        (date) =>
+          entry.cells.get(date) ?? {
+            date,
+            practiceMinutes: 0,
+            studyMinutes: 0,
+            testMinutes: 0,
+            exerciseMinutes: 0,
+          },
       ),
       totalPracticeMinutes: [...entry.cells.values()].reduce(
         (sum, cell) => sum + cell.practiceMinutes,
@@ -851,6 +903,14 @@ export async function getPerformanceRangeData(
       ),
       totalStudyMinutes: [...entry.cells.values()].reduce(
         (sum, cell) => sum + cell.studyMinutes,
+        0,
+      ),
+      totalTestMinutes: [...entry.cells.values()].reduce(
+        (sum, cell) => sum + cell.testMinutes,
+        0,
+      ),
+      totalExerciseMinutes: [...entry.cells.values()].reduce(
+        (sum, cell) => sum + cell.exerciseMinutes,
         0,
       ),
     }))
