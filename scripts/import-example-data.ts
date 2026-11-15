@@ -26,11 +26,6 @@ async function main() {
   for (const [name, table] of EXAMPLE_TABLES) {
     const content = readFileSync(join(inDir, `${name}.json`), "utf8");
     const rows = reviveDates(name, JSON.parse(content) as Row[]);
-    if (name === "question_banks") {
-      for (const row of rows) {
-        if (!row.ownerId && row.createdBy) row.ownerId = row.createdBy;
-      }
-    }
     if (rows.length === 0) {
       console.log(`${name}: 0`);
       continue;
