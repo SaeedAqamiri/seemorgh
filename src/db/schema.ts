@@ -5,6 +5,7 @@ import {
   jsonb,
   numeric,
   pgTable,
+  real,
   text,
   timestamp,
   uniqueIndex,
@@ -313,7 +314,54 @@ type PanelRoutineAction = {
   chapterId: string | null;
   count: number;
 };
+export type StudyGoalMetric = "percent" | "score";
 
+export const studyGoals = pgTable(
+  "study_goals",
+  {
+    id: id(),
+    studentId: text("student_id")
+      .notNull()
+      .references(() => students.id, { onDelete: "cascade" }),
+    subjectId: text("subject_id")
+      .notNull()
+      .references(() => subjects.id, { onDelete: "cascade" }),
+    metric: text("metric", { enum: ["percent", "score"] })
+      .notNull()
+      .default("percent"),
+    currentValue: real("current_value").notNull().default(0),
+    targetValue: real("target_value").notNull().default(0),
+    weight: integer("weight").notNull().default(3),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("study_goals_student_subject_unique").on(table.studentId, table.subjectId),
+  ],
+);
+
+export type PlanningPolicyJson = {
+  strategy: "balanced" | "weakest_first" | "exam_weighted";
+  minutesPerPercentPoint: number;
+  minutesPerTest: number;
+  testRatioPct: number;
+  reviewRatioPct: number;
+  maxSubjectsPerDay: number;
+  minBlockMinutes: number;
+  maxBlockMinutes: number;
+  fillCapacity: boolean;
+  notes: string;
+};
+
+export const planningSettings = pgTable("planning_settings", {
+  studentId: text("student_id")
+    .primaryKey()
+    .references(() => students.id, { onDelete: "cascade" }),
+  targetDate: text("target_date"),
+  policyJson: jsonb("policy_json").$type<PlanningPolicyJson>(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" })
+    .notNull()
+    .defaultNow(),
+});
 export type PanelCellJson =
   | { kind: "empty" }
   | { kind: "rest" }
@@ -777,6 +825,8 @@ export type ResourcePoolChapter = typeof resourcePoolChapters.$inferSelect;
 export type BellSchedule = typeof bellSchedules.$inferSelect;
 export type Availability = typeof availability.$inferSelect;
 export type StudentConstraints = typeof studentConstraints.$inferSelect;
+export type StudyGoal = typeof studyGoals.$inferSelect;
+export type PlanningSettings = typeof planningSettings.$inferSelect;
 export type Plan = typeof plans.$inferSelect;
 export type Task = typeof tasks.$inferSelect;
 export type WeeklyPanel = typeof weeklyPanels.$inferSelect;

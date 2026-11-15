@@ -163,6 +163,25 @@ CREATE TABLE IF NOT EXISTS student_constraints (
   buffer_pct integer NOT NULL DEFAULT 15
 );
 
+CREATE TABLE IF NOT EXISTS study_goals (
+  id text PRIMARY KEY,
+  student_id text NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  subject_id text NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+  metric text NOT NULL DEFAULT 'percent',
+  current_value real NOT NULL DEFAULT 0,
+  target_value real NOT NULL DEFAULT 0,
+  weight integer NOT NULL DEFAULT 3,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS study_goals_student_subject_unique ON study_goals(student_id, subject_id);
+
+CREATE TABLE IF NOT EXISTS planning_settings (
+  student_id text PRIMARY KEY REFERENCES students(id) ON DELETE CASCADE,
+  target_date text,
+  policy_json jsonb,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS weekly_panels (
   id text PRIMARY KEY,
   student_id text NOT NULL REFERENCES students(id) ON DELETE CASCADE,

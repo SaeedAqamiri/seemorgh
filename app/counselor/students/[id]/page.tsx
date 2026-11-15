@@ -164,6 +164,12 @@ export default async function StudentDetailPage({
           <Link className="btn btn-secondary btn-sm" href={panelHref}>
             برنامه‌ریزی
           </Link>
+          <Link
+            className="btn btn-secondary btn-sm"
+            href={`/counselor/students/${id}/auto-plan`}
+          >
+            برنامه‌ریزی خودکار
+          </Link>
           <Link className="btn btn-secondary btn-sm" href={performanceHref}>
             دفترچه عملکرد
           </Link>

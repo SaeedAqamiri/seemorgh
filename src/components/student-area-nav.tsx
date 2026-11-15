@@ -12,6 +12,7 @@ export function StudentAreaNav({ studentId }: { studentId: string }) {
     { href: `${base}/resources`, label: "منابع" },
     { href: `${base}/progress`, label: "وضعیت منابع" },
     { href: `${base}/panel`, label: "برنامه‌ریزی" },
+    { href: `${base}/auto-plan`, label: "برنامه‌ریزی خودکار" },
     { href: `${base}/performance`, label: "عملکرد" },
     { href: `${base}/exam-analysis`, label: "تحلیل آزمون" },
     { href: `${base}/report`, label: "گزارش" },

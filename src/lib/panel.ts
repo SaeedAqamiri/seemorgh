@@ -241,20 +241,44 @@ export function taskTypeForCell(cell: PanelCellJson): {
   }
 }
 
-function cellFromTask(task: typeof tasks.$inferSelect): PanelCellJson {
-  const actionKind = (task.actionKind || "study") as PanelActionKind;
+type PanelTaskLike = {
+  planDate: string;
+  plannedStart: number;
+  subjectId: string;
+  resourceId: string | null;
+  type: string;
+  targetUnits: number;
+  actionKind?: string | null;
+  routineMode?: string | null;
+  chapterId?: string | null;
+  resourceText?: string | null;
+};
+
+function fallbackActionKind(task: PanelTaskLike): PanelActionKind {
+  if (task.type === "review") return "review";
+  if (task.type === "test" || task.type === "timed_test") return "test";
+  if (task.type === "exercise") return "exercise";
+  return "study";
+}
+
+function cellFromTask(task: PanelTaskLike): PanelCellJson {
+  const actionKind = (task.actionKind || fallbackActionKind(task)) as PanelActionKind;
   const count = Math.max(0, task.targetUnits);
   const base = {
     subjectId: task.subjectId,
     resourceId: task.resourceId,
-    chapterId: task.chapterId,
-    resourceText: task.resourceText,
+    chapterId: task.chapterId ?? null,
+    resourceText: task.resourceText ?? "",
     count,
   };
   switch (actionKind) {
     case "study":
     case "review":
-      return { kind: actionKind, subjectId: task.subjectId, resourceText: task.resourceText };
+      return {
+        kind: actionKind,
+        subjectId: task.subjectId,
+        resourceText: task.resourceText ?? "",
+      };
     case "test":
     case "timedTest":
     case "exercise":
@@ -265,9 +289,39 @@ function cellFromTask(task: typeof tasks.$inferSelect): PanelCellJson {
         routineMode: task.routineMode === "study" ? "study" : "test",
         ...base,
       };
-    default:
-      return { kind: task.type === "review" ? "review" : "study", subjectId: task.subjectId, resourceText: task.resourceText };
+    default: {
+      const fallback = fallbackActionKind(task);
+      if (fallback === "review") {
+        return { kind: "review", subjectId: task.subjectId, resourceText: task.resourceText ?? "" };
+      }
+      if (fallback === "test") {
+        return { kind: "test", ...base };
+      }
+      if (fallback === "exercise") {
+        return { kind: "exercise", ...base };
+      }
+      return { kind: "study", subjectId: task.subjectId, resourceText: task.resourceText ?? "" };
+    }
   }
+}
+
+export function buildGridFromTasks(
+  weekStart: string,
+  rows: PanelTaskLike[],
+  slots: readonly PanelSlot[] = PANEL_SLOTS,
+): WeeklyGridJson {
+  const dates = weekDates(weekStart);
+  const grid = emptyGrid(slots.length);
+  for (const task of rows) {
+    const day = dates.indexOf(task.planDate);
+    if (day < 0) continue;
+    const slotIndex = slotIndexForStart(slots, task.plannedStart);
+    if (slotIndex < 0) continue;
+    if (grid[day][slotIndex].kind !== "empty") continue;
+    grid[day][slotIndex] = cellFromTask(task);
+  }
+
+  return grid;
 }
 
 async function gridFromTasks(
@@ -281,19 +335,39 @@ async function gridFromTasks(
     .from(tasks)
     .where(eq(tasks.planId, planId))
     .orderBy(asc(tasks.planDate), asc(tasks.plannedStart));
+  return buildGridFromTasks(weekStart, rows, slots);
+}
 
-  const dates = weekDates(weekStart);
-  const grid = emptyGrid(slots.length);
-  for (const task of rows) {
-    const day = dates.indexOf(task.planDate);
-    if (day < 0) continue;
-    const slotIndex = slotIndexForStart(slots, task.plannedStart);
-    if (slotIndex < 0) continue;
-    if (grid[day][slotIndex].kind !== "empty") continue;
-    grid[day][slotIndex] = cellFromTask(task);
-  }
-
-  return grid;
+export async function saveGeneratedPanel(input: {
+  studentId: string;
+  weekStart: string;
+  grid: WeeklyGridJson;
+  dailyRoutine: string;
+  nextWeekHomework: string;
+  actorId: string;
+}): Promise<void> {
+  const db = await getDb();
+  await db
+    .insert(weeklyPanels)
+    .values({
+      studentId: input.studentId,
+      weekStart: input.weekStart,
+      gridJson: input.grid,
+      dailyRoutine: input.dailyRoutine.trim().slice(0, 2000),
+      nextWeekHomework: input.nextWeekHomework.trim().slice(0, 2000),
+      updatedBy: input.actorId,
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: [weeklyPanels.studentId, weeklyPanels.weekStart],
+      set: {
+        gridJson: input.grid,
+        dailyRoutine: input.dailyRoutine.trim().slice(0, 2000),
+        nextWeekHomework: input.nextWeekHomework.trim().slice(0, 2000),
+        updatedBy: input.actorId,
+        updatedAt: new Date(),
+      },
+    });
 }
 
 export async function getWeeklyPanelView(studentId: string, weekStart: string): Promise<PanelView> {
