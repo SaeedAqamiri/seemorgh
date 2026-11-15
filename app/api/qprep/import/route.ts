@@ -11,6 +11,10 @@ import {
   type Difficulty,
   type SourceType,
 } from "@/lib/exam";
+import {
+  inferGradeFromText,
+  normalizeGrade,
+} from "@/lib/question-taxonomy";
 
 type IncomingQuestion = {
   body?: string;
@@ -22,6 +26,8 @@ type IncomingQuestion = {
   subject?: string;
   subjectTitle?: string;
   subjectId?: string;
+  grade?: string;
+  bookGrade?: string;
   topic?: string;
   score?: number;
   tags?: string;
@@ -224,11 +230,24 @@ export async function POST(request: Request) {
     const sourceYear = String(raw.sourceYear ?? source.year ?? "").trim();
     const sourceDate = String(raw.sourceDate ?? source.date ?? "").trim();
     const sourceRef = String(raw.sourceRef ?? source.ref ?? "").trim();
+    const subjectTitleForGrade =
+      (subjectId
+        ? subjectRows.find((subject) => subject.id === subjectId)?.title
+        : undefined) ||
+      subjectTitle ||
+      null;
+    const grade =
+      normalizeGrade(raw.grade ?? raw.bookGrade) ||
+      inferGradeFromText(
+        `${bank.title} ${sourceTitle} ${sourceYear}`,
+        subjectTitleForGrade,
+      );
 
     await db.insert(questions).values({
       bankId: bank.id,
       workspaceId: user.workspaceId,
       subjectId,
+      grade,
       topic: String(raw.topic ?? "").trim(),
       type,
       difficulty: normalizeDifficulty(raw.difficulty),

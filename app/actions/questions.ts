@@ -85,6 +85,7 @@ function validateQuestionForm(formData: FormData, path: string) {
   const sourceYear = field(formData, "sourceYear");
   const sourceDate = field(formData, "sourceDate");
   const sourceRef = field(formData, "sourceRef");
+  const grade = field(formData, "grade");
 
   if (!body) fail(path, "متن سوال لازم است.");
   if (!DIFFICULTIES.includes(difficulty as Difficulty)) {
@@ -121,6 +122,7 @@ function validateQuestionForm(formData: FormData, path: string) {
       sourceYear,
       sourceDate,
       sourceRef,
+      grade,
       options: normalizedOptions,
       correct,
     };
@@ -142,6 +144,7 @@ function validateQuestionForm(formData: FormData, path: string) {
     sourceYear,
     sourceDate,
     sourceRef,
+    grade,
     options: null,
     correct: correctRaw,
   };
@@ -197,6 +200,7 @@ export async function createQuestionAction(formData: FormData): Promise<void> {
     bankId,
     workspaceId: user.workspaceId,
     subjectId: data.subjectId,
+    grade: data.grade,
     topic: data.topic,
     type: data.type,
     difficulty: data.difficulty,
@@ -233,6 +237,7 @@ export async function updateQuestionAction(formData: FormData): Promise<void> {
     .update(questions)
     .set({
       subjectId: data.subjectId,
+      grade: data.grade,
       topic: data.topic,
       type: data.type,
       difficulty: data.difficulty,

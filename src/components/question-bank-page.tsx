@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { eq } from "drizzle-orm";
 import {
   archiveQuestionAction,
   createBankAction,
@@ -10,9 +9,9 @@ import {
   updateQuestionAction,
 } from "@/app/actions/questions";
 import { createPracticeExamAction } from "@/app/actions/exams";
+import { QuestionBankFilters } from "@/components/question-bank-filters";
+import { QuestionTaxonomyFields } from "@/components/question-taxonomy-fields";
 import { SubmitButton } from "@/components/submit-button";
-import { getDb } from "@/db/client";
-import { subjects } from "@/db/schema";
 import type { SessionUser } from "@/lib/auth";
 import {
   DIFFICULTIES,
@@ -23,6 +22,7 @@ import {
   type SourceType,
 } from "@/lib/exam";
 import {
+  countQuestions,
   getOrCreateImportToken,
   listBanks,
   listQuestions,
@@ -30,6 +30,10 @@ import {
   sourceLabel,
   type QuestionFilters,
 } from "@/lib/questions";
+import {
+  listQuestionTaxonomy,
+  parseQuestionBookKey,
+} from "@/lib/question-taxonomy";
 
 const SUCCESS: Record<string, string> = {
   bank: "بانک سوال ساخته شد.",
@@ -41,16 +45,16 @@ const SUCCESS: Record<string, string> = {
   token: "کد اتصال qprep بازسازی شد.",
 };
 
-type SearchParams = {
-  bank?: string;
-  success?: string;
-  error?: string;
-  q?: string;
-  subjectId?: string;
-  difficulty?: string;
-  sourceType?: string;
-  year?: string;
-};
+type SearchParams = Record<string, string | string[] | undefined>;
+
+function one(value: string | string[] | undefined): string {
+  return Array.isArray(value) ? value[0] ?? "" : value ?? "";
+}
+
+function many(value: string | string[] | undefined): string[] {
+  if (Array.isArray(value)) return value.filter(Boolean);
+  return value ? [value] : [];
+}
 
 function optionList(values: readonly string[], labels: Record<string, string>) {
   return values.map((value) => (
@@ -77,11 +81,26 @@ export async function QuestionBankPage({
 }) {
   const base = user.role === "counselor" ? "/counselor/questions" : "/student/questions";
   const examNewPath = user.role === "counselor" ? "/counselor/exams/new" : "";
-  const { bank, success, error, q, subjectId, difficulty, sourceType, year } = searchParams;
+  const bank = one(searchParams.bank);
+  const success = one(searchParams.success);
+  const error = one(searchParams.error);
+  const q = one(searchParams.q);
+  const difficulty = one(searchParams.difficulty);
+  const sourceType = one(searchParams.sourceType);
+  const year = one(searchParams.year);
+  const groupRaw = one(searchParams.group);
+  const group =
+    groupRaw === "general" || groupRaw === "specialized" ? groupRaw : "";
+  const subjectIds = Array.from(
+    new Set([...many(searchParams.subjects), one(searchParams.subjectId)].filter(Boolean)),
+  );
+  const books = many(searchParams.books)
+    .map((key) => parseQuestionBookKey(key))
+    .filter((book): book is { subjectId: string; grade: string } => Boolean(book));
+  const topics = many(searchParams.topics);
 
-  const db = await getDb();
-  const [subjectRows, banks, years, importToken] = await Promise.all([
-    db.select().from(subjects).where(eq(subjects.workspaceId, user.workspaceId)),
+  const [taxonomy, banks, years, importToken] = await Promise.all([
+    listQuestionTaxonomy(user.workspaceId),
     listBanks(user.workspaceId, user.id),
     listSourceYears(user.workspaceId, user.id),
     getOrCreateImportToken(user.id),
@@ -90,7 +109,10 @@ export async function QuestionBankPage({
   const selectedBank = bank && banks.some((item) => item.id === bank) ? bank : undefined;
   const filters: QuestionFilters = {
     bankId: selectedBank,
-    subjectId: subjectId || undefined,
+    subjectIds,
+    group,
+    books,
+    topics,
     difficulty: (DIFFICULTIES.includes(difficulty as Difficulty) ? difficulty : "") as
       | Difficulty
       | "",
@@ -100,13 +122,35 @@ export async function QuestionBankPage({
     year: year || undefined,
     query: q?.trim() || undefined,
     includeArchived: true,
+    limit: 100,
   };
-  const questionRows = await listQuestions(user.workspaceId, user.id, filters);
-  const activeCount = questionRows.filter((question) => question.status === "active").length;
+  const [questionRows, matchedCount, activeCount] = await Promise.all([
+    listQuestions(user.workspaceId, user.id, filters),
+    countQuestions(user.workspaceId, user.id, filters),
+    countQuestions(user.workspaceId, user.id, {}),
+  ]);
   const selectedBankInfo = banks.find((item) => item.id === selectedBank);
   const examFormId = user.role === "counselor" ? "selectedExamForm" : "practiceExamForm";
+  const filterStateKey = JSON.stringify({
+    group,
+    subjectIds,
+    books,
+    topics,
+    q,
+    difficulty,
+    sourceType,
+    year,
+  });
   const hasFilter = Boolean(
-    selectedBank || subjectId || difficulty || sourceType || year || q?.trim(),
+    selectedBank ||
+      subjectIds.length > 0 ||
+      books.length > 0 ||
+      topics.length > 0 ||
+      group ||
+      difficulty ||
+      sourceType ||
+      year ||
+      q?.trim(),
   );
 
   return (
@@ -190,11 +234,20 @@ export async function QuestionBankPage({
               <label>درس (اختیاری)</label>
               <select name="subjectId">
                 <option value="">—</option>
-                {subjectRows.map((subject) => (
-                  <option key={subject.id} value={subject.id}>
-                    {subject.title}
-                  </option>
-                ))}
+                <optgroup label="عمومی">
+                  {taxonomy.groups.general.map((subject) => (
+                    <option key={subject.id} value={subject.id}>
+                      {subject.title}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="تخصصی">
+                  {taxonomy.groups.specialized.map((subject) => (
+                    <option key={subject.id} value={subject.id}>
+                      {subject.title}
+                    </option>
+                  ))}
+                </optgroup>
               </select>
             </div>
             <div className="field">
@@ -250,21 +303,11 @@ export async function QuestionBankPage({
                   ))}
                 </select>
               </div>
-              <div className="field">
-                <label>درس</label>
-                <select name="subjectId" defaultValue="" required>
-                  <option value="">—</option>
-                  {subjectRows.map((subject) => (
-                    <option key={subject.id} value={subject.id}>
-                      {subject.title}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="field">
-                <label>مبحث</label>
-                <input name="topic" placeholder="مثلاً ژنتیک" required />
-              </div>
+              <QuestionTaxonomyFields
+                taxonomy={taxonomy}
+                subjectRequired
+                topicRequired
+              />
               <div className="field">
                 <label>نوع</label>
                 <select name="type" defaultValue="mcq">
@@ -348,63 +391,29 @@ export async function QuestionBankPage({
         <div className="section-head">
           <h2>فیلتر و انتخاب</h2>
           <small>
-            {questionRows.length.toLocaleString("fa-IR")} سوال مطابق فیلتر
+            {matchedCount.toLocaleString("fa-IR")} سوال مطابق فیلتر
             {selectedBankInfo ? ` — ${selectedBankInfo.title}` : ""}
           </small>
         </div>
-        <form method="get" action={base} className="form-grid">
-          {selectedBank ? <input type="hidden" name="bank" value={selectedBank} /> : null}
-          <div className="field">
-            <label>جستجو</label>
-            <input name="q" defaultValue={q ?? ""} placeholder="متن، مبحث، منبع یا تگ" />
-          </div>
-          <div className="field">
-            <label>درس</label>
-            <select name="subjectId" defaultValue={subjectId ?? ""}>
-              <option value="">همه</option>
-              {subjectRows.map((subject) => (
-                <option key={subject.id} value={subject.id}>
-                  {subject.title}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label>سال</label>
-            <select name="year" defaultValue={year ?? ""}>
-              <option value="">همه</option>
-              {years.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label>سختی</label>
-            <select name="difficulty" defaultValue={difficulty ?? ""}>
-              <option value="">همه</option>
-              <DifficultyOptions />
-            </select>
-          </div>
-          <div className="field">
-            <label>منبع</label>
-            <select name="sourceType" defaultValue={sourceType ?? ""}>
-              <option value="">همه</option>
-              <SourceOptions />
-            </select>
-          </div>
-          <div className="field">
-            <SubmitButton className="btn-secondary">اعمال فیلتر</SubmitButton>
-          </div>
-          {hasFilter ? (
-            <div className="field">
-              <Link className="btn btn-ghost btn-sm" href={base}>
-                پاک‌کردن فیلتر
-              </Link>
-            </div>
-          ) : null}
-        </form>
+        <QuestionBankFilters
+          key={filterStateKey}
+          base={base}
+          bank={selectedBank}
+          subjects={taxonomy.subjects}
+          books={taxonomy.books}
+          years={years}
+          initial={{
+            group,
+            subjects: subjectIds,
+            books: many(searchParams.books),
+            topics,
+            q,
+            difficulty,
+            sourceType,
+            year,
+          }}
+          hasFilter={hasFilter}
+        />
 
         {user.role === "counselor" ? (
           <form id={examFormId} action={examNewPath} method="get" className="stack" style={{ marginTop: "0.8rem" }}>
@@ -441,6 +450,13 @@ export async function QuestionBankPage({
           <div className="empty">سوالی پیدا نشد.</div>
         ) : (
           <div className="stack" style={{ marginTop: "0.8rem" }}>
+            {matchedCount > questionRows.length ? (
+              <div className="muted" style={{ fontSize: "0.82rem" }}>
+                نمایش {questionRows.length.toLocaleString("fa-IR")} سوال از{" "}
+                {matchedCount.toLocaleString("fa-IR")} سوال؛ فیلترها را محدودتر کنید تا
+                نتیجه دقیق‌تری ببینید.
+              </div>
+            ) : null}
             {questionRows.map((question) => (
               <div key={question.id} className="card" style={{ boxShadow: "none" }}>
                 <div className="row between" style={{ alignItems: "flex-start" }}>
@@ -461,6 +477,7 @@ export async function QuestionBankPage({
                       </label>
                       <span className="badge">{question.bankTitle}</span>
                       <span className="badge">{question.subjectTitle ?? "بدون درس"}</span>
+                      {question.grade ? <span className="badge">{question.grade}</span> : null}
                       <span className="badge">{question.topic || "بدون مبحث"}</span>
                       <span className="badge">
                         {question.type === "mcq" ? "چهارگزینه‌ای" : "کوتاه‌پاسخ"}
@@ -517,21 +534,13 @@ export async function QuestionBankPage({
                     <input type="hidden" name="questionId" value={question.id} />
                     <input type="hidden" name="bankId" value={question.bankId} />
                     <div className="form-grid">
-                      <div className="field">
-                        <label>درس</label>
-                        <select name="subjectId" defaultValue={question.subjectId ?? ""}>
-                          <option value="">—</option>
-                          {subjectRows.map((subject) => (
-                            <option key={subject.id} value={subject.id}>
-                              {subject.title}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="field">
-                        <label>مبحث</label>
-                        <input name="topic" defaultValue={question.topic} />
-                      </div>
+                      <QuestionTaxonomyFields
+                        taxonomy={taxonomy}
+                        defaultSubjectId={question.subjectId ?? ""}
+                        defaultGrade={question.grade}
+                        defaultTopic={question.topic}
+                        subjectRequired={false}
+                      />
                       <div className="field">
                         <label>نوع</label>
                         <select name="type" defaultValue={question.type}>

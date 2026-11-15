@@ -555,6 +555,7 @@ export const questions = pgTable(
       .notNull()
       .references(() => workspaces.id, { onDelete: "cascade" }),
     subjectId: text("subject_id").references(() => subjects.id, { onDelete: "set null" }),
+    grade: text("grade").notNull().default(""),
     topic: text("topic").notNull().default(""),
     type: text("type", { enum: ["mcq", "short"] })
       .notNull()
@@ -589,6 +590,7 @@ export const questions = pgTable(
   (table) => [
     index("questions_bank_idx").on(table.bankId),
     index("questions_workspace_idx").on(table.workspaceId),
+    index("questions_subject_idx").on(table.subjectId, table.grade),
     index("questions_external_key_idx").on(table.workspaceId, table.externalKey),
   ],
 );

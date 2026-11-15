@@ -294,6 +294,7 @@ CREATE TABLE IF NOT EXISTS questions (
   bank_id text NOT NULL REFERENCES question_banks(id) ON DELETE CASCADE,
   workspace_id text NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
   subject_id text REFERENCES subjects(id) ON DELETE SET NULL,
+  grade text NOT NULL DEFAULT '',
   topic text NOT NULL DEFAULT '',
   type text NOT NULL DEFAULT 'mcq',
   difficulty text NOT NULL DEFAULT 'medium',
@@ -316,6 +317,8 @@ CREATE TABLE IF NOT EXISTS questions (
 CREATE INDEX IF NOT EXISTS questions_bank_idx ON questions(bank_id);
 CREATE INDEX IF NOT EXISTS questions_workspace_idx ON questions(workspace_id);
 CREATE INDEX IF NOT EXISTS questions_external_key_idx ON questions(workspace_id, external_key);
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS grade text NOT NULL DEFAULT '';
+CREATE INDEX IF NOT EXISTS questions_subject_idx ON questions(subject_id, grade);
 ALTER TABLE questions ADD COLUMN IF NOT EXISTS source_type text NOT NULL DEFAULT 'authored';
 ALTER TABLE questions ADD COLUMN IF NOT EXISTS source_title text NOT NULL DEFAULT '';
 ALTER TABLE questions ADD COLUMN IF NOT EXISTS source_year text NOT NULL DEFAULT '';

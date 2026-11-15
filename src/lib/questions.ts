@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, ilike, isNotNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, isNotNull, or, sql } from "drizzle-orm";
 import { randomBytes } from "node:crypto";
 import { getDb } from "@/db/client";
 import { questionBanks, questions, subjects, users } from "@/db/schema";
@@ -52,14 +52,24 @@ export async function listBanks(
   return rows;
 }
 
+export type QuestionBookFilter = {
+  subjectId: string;
+  grade: string;
+};
+
 export type QuestionFilters = {
   bankId?: string;
   subjectId?: string;
+  subjectIds?: string[];
+  group?: "general" | "specialized" | "";
+  books?: QuestionBookFilter[];
+  topics?: string[];
   difficulty?: Difficulty | "";
   sourceType?: SourceType | "";
   year?: string;
   query?: string;
   includeArchived?: boolean;
+  limit?: number;
 };
 
 export type QuestionItem = {
@@ -68,6 +78,7 @@ export type QuestionItem = {
   bankTitle: string;
   subjectId: string | null;
   subjectTitle: string | null;
+  grade: string;
   topic: string;
   type: "mcq" | "short";
   difficulty: Difficulty;
@@ -86,18 +97,43 @@ export type QuestionItem = {
   status: "active" | "archived";
 };
 
-export async function listQuestions(
+function questionConditions(
   workspaceId: string,
   ownerId: string,
-  options: QuestionFilters = {},
-): Promise<QuestionItem[]> {
-  const db = await getDb();
+  options: QuestionFilters,
+) {
   const conditions = [
     eq(questions.workspaceId, workspaceId),
     eq(questionBanks.ownerId, ownerId),
   ];
   if (options.bankId) conditions.push(eq(questions.bankId, options.bankId));
-  if (options.subjectId) conditions.push(eq(questions.subjectId, options.subjectId));
+
+  const subjectIds = new Set(options.subjectIds ?? []);
+  if (options.subjectId) subjectIds.add(options.subjectId);
+  if (subjectIds.size > 0) {
+    conditions.push(inArray(questions.subjectId, Array.from(subjectIds)));
+  }
+
+  if (options.group === "general") {
+    conditions.push(or(eq(subjects.kind, "general"), eq(subjects.kind, "both"))!);
+  } else if (options.group === "specialized") {
+    conditions.push(or(eq(subjects.kind, "specialized"), eq(subjects.kind, "both"))!);
+  }
+
+  if (options.books && options.books.length > 0) {
+    const bookConditions = options.books.map(
+      (book) =>
+        and(
+          eq(questions.subjectId, book.subjectId),
+          eq(questions.grade, book.grade),
+        )!,
+    );
+    conditions.push(or(...bookConditions)!);
+  }
+
+  if (options.topics && options.topics.length > 0) {
+    conditions.push(inArray(questions.topic, options.topics));
+  }
   if (options.difficulty) conditions.push(eq(questions.difficulty, options.difficulty));
   if (options.sourceType) conditions.push(eq(questions.sourceType, options.sourceType));
   if (options.year) conditions.push(eq(questions.sourceYear, options.year));
@@ -114,6 +150,17 @@ export async function listQuestions(
   }
   if (!options.includeArchived) conditions.push(eq(questions.status, "active"));
 
+  return conditions;
+}
+
+export async function listQuestions(
+  workspaceId: string,
+  ownerId: string,
+  options: QuestionFilters = {},
+): Promise<QuestionItem[]> {
+  const db = await getDb();
+  const conditions = questionConditions(workspaceId, ownerId, options);
+
   const rows = await db
     .select({
       id: questions.id,
@@ -121,6 +168,7 @@ export async function listQuestions(
       bankTitle: questionBanks.title,
       subjectId: questions.subjectId,
       subjectTitle: subjects.title,
+      grade: questions.grade,
       topic: questions.topic,
       type: questions.type,
       difficulty: questions.difficulty,
@@ -143,9 +191,25 @@ export async function listQuestions(
     .leftJoin(subjects, eq(questions.subjectId, subjects.id))
     .where(and(...conditions))
     .orderBy(desc(questions.createdAt))
-    .limit(1000);
+    .limit(options.limit ?? 1000);
 
   return rows as QuestionItem[];
+}
+
+export async function countQuestions(
+  workspaceId: string,
+  ownerId: string,
+  options: QuestionFilters = {},
+): Promise<number> {
+  const db = await getDb();
+  const conditions = questionConditions(workspaceId, ownerId, options);
+  const [row] = await db
+    .select({ total: sql<number>`count(*)::int` })
+    .from(questions)
+    .innerJoin(questionBanks, eq(questions.bankId, questionBanks.id))
+    .leftJoin(subjects, eq(questions.subjectId, subjects.id))
+    .where(and(...conditions));
+  return row?.total ?? 0;
 }
 
 export async function getQuestion(
