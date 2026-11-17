@@ -40,6 +40,19 @@ export default async function PsychTestDetailPage({
           </Link>
           <h1>{test.title}</h1>
           <small>{test.description || "بدون توضیح"}</small>
+          {test.sourceUrl ? (
+            <div style={{ marginTop: "0.35rem" }}>
+              <a
+                className="muted"
+                href={test.sourceUrl}
+                target="_blank"
+                rel="noreferrer"
+                style={{ fontSize: "0.78rem", textDecoration: "underline" }}
+              >
+                منبع الگو: {test.sourceUrl}
+              </a>
+            </div>
+          ) : null}
         </div>
         <div className="row" style={{ flexWrap: "wrap", justifyContent: "flex-end" }}>
           <span className={`badge ${PSYCH_STATUS_CLASSES[test.status] ?? "badge"}`}>

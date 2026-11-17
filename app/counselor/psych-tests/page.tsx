@@ -3,6 +3,7 @@ import { requireCounselor } from "@/lib/auth";
 import { formatTehranDateTime } from "@/lib/dates";
 import { listPsychTests } from "@/lib/psych-server";
 import { PSYCH_STATUS_CLASSES, PSYCH_STATUS_LABELS } from "@/lib/psych";
+import { PSYCH_CATEGORY_LABELS } from "@/lib/psych-catalog";
 
 export default async function PsychTestsPage({
   searchParams,
@@ -54,7 +55,10 @@ export default async function PsychTestsPage({
                     <td>
                       <Link href={`/counselor/psych-tests/${test.id}`}>
                         <strong>{test.title}</strong>
-                      </Link>
+                      </Link>{" "}
+                      <span className="badge">
+                        {PSYCH_CATEGORY_LABELS[test.category] ?? test.category}
+                      </span>
                       {test.description ? (
                         <div className="muted" style={{ fontSize: "0.78rem" }}>
                           {test.description}

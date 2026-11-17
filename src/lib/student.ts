@@ -15,7 +15,7 @@ export type StudentTaskItem = {
   resourceTitle: string | null;
   resourceUnitType: "test" | "exercise" | "page" | "chapter" | null;
   topic: string;
-  type: "study" | "review" | "test" | "timed_test" | "exercise";
+  type: "study" | "review" | "test" | "timed_test" | "exercise" | "school" | "exam" | "exam_analysis";
   actionKind: string;
   routineMode: "study" | "test" | null;
   chapterId: string | null;
@@ -161,7 +161,9 @@ export async function getStudentWeekData(
 export function summarizeWeek(tasks: StudentTaskItem[], weekStart: string) {
   const dates = weekDates(weekStart);
   return dates.map((date) => {
-    const dayTasks = tasks.filter((task) => task.planDate === date);
+    const dayTasks = tasks.filter(
+      (task) => task.planDate === date && task.type !== "school" && task.type !== "exam" && task.type !== "exam_analysis",
+    );
     return {
       date,
       total: dayTasks.length,

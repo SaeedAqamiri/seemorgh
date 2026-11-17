@@ -27,6 +27,7 @@ import { subjectSupportsTests } from "@/lib/subjects";
 import { chaptersByResourceIds, recomputeResourceTotals, replaceResourceChapters } from "@/lib/resource-chapters";
 import { copyPoolBookToStudent, ResourcePoolError } from "@/lib/resource-pool";
 import { generatePlan } from "@/lib/planner";
+import { GroupFieldMismatchError, resolveGroupForForm } from "@/lib/student-groups";
 
 function field(form: FormData, name: string): string {
   return String(form.get(name) ?? "").trim();
@@ -79,17 +80,27 @@ export async function createStudentAction(formData: FormData): Promise<void> {
   const studentField = field(formData, "field") || "تجربی";
   const track = field(formData, "track") || "both";
   const guardianPhone = field(formData, "guardianPhone") || null;
+  const groupId = field(formData, "groupId");
+  const newGroupName = field(formData, "newGroup");
 
   if (name.length < 2) fail("/counselor", "نام دانش‌آموز را کامل وارد کنید.");
   if (!/^09\d{9}$/.test(phone)) fail("/counselor", "شماره موبایل باید با ۰۹ شروع شود و ۱۱ رقم باشد.");
 
   const db = await getDb();
   const inviteCode = randomUUID().replace(/-/g, "").slice(0, 12);
+  let group: Awaited<ReturnType<typeof resolveGroupForForm>>;
+  try {
+    group = await resolveGroupForForm(counselor.workspaceId, groupId, newGroupName, studentField);
+  } catch (error) {
+    if (error instanceof GroupFieldMismatchError) fail("/counselor", error.message);
+    throw error;
+  }
 
   const [student] = await db
     .insert(students)
     .values({
       workspaceId: counselor.workspaceId,
+      groupId: group.id,
       counselorId: counselor.id,
       name,
       phone,
@@ -110,6 +121,8 @@ export async function createStudentAction(formData: FormData): Promise<void> {
     .onConflictDoNothing();
 
   revalidatePath("/counselor");
+  revalidatePath("/counselor/groups");
+  revalidatePath("/counselor/leaderboard");
   redirect(studentPath(student.id, "?success=created"));
 }
 
@@ -123,10 +136,24 @@ export async function updateStudentAction(formData: FormData): Promise<void> {
   const studentField = field(formData, "field");
   const track = field(formData, "track");
   const guardianPhone = field(formData, "guardianPhone") || null;
+  const groupId = field(formData, "groupId");
+  const newGroupName = field(formData, "newGroup");
 
   if (name.length < 2) fail(studentPath(studentId), "نام را کامل وارد کنید.");
 
   const db = await getDb();
+  let group: Awaited<ReturnType<typeof resolveGroupForForm>>;
+  try {
+    group = await resolveGroupForForm(
+      counselor.workspaceId,
+      groupId,
+      newGroupName,
+      studentField || "تجربی",
+    );
+  } catch (error) {
+    if (error instanceof GroupFieldMismatchError) fail(studentPath(studentId), error.message);
+    throw error;
+  }
   await db
     .update(students)
     .set({
@@ -135,10 +162,13 @@ export async function updateStudentAction(formData: FormData): Promise<void> {
       field: studentField || "تجربی",
       track: (track || "both") as "konkur" | "final" | "both",
       guardianPhone,
+      groupId: group.id,
     })
     .where(and(eq(students.id, studentId), eq(students.workspaceId, counselor.workspaceId)));
 
   revalidatePath(studentPath(studentId));
+  revalidatePath("/counselor/groups");
+  revalidatePath("/counselor/leaderboard");
   redirect(studentPath(studentId, "?success=profile"));
 }
 

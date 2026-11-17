@@ -1,8 +1,11 @@
 import Link from "next/link";
+import type { CSSProperties } from "react";
 import { createStudentAction } from "@/app/actions/counselor";
+import { GroupSelect } from "@/components/group-select";
 import { SubmitButton } from "@/components/submit-button";
 import { requireCounselor } from "@/lib/auth";
 import { listStudents } from "@/lib/counselor";
+import { listStudentGroups } from "@/lib/student-groups";
 import { formatJalali, todayISO } from "@/lib/dates";
 import { FIELDS, GRADES, TRACK_LABELS } from "@/lib/subjects";
 
@@ -18,7 +21,10 @@ export default async function CounselorPage({
 }) {
   const counselor = await requireCounselor();
   const { success, error } = await searchParams;
-  const students = await listStudents(counselor.workspaceId, counselor.id);
+  const [students, groups] = await Promise.all([
+    listStudents(counselor.workspaceId, counselor.id),
+    listStudentGroups(counselor.workspaceId),
+  ]);
 
   const withPlan = students.filter((student) => student.planStatus === "approved" || student.planStatus === "active");
   const todayTasks = students.reduce((sum, student) => sum + student.todayTasks, 0);
@@ -32,7 +38,15 @@ export default async function CounselorPage({
           <h1>دانش‌آموزان</h1>
           <small>{formatJalali(todayISO())}</small>
         </div>
-        <span className="badge badge-green">{students.length} دانش‌آموز فعال</span>
+        <div className="row">
+          <Link className="btn btn-secondary btn-sm" href="/counselor/leaderboard">
+            رده‌بندی گروهی
+          </Link>
+          <Link className="btn btn-secondary btn-sm" href="/counselor/groups">
+            گروه‌ها
+          </Link>
+          <span className="badge badge-green">{students.length} دانش‌آموز فعال</span>
+        </div>
       </div>
 
       {success && SUCCESS[success] ? <div className="alert alert-success">{SUCCESS[success]}</div> : null}
@@ -100,6 +114,23 @@ export default async function CounselorPage({
             </select>
           </div>
           <div className="field">
+            <label htmlFor="groupId">گروه آموزشی (هم‌رشته)</label>
+            <GroupSelect
+              groups={groups.map((group) => ({
+                id: group.id,
+                name: group.name,
+                emoji: group.emoji,
+                field: group.field,
+              }))}
+              initialField="تجربی"
+              defaultValue={groups[0]?.id ?? null}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="newGroup">یا گروه جدید (اختیاری)</label>
+            <input id="newGroup" name="newGroup" placeholder="نام گروه جدید" />
+          </div>
+          <div className="field">
             <label htmlFor="guardianPhone">موبایل والد (اختیاری)</label>
             <input id="guardianPhone" name="guardianPhone" inputMode="tel" />
           </div>
@@ -122,6 +153,7 @@ export default async function CounselorPage({
               <thead>
                 <tr>
                   <th>دانش‌آموز</th>
+                  <th>گروه</th>
                   <th>پایه / رشته</th>
                   <th>برنامه هفته</th>
                   <th>امروز</th>
@@ -140,6 +172,16 @@ export default async function CounselorPage({
                       <div className="muted" style={{ fontSize: "0.78rem" }} dir="ltr">
                         {student.phone}
                       </div>
+                    </td>
+                    <td>
+                      {student.groupName ? (
+                        <span className="group-chip" style={{ "--group-color": student.groupColor ?? "#1f6f4a" } as CSSProperties}>
+                          <span>{student.groupEmoji ?? "🏫"}</span>
+                          {student.groupName}
+                        </span>
+                      ) : (
+                        <span className="muted">—</span>
+                      )}
                     </td>
                     <td>
                       {student.grade} / {student.field}

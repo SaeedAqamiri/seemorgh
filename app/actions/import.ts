@@ -18,6 +18,7 @@ import { requireCounselor } from "@/lib/auth";
 import { errorRows, parseWorkbook, totalRows } from "@/lib/excel";
 import { deleteImportFile, readImportFile, saveImportFile } from "@/lib/import-store";
 import { normalizePhone } from "@/lib/password";
+import { resolveGroupForForm } from "@/lib/student-groups";
 
 export async function uploadExcelAction(formData: FormData): Promise<void> {
   await requireCounselor();
@@ -58,6 +59,13 @@ export async function applyImportAction(formData: FormData): Promise<void> {
 
   const parsed = await parseWorkbook(buffer);
   const db = await getDb();
+  const groupIdByField = new Map<string, string>();
+  for (const row of parsed.students) {
+    const studentField = row.data.field || "تجربی";
+    if (groupIdByField.has(studentField)) continue;
+    const group = await resolveGroupForForm(counselor.workspaceId, "", "", studentField);
+    groupIdByField.set(studentField, group.id);
+  }
 
   const subjectRows = await db
     .select()
@@ -90,6 +98,7 @@ export async function applyImportAction(formData: FormData): Promise<void> {
         .insert(students)
         .values({
           workspaceId: counselor.workspaceId,
+          groupId: groupIdByField.get(row.data.field || "تجربی") ?? null,
           counselorId: counselor.id,
           name: row.data.name,
           phone: row.data.phone,

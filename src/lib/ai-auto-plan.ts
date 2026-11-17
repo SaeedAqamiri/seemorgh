@@ -19,7 +19,7 @@ function weeklyCapacity(input: AutoPlanInput): { weekday: number; minutes: numbe
   const sums = Array.from({ length: 7 }, () => ({ total: 0, count: 0 }));
   for (const date of planDates(input)) {
     const weekday = (new Date(`${date}T00:00:00Z`).getUTCDay() + 1) % 7;
-    sums[weekday].total += dateCapacity(input.availability, input.constraints, date);
+    sums[weekday].total += dateCapacity(input.availability, input.constraints, date, input.schoolPeriods ?? [], input.exams ?? []);
     sums[weekday].count += 1;
   }
   return sums.map((sum, weekday) => ({
@@ -31,7 +31,7 @@ function weeklyCapacity(input: AutoPlanInput): { weekday: number; minutes: numbe
 function anonymizedInput(input: AutoPlanInput) {
   const dates = planDates(input);
   const totalCapacity = dates.reduce(
-    (sum, date) => sum + dateCapacity(input.availability, input.constraints, date),
+    (sum, date) => sum + dateCapacity(input.availability, input.constraints, date, input.schoolPeriods ?? [], input.exams ?? []),
     0,
   );
   return {
@@ -40,6 +40,9 @@ function anonymizedInput(input: AutoPlanInput) {
     horizon_days: Math.max(1, daysBetween(input.startDate, input.targetDate) + 1),
     first_week_start: startOfWeekSaturday(input.startDate),
     total_capacity_minutes: totalCapacity,
+    school_periods: input.schoolPeriods ?? [],
+    exams: input.exams ?? [],
+    student_level: input.level ?? "normal",
     weekly_capacity: weeklyCapacity(input),
     constraints: {
       max_daily_minutes: input.constraints.maxDailyMinutes,

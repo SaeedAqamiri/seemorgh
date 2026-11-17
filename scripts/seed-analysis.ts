@@ -11,6 +11,7 @@ import {
   reports,
   resources,
   studentConstraints,
+  studentGroups,
   students,
   subjects,
   users,
@@ -52,8 +53,24 @@ const NEW_STUDENT_NAMES = [
   "آرش امینی",
 ];
 
-const EXPERIMENTAL_SUBJECTS = ["زیست‌شناسی", "شیمی", "فیزیک", "ریاضی"] as const;
-const MATH_SUBJECTS = ["ریاضی", "فیزیک", "شیمی"] as const;
+const EXPERIMENTAL_SUBJECTS = [
+  "زیست‌شناسی",
+  "شیمی",
+  "فیزیک",
+  "ریاضی",
+  "ادبیات فارسی",
+  "عربی",
+  "دین و زندگی",
+  "زبان انگلیسی",
+] as const;
+const MATH_SUBJECTS = [
+  "فیزیک",
+  "شیمی",
+  "ادبیات فارسی",
+  "عربی",
+  "دین و زندگی",
+  "زبان انگلیسی",
+] as const;
 
 const QUESTION_COUNT: Record<string, number> = {
   "زیست‌شناسی": 45,
@@ -207,6 +224,43 @@ async function main() {
       );
   }
 
+  const groupSeed = [
+    { name: "مدرسه علامه حلی", field: "تجربی", emoji: "🏫", color: "#2563eb" },
+    { name: "مؤسسه مشاوره دکتر سعیدی", field: "ریاضی", emoji: "🎓", color: "#7c3aed" },
+    { name: "دبیرستان فرزانگان", field: "تجربی", emoji: "⭐", color: "#be123c" },
+  ];
+  for (const group of groupSeed) {
+    await db
+      .insert(studentGroups)
+      .values({ workspaceId: workspace.id, ...group })
+      .onConflictDoNothing();
+    await db
+      .update(studentGroups)
+      .set({ field: group.field, emoji: group.emoji, color: group.color })
+      .where(
+        and(eq(studentGroups.workspaceId, workspace.id), eq(studentGroups.name, group.name)),
+      );
+  }
+  const groupRows = await db
+    .select()
+    .from(studentGroups)
+    .where(eq(studentGroups.workspaceId, workspace.id));
+  const groupIdByName = (name: string) => groupRows.find((group) => group.name === name)?.id ?? null;
+  const experimentalGroups = [
+    groupIdByName("مدرسه علامه حلی"),
+    groupIdByName("دبیرستان فرزانگان"),
+  ].filter((id): id is string => Boolean(id));
+  const mathGroup = groupIdByName("مؤسسه مشاوره دکتر سعیدی");
+
+  await db
+    .update(students)
+    .set({ groupId: experimentalGroups[0] ?? null })
+    .where(eq(students.id, ali.id));
+  await db
+    .update(students)
+    .set({ groupId: mathGroup ?? null })
+    .where(eq(students.id, maryam.id));
+
   const today = todayISO();
   const currentWeek = startOfWeekSaturday(today);
   const firstWeek = addDays(currentWeek, -16 * 7);
@@ -251,6 +305,7 @@ async function main() {
       .insert(students)
       .values({
         workspaceId: workspace.id,
+        groupId: experimentalGroups[index % Math.max(1, experimentalGroups.length)] ?? null,
         counselorId: counselor.id,
         userId: user.id,
         name,

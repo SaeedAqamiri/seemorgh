@@ -174,8 +174,31 @@ export async function normalizeGeneralSubjectResources(
   normalizedWorkspaces.add(workspaceId);
 }
 
+export async function ensureSystemSubject(workspaceId: string): Promise<string> {
+  const db = await getDb();
+  const [existing] = await db
+    .select({ id: subjects.id })
+    .from(subjects)
+    .where(and(eq(subjects.workspaceId, workspaceId), eq(subjects.title, "آزمون")))
+    .limit(1);
+  if (existing) return existing.id;
+  const [created] = await db
+    .insert(subjects)
+    .values({ workspaceId, title: "آزمون", kind: "general", fieldsJson: [], color: "#475569", isSystem: true })
+    .onConflictDoNothing()
+    .returning({ id: subjects.id });
+  if (created) return created.id;
+  const [row] = await db
+    .select({ id: subjects.id })
+    .from(subjects)
+    .where(and(eq(subjects.workspaceId, workspaceId), eq(subjects.title, "آزمون")))
+    .limit(1);
+  return row.id;
+}
+
 export async function ensureSubjectCatalog(workspaceId: string): Promise<void> {
   const db = await getDb();
+  await ensureSystemSubject(workspaceId);
   const existing = await db
     .select({ title: subjects.title })
     .from(subjects)
@@ -233,6 +256,7 @@ export async function listSubjectsForField(
     .orderBy(asc(subjects.title));
 
   return rows.filter((row) => {
+    if (row.title === "آزمون") return false;
     const fields = row.fieldsJson ?? catalogItemFor(row.title)?.fields;
     if (!fields || fields.length === 0) return true;
     return fields.includes(field);
@@ -251,7 +275,7 @@ export async function listAllWorkspaceSubjects(workspaceId: string): Promise<Sub
       fieldsJson: subjects.fieldsJson,
     })
     .from(subjects)
-    .where(eq(subjects.workspaceId, workspaceId))
+    .where(and(eq(subjects.workspaceId, workspaceId), eq(subjects.isSystem, false)))
     .orderBy(asc(subjects.title));
 }
 

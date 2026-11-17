@@ -31,7 +31,7 @@ import {
 export { PANEL_DAYS, PANEL_SLOTS };
 
 export type PerfCellState = {
-  kind: "empty" | "rest" | "study" | "review" | "test" | "timedTest" | "exercise" | "routine";
+  kind: "empty" | "rest" | "study" | "review" | "test" | "timedTest" | "exercise" | "routine" | "school" | "exam" | "examAnalysis";
   subjectId?: string;
   resourceText?: string;
   resourceId?: string | null;
@@ -40,6 +40,9 @@ export type PerfCellState = {
   routineMode?: "study" | "test";
   minutes?: number;
   note?: string;
+  label?: string;
+  title?: string;
+  mockExamId?: string | null;
 };
 
 export type PerformanceView = {
@@ -99,7 +102,25 @@ export function normalizePerfCell(value: unknown): PerformanceCellJson {
 
   if (kind === "rest") return { kind: "rest" };
   if (!Number.isFinite(minutes)) return { kind: "empty" };
+  if (kind === "exam" || kind === "examAnalysis") {
+    return {
+      kind,
+      mockExamId: typeof cell.mockExamId === "string" && cell.mockExamId ? cell.mockExamId : null,
+      title: typeof cell.title === "string" ? cell.title.trim().slice(0, 300) : "",
+      minutes,
+      note,
+    };
+  }
   if (!subjectId) return { kind: "empty" };
+  if (kind === "school") {
+    return {
+      kind: "school",
+      subjectId,
+      label: typeof cell.label === "string" ? cell.label.trim().slice(0, 300) : "",
+      minutes,
+      note,
+    };
+  }
 
   const resourceId = typeof cell.resourceId === "string" && cell.resourceId ? cell.resourceId : null;
   const chapterId = typeof cell.chapterId === "string" && cell.chapterId ? cell.chapterId : null;
@@ -141,13 +162,14 @@ export function normalizePerfGrid(value: unknown, slotCount: number = PANEL_SLOT
   return grid;
 }
 
-function normalizePerfGridForSubjectKinds(
+export function normalizePerfGridForSubjectKinds(
   grid: PerformanceGridJson,
   kindById: Map<string, string>,
 ): PerformanceGridJson {
   return grid.map((row) =>
     row.map((cell) => {
       if (cell.kind === "empty" || cell.kind === "rest") return cell;
+      if (!("subjectId" in cell) || !cell.subjectId) return cell;
       const kind = kindById.get(cell.subjectId);
       if (!kind || subjectSupportsTests(kind)) return cell;
       if (cell.kind === "test" || cell.kind === "timedTest") {
@@ -187,7 +209,8 @@ function assertPerfGrid(value: unknown, slotCount: number): asserts value is Per
       }
       const c = cell as PerformanceCellJson;
       if (c.kind === "empty" || c.kind === "rest") continue;
-      if (!c.subjectId) {
+      if (c.kind === "exam" || c.kind === "examAnalysis") continue;
+      if (!("subjectId" in c) || !c.subjectId) {
         throw new PerformanceValidationError("برای هر اقدام باید درس انتخاب شود.");
       }
       if (!Number.isInteger(c.minutes) || c.minutes < 0 || c.minutes > 1440) {
@@ -293,7 +316,8 @@ export async function savePerformancePanel(input: SavePerformanceInput): Promise
   for (const row of grid) {
     for (const cell of row) {
       if (cell.kind === "empty" || cell.kind === "rest") continue;
-      if (!subjectIds.has(cell.subjectId)) {
+      if (cell.kind === "exam" || cell.kind === "examAnalysis") continue;
+      if (!("subjectId" in cell) || !subjectIds.has(cell.subjectId)) {
         throw new PerformanceValidationError("یکی از درس‌های ثبت عملکرد معتبر نیست.");
       }
       const countCell = isCountCell(cell) ? cell : cell.kind === "routine" && cell.routineMode === "test" ? cell : null;
@@ -301,7 +325,7 @@ export async function savePerformancePanel(input: SavePerformanceInput): Promise
       if (countCell.resourceId) {
         const resource = resourceById.get(countCell.resourceId);
         if (!resource) throw new PerformanceValidationError("یکی از منابع ثبت عملکرد معتبر نیست.");
-        if (resource.subjectId !== cell.subjectId) {
+        if (!("subjectId" in cell) || resource.subjectId !== cell.subjectId) {
           throw new PerformanceValidationError("منبع انتخاب‌شده با درس عملکرد هم‌خوان نیست.");
         }
         if (!countCell.chapterId && (chapterMap.get(countCell.resourceId)?.length ?? 0) > 0) {
@@ -463,6 +487,9 @@ function reportBucket(cell: PerfActivityCell): {
   test: number;
   exercise: number;
 } {
+  if (cell.kind === "school" || cell.kind === "exam" || cell.kind === "examAnalysis") {
+    return { study: 0, test: 0, exercise: 0 };
+  }
   if (cell.kind === "study" || cell.kind === "review") {
     return { study: cell.minutes, test: 0, exercise: 0 };
   }
@@ -501,6 +528,7 @@ export function buildSubjectDayMatrix(
     for (const cell of perfGrid[day] ?? []) {
       if (!isPerformedCell(cell)) continue;
       const activity = cell as PerfActivityCell;
+      if (!("subjectId" in activity) || !activity.subjectId) continue;
       const meta = subjectMeta.get(activity.subjectId);
       if (!meta) continue;
       const bucket = reportBucket(activity);
@@ -577,6 +605,7 @@ export function buildPlanningInsights(
     for (let slot = 0; slot < slots.length; slot += 1) {
       const cell = planGrid[day]?.[slot];
       if (!cell || cell.kind === "empty" || cell.kind === "rest") continue;
+      if (!("subjectId" in cell) || !cell.subjectId) continue;
       const title = subjectMeta.get(cell.subjectId)?.title;
       if (!title) continue;
       const row = bySubject.get(title) ?? { title, morning: 0, afternoon: 0, evening: 0 };
@@ -656,8 +685,11 @@ export function buildPerformanceAnalysis(
     })();
     const plannedStartMin = plannedStartByDate?.get(dates[day]) ?? gridPlannedStartMin;
 
-    const performed = (perfGrid[day] ?? []).filter(
+    const performedAll = (perfGrid[day] ?? []).filter(
       (cell): cell is PerfActivityCell => isPerformedCell(cell),
+    );
+    const performed = performedAll.filter(
+      (cell) => cell.kind !== "school" && cell.kind !== "exam" && cell.kind !== "examAnalysis",
     );
 
     const performedMinutes = performed.reduce((sum, cell) => sum + cell.minutes, 0);
@@ -851,10 +883,13 @@ export async function getPerformanceRangeData(
           ...new Set(
             plannedRow
               .filter(
-                (cell): cell is Exclude<PanelCellJson, { kind: "empty" | "rest" }> =>
-                  cell.kind !== "empty" && cell.kind !== "rest",
+                (cell) =>
+                  cell.kind !== "empty" &&
+                  cell.kind !== "rest" &&
+                  cell.kind !== "school" &&
+                  "subjectId" in cell,
               )
-              .map((cell) => subjectTitles.get(cell.subjectId) ?? "درس"),
+              .map((cell) => subjectTitles.get("subjectId" in cell ? cell.subjectId : "") ?? "درس"),
           ),
         ]);
 
@@ -863,6 +898,7 @@ export async function getPerformanceRangeData(
         perfRow.forEach((cell, slot) => {
           if (!isPerformedCell(cell)) return;
           const activity = cell as PerfActivityCell;
+          if (!("subjectId" in activity) || !activity.subjectId) return;
           const note = activity.note.trim();
           if (note) notes.push({ weekday: dayIndex, slot, text: note.slice(0, 300) });
           const meta = subjectMeta.get(activity.subjectId);

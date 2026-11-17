@@ -16,10 +16,14 @@
     "db:seed:pool": "tsx scripts/seed-resource-pool.ts",
     "db:seed:performance": "tsx scripts/seed-performance.ts",
     "db:seed:psych": "tsx scripts/seed-psych.ts",
+    "db:simulate:psych": "tsx scripts/simulate-psych.ts",
     "db:export:example": "tsx scripts/export-example-data.ts",
     "db:import:example": "tsx scripts/import-example-data.ts",
     "db:seed:questions": "tsx scripts/seed-question-bank.ts",
-    "db:backfill:questions": "tsx scripts/backfill-question-taxonomy.ts"
+    "db:backfill:questions": "tsx scripts/backfill-question-taxonomy.ts",
+    "db:seed:groups": "tsx scripts/seed-groups.ts",
+    "db:seed:extra": "tsx scripts/seed-extra-fields.ts",
+    "db:seed:mock-planning": "tsx scripts/seed-mock-planning.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.11",

@@ -12,6 +12,7 @@ import {
   resourceChapters,
   resources,
   studentConstraints,
+  studentGroups,
   students,
   subjects,
   tasks,
@@ -98,6 +99,26 @@ async function main() {
     if (!subject) throw new Error(`subject missing: ${title}`);
     return subject.id;
   };
+
+  const demoGroups = await db
+    .insert(studentGroups)
+    .values([
+      {
+        workspaceId: workspace.id,
+        name: "مدرسه علامه حلی",
+        field: "تجربی",
+        emoji: "🏫",
+        color: "#2563eb",
+      },
+      {
+        workspaceId: workspace.id,
+        name: "مؤسسه مشاوره دکتر سعیدی",
+        field: "ریاضی",
+        emoji: "🎓",
+        color: "#7c3aed",
+      },
+    ])
+    .returning();
 
   const weekStart = startOfWeekSaturday(todayISO());
   const examDate = addDays(weekStart, 70);
@@ -217,11 +238,12 @@ async function main() {
     },
   ];
 
-  for (const demo of demoStudents) {
+  for (const [demoIndex, demo] of demoStudents.entries()) {
     const [student] = await db
       .insert(students)
       .values({
         workspaceId: workspace.id,
+        groupId: demoGroups[demoIndex % demoGroups.length]?.id ?? null,
         counselorId: counselor.id,
         name: demo.name,
         phone: demo.phone,

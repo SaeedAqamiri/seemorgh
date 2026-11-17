@@ -19,6 +19,9 @@ const TYPE_LABELS: Record<string, string> = {
   test: "تست آموزشی",
   timed_test: "تست زمان‌دار",
   exercise: "تمرین",
+  school: "مدرسه",
+  exam: "آزمون آزمایشی",
+  exam_analysis: "تحلیل آزمون",
 };
 
 export default async function StudentHomePage({
@@ -34,14 +37,17 @@ export default async function StudentHomePage({
     getDailyChallengeState(student.id),
   ]);
   const week = summarizeWeek(data.weekTasks, data.weekStart);
-  const doneToday = data.tasks.filter((task) => task.status === "done").length;
-  const totalMinutes = data.tasks.reduce((sum, task) => sum + task.estMinutes, 0);
-  const doneMinutes = data.tasks
+  const countedTasks = data.tasks.filter(
+    (task) => task.type !== "school" && task.type !== "exam" && task.type !== "exam_analysis",
+  );
+  const doneToday = countedTasks.filter((task) => task.status === "done").length;
+  const totalMinutes = countedTasks.reduce((sum, task) => sum + task.estMinutes, 0);
+  const doneMinutes = countedTasks
     .filter((task) => task.status === "done")
     .reduce((sum, task) => sum + task.estMinutes, 0);
   const pct = totalMinutes === 0 ? 0 : Math.round((doneMinutes / totalMinutes) * 100);
   const nowMinutes = tehranMinutesNow();
-  const pendingTasks = data.tasks.filter((task) => task.status === "pending");
+  const pendingTasks = countedTasks.filter((task) => task.status === "pending");
   const firstPending = pendingTasks[0];
   const overdueCount = pendingTasks.filter((task) => task.plannedEnd < nowMinutes).length;
   const lateStart =
@@ -55,9 +61,9 @@ export default async function StudentHomePage({
         <small>{formatJalali(data.today)}</small>
         <h1>سلام {user.name.split(" ")[0]}!</h1>
         <p className="muted" style={{ margin: 0 }}>
-          {data.tasks.length === 0
-            ? "برای امروز تسکی ثبت نشده است."
-            : `${doneToday} از ${data.tasks.length} تسک انجام شده — ${doneMinutes} از ${totalMinutes} دقیقه`}
+          {countedTasks.length === 0
+            ? "برای امروز تسک مطالعه‌ای ثبت نشده است."
+            : `${doneToday} از ${countedTasks.length} تسک انجام شده — ${doneMinutes} از ${totalMinutes} دقیقه`}
         </p>
       </div>
 

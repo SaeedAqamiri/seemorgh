@@ -5,10 +5,12 @@ import {
   savePlanningSetupAction,
 } from "@/app/actions/auto-plan";
 import { SubmitButton } from "@/components/submit-button";
+import { PsychProfileCard } from "@/components/psych-profile-card";
 import { aiAutoPlanningConfigured } from "@/lib/ai-auto-plan";
 import { defaultCurrentFor, defaultTargetFor, getAutoPlanContext } from "@/lib/auto-plan-data";
 import {
   DEFAULT_PLANNING_POLICY,
+  levelFactor,
   type GoalMetric,
 } from "@/lib/auto-plan";
 import { requireCounselor } from "@/lib/auth";
@@ -49,6 +51,10 @@ export default async function AutoPlanPage({
   if (!context) notFound();
 
   const { detail, goals, policy, targetDate, currentPercentBySubject } = context;
+  const selectedIds = new Set(context.mockExams.map((program) => program.id));
+  const levelDefaults = levelFactor(context.level);
+  const defaultTestsPerHour = Math.round(policy.testsPerHour * levelDefaults);
+  const defaultExercisesPerHour = Math.round(policy.exercisesPerHour * levelDefaults);
   const summary = summarizeResourceProgress(detail.resources);
   const goalBySubject = new Map(goals.map((goal) => [goal.subjectId, goal]));
   const defaultMetric: GoalMetric = detail.student.track === "final" ? "score" : "percent";
@@ -117,6 +123,8 @@ export default async function AutoPlanPage({
       ) : null}
       {error ? <div className="alert alert-error">{error}</div> : null}
 
+      <PsychProfileCard profile={context.psychProfile} studentId={id} compact />
+
       <div className="card">
         <div className="section-head">
           <div>
@@ -177,13 +185,36 @@ export default async function AutoPlanPage({
 
           <div className="form-grid">
             <div className="field">
-              <label>تاریخ رسیدن به هدف</label>
+              <label>تاریخ رسیدن به هدف (از آزمون هدف پر می‌شود)</label>
               <input
                 type="date"
                 name="targetDate"
                 defaultValue={effectiveTargetDate}
                 min={todayISO()}
                 required
+              />
+            </div>
+            <div className="field">
+              <label>شروع برنامه‌ریزی / بازبرنامه‌ریزی</label>
+              <input type="date" name="startDate" defaultValue={todayISO()} min={todayISO()} />
+            </div>
+            <div className="field">
+              <label>سطح فعلی دانش‌آموز</label>
+              <select name="studentLevel" defaultValue={context.level}>
+                <option value="weak">ضعیف (۷۰٪ سرعت پایه)</option>
+                <option value="normal">نرمال (۳۰ تمرین و ۴۰ تست در ساعت)</option>
+                <option value="strong">قوی (۱۲۰٪ سرعت پایه)</option>
+              </select>
+            </div>
+            <div className="field">
+              <label>دقیقه تحلیل هر آزمون</label>
+              <input
+                type="number"
+                name="analysisMinutesPerExam"
+                min={0}
+                max={720}
+                step={15}
+                defaultValue={context.analysisMinutesPerExam}
               />
             </div>
             <div className="field">
@@ -208,6 +239,8 @@ export default async function AutoPlanPage({
                   <th>وضعیت فعلی</th>
                   <th>مقدار مطلوب</th>
                   <th>وزن</th>
+                  <th>تست/ساعت</th>
+                  <th>تمرین/ساعت</th>
                 </tr>
               </thead>
               <tbody>
@@ -262,6 +295,30 @@ export default async function AutoPlanPage({
                         ))}
                       </select>
                     </td>
+                    <td>
+                      <input
+                        type="number"
+                        name={`testsPerHour_${row.id}`}
+                        min={1}
+                        max={120}
+                        defaultValue={
+                          context.subjectSpeeds[row.id]?.testsPerHour ?? defaultTestsPerHour
+                        }
+                        style={{ width: "80px" }}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="number"
+                        name={`exercisesPerHour_${row.id}`}
+                        min={1}
+                        max={120}
+                        defaultValue={
+                          context.subjectSpeeds[row.id]?.exercisesPerHour ?? defaultExercisesPerHour
+                        }
+                        style={{ width: "80px" }}
+                      />
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -270,6 +327,81 @@ export default async function AutoPlanPage({
           <small className="muted" style={{ display: "block", marginTop: "0.5rem" }}>
             اگر نمره از ۲۰ انتخاب شود، مقدار مطلوب هم از ۲۰ است و برنامه به سمت مطالعه و
             تسلط مفهومی وزن بیشتری می‌دهد.
+          </small>
+        </div>
+
+        <div className="card">
+          <div className="section-head">
+            <div>
+              <h2>آزمون‌های آزمایشی</h2>
+              <small>
+                آزمون‌هایی را که دانش‌آموز شرکت می‌کند انتخاب کنید؛ هدف، آخرین آزمون انتخاب‌شده
+                است و بقیه آزمون‌ها و زمان تحلیل‌شان در برنامه رزرو می‌شوند.
+              </small>
+            </div>
+            <Link className="btn btn-secondary btn-sm" href="/counselor/mock-exams">
+              تقویم آزمون‌ها
+            </Link>
+          </div>
+          <div className="form-grid">
+            <div className="field">
+              <label>آزمون هدف (پیش‌فرض: آخرین آزمون)</label>
+              <select name="goalMockExamId" defaultValue={context.goalExamId ?? ""}>
+                <option value="">خودکار — آخرین آزمون انتخاب‌شده</option>
+                {context.allMockExams.map((program) => (
+                  <option key={program.id} value={program.id}>
+                    {formatJalaliNumeric(program.examDate)} — {program.provider} — {program.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label>شروع بازبرنامه‌ریزی (اختیاری)</label>
+              <input
+                type="date"
+                name="replanFromDate"
+                defaultValue={context.replanFromDate ?? ""}
+              />
+            </div>
+          </div>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>انتخاب</th>
+                  <th>تاریخ</th>
+                  <th>موسسه</th>
+                  <th>عنوان</th>
+                  <th>بودجه‌بندی</th>
+                </tr>
+              </thead>
+              <tbody>
+                {context.allMockExams.map((program) => (
+                  <tr key={program.id}>
+                    <td>
+                      <input
+                        type="checkbox"
+                        name="mockExamId"
+                        value={program.id}
+                        defaultChecked={selectedIds.has(program.id)}
+                      />
+                    </td>
+                    <td>{formatJalaliNumeric(program.examDate)}</td>
+                    <td>{program.provider}</td>
+                    <td>{program.title}</td>
+                    <td>
+                      {(program.budgetJson ?? [])
+                        .slice(0, 3)
+                        .map((item) => `${item.subjectTitle}: ${item.chapters.slice(0, 2).join("، ")}`)
+                        .join(" · ")}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <small className="muted" style={{ display: "block", marginTop: "0.5rem" }}>
+            اگر آزمونی انتخاب نشود، برنامه بر اساس اهداف دستی و تاریخ هدف ساخته می‌شود.
           </small>
         </div>
 
@@ -295,7 +427,7 @@ export default async function AutoPlanPage({
               />
             </div>
             <div className="field">
-              <label>دقیقه به ازای هر تست</label>
+              <label>دقیقه به ازای هر تست (پایه)</label>
               <input
                 type="number"
                 name="minutesPerTest"
@@ -303,6 +435,26 @@ export default async function AutoPlanPage({
                 min={0.5}
                 max={10}
                 defaultValue={policy.minutesPerTest}
+              />
+            </div>
+            <div className="field">
+              <label>تست در ساعت (پایه)</label>
+              <input
+                type="number"
+                name="testsPerHour"
+                min={5}
+                max={120}
+                defaultValue={policy.testsPerHour}
+              />
+            </div>
+            <div className="field">
+              <label>تمرین در ساعت (پایه)</label>
+              <input
+                type="number"
+                name="exercisesPerHour"
+                min={5}
+                max={120}
+                defaultValue={policy.exercisesPerHour}
               />
             </div>
             <div className="field">
@@ -377,6 +529,14 @@ export default async function AutoPlanPage({
             <input type="checkbox" name="overwrite" value="1" />
             جایگزینی هفته‌های تأییدشده
           </label>
+          <SubmitButton
+            name="mode"
+            value="replan"
+            formAction={generateAutoPlanAction}
+            pendingLabel="در حال بازبرنامه‌ریزی…"
+          >
+            بازبرنامه‌ریزی از تاریخ شروع
+          </SubmitButton>
           <SubmitButton
             formAction={generateAutoPlanAction}
             pendingLabel="در حال ساخت برنامه…"

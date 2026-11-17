@@ -24,7 +24,7 @@ import {
   slotIndexForStart,
   slotLabel,
 } from "./schedule";
-import { listSubjectsForField, type SubjectOption } from "./subject-catalog";
+import { ensureSystemSubject, listSubjectsForField, type SubjectOption } from "./subject-catalog";
 import { subjectSupportsTests } from "./subjects";
 
 export { PANEL_DAYS, PANEL_SLOTS, faNumber, slotLabel };
@@ -39,6 +39,9 @@ export const PANEL_ACTION_LABELS: Record<PanelActionKind, string> = {
   timedTest: "تست زمان‌دار",
   exercise: "تمرین",
   routine: "روتین",
+  school: "مدرسه",
+  exam: "آزمون آزمایشی",
+  examAnalysis: "تحلیل آزمون",
 };
 
 export type PanelExam = { title: string; examDate: string; examType: string };
@@ -84,6 +87,13 @@ export function plannedCellLabel(
   if (!cell) return "—";
   if (cell.kind === "empty") return "—";
   if (cell.kind === "rest") return "استراحت";
+  if (cell.kind === "exam" || cell.kind === "examAnalysis") {
+    return [PANEL_ACTION_LABELS[cell.kind], cell.title].filter(Boolean).join(" · ");
+  }
+  if (cell.kind === "school") {
+    return ["مدرسه", cell.label || subjectTitles.get(cell.subjectId) || "درس"].filter(Boolean).join(" · ");
+  }
+  if (!("subjectId" in cell)) return actionLabel(cell);
 
   const subject = subjectTitles.get(cell.subjectId) ?? "درس";
 
@@ -140,9 +150,19 @@ export function normalizeCell(value: unknown): PanelCellJson {
   const cell = value as Record<string, unknown>;
   const kind = cell.kind;
   if (kind === "rest") return { kind: "rest" };
+  if (kind === "exam" || kind === "examAnalysis") {
+    return {
+      kind,
+      mockExamId: nullableId(cell.mockExamId),
+      title: text(cell.title),
+    };
+  }
 
   const subjectId = typeof cell.subjectId === "string" ? cell.subjectId : "";
   if (!subjectId) return { kind: "empty" };
+  if (kind === "school") {
+    return { kind: "school", subjectId, label: text(cell.label) };
+  }
 
   if (kind === "study" || kind === "review") {
     return { kind, subjectId, resourceText: text(cell.resourceText) };
@@ -209,7 +229,8 @@ function assertGrid(value: unknown, slotCount: number): asserts value is WeeklyG
       }
       const c = cell as PanelCellJson;
       if (c.kind === "empty" || c.kind === "rest") continue;
-      if (!c.subjectId) throw new PanelValidationError("برای هر اقدام باید درس انتخاب شود.");
+      if (c.kind === "exam" || c.kind === "examAnalysis") continue;
+      if (!("subjectId" in c) || !c.subjectId) throw new PanelValidationError("برای هر اقدام باید درس انتخاب شود.");
       if (isCountAction(c)) assertCountCell(c);
       if (c.kind === "routine" && c.routineMode === "test") assertCountCell(c);
     }
@@ -217,7 +238,7 @@ function assertGrid(value: unknown, slotCount: number): asserts value is WeeklyG
 }
 
 export function taskTypeForCell(cell: PanelCellJson): {
-  type: "study" | "review" | "test" | "timed_test" | "exercise";
+  type: "study" | "review" | "test" | "timed_test" | "exercise" | "school" | "exam" | "exam_analysis";
   actionKind: PanelActionKind;
   routineMode: "study" | "test" | null;
 } {
@@ -236,6 +257,12 @@ export function taskTypeForCell(cell: PanelCellJson): {
         actionKind: "routine",
         routineMode: cell.routineMode,
       };
+    case "school":
+      return { type: "school", actionKind: "school", routineMode: null };
+    case "exam":
+      return { type: "exam", actionKind: "exam", routineMode: null };
+    case "examAnalysis":
+      return { type: "exam_analysis", actionKind: "examAnalysis", routineMode: null };
     case "study":
     default:
       return { type: "study", actionKind: "study", routineMode: null };
@@ -253,6 +280,8 @@ type PanelTaskLike = {
   routineMode?: string | null;
   chapterId?: string | null;
   resourceText?: string | null;
+  topic?: string | null;
+  mockExamId?: string | null;
 };
 
 function fallbackActionKind(task: PanelTaskLike): PanelActionKind {
@@ -273,6 +302,19 @@ function cellFromTask(task: PanelTaskLike): PanelCellJson {
     count,
   };
   switch (actionKind) {
+    case "school":
+      return {
+        kind: "school",
+        subjectId: task.subjectId,
+        label: task.resourceText || task.topic || "",
+      };
+    case "exam":
+    case "examAnalysis":
+      return {
+        kind: actionKind,
+        mockExamId: task.mockExamId ?? null,
+        title: task.resourceText || task.topic || "",
+      };
     case "study":
     case "review":
       return {
@@ -377,7 +419,8 @@ function normalizeGridForSubjectKinds(
 ): WeeklyGridJson {
   return grid.map((row) =>
     row.map((cell) => {
-      if (cell.kind === "empty" || cell.kind === "rest" || !cell.subjectId) return cell;
+      if (cell.kind === "empty" || cell.kind === "rest") return cell;
+      if (!("subjectId" in cell) || !cell.subjectId) return cell;
       const kind = kindById.get(cell.subjectId);
       if (!kind || subjectSupportsTests(kind)) return cell;
       if (cell.kind === "test" || cell.kind === "timedTest") {
@@ -494,6 +537,7 @@ export type PanelOptions = {
   subjects: SubjectOption[];
   resources: PanelResourceOption[];
   subjectGroups: { general: string[]; specialized: string[] };
+  systemSubjectId: string;
 };
 
 export function subjectsToGroups(subjects: SubjectOption[], field: string): {
@@ -598,6 +642,7 @@ export async function getPanelOptions(
       })),
     })),
     subjectGroups: subjectsToGroups(subjectRows, student?.field ?? "تجربی"),
+    systemSubjectId: await ensureSystemSubject(workspaceId),
   };
 }
 
@@ -618,6 +663,7 @@ export async function saveWeeklyPanel(input: SavePanelInput): Promise<void> {
     .where(eq(students.id, input.studentId))
     .limit(1);
   if (!studentRow) throw new PanelValidationError("دانش‌آموز پیدا نشد.");
+  const systemSubjectId = await ensureSystemSubject(studentRow.workspaceId);
 
   const slots = await getBellSlots(input.studentId);
   assertGrid(input.grid, slots.length);
@@ -646,10 +692,11 @@ export async function saveWeeklyPanel(input: SavePanelInput): Promise<void> {
   for (const row of grid) {
     for (const cell of row) {
       if (cell.kind === "empty" || cell.kind === "rest") continue;
-      if (!subjectIds.has(cell.subjectId)) {
+      if (cell.kind === "exam" || cell.kind === "examAnalysis") continue;
+      if (!("subjectId" in cell) || !subjectIds.has(cell.subjectId)) {
         throw new PanelValidationError("یکی از درس‌های انتخابی معتبر نیست.");
       }
-      if (isTextAction(cell)) continue;
+      if (isTextAction(cell) || cell.kind === "school") continue;
       if (isCountAction(cell) || cell.kind === "routine") {
         const isTestMode = cell.kind !== "routine" || cell.routineMode === "test";
         if (!isTestMode) continue;
@@ -726,6 +773,7 @@ export async function saveWeeklyPanel(input: SavePanelInput): Promise<void> {
         if (cell.kind === "empty" || cell.kind === "rest") continue;
         const slotDef = slots[slot];
         const meta = taskTypeForCell(cell);
+        const eventCell = cell.kind === "exam" || cell.kind === "examAnalysis" ? cell : null;
         const countCell = isCountAction(cell)
           ? cell
           : cell.kind === "routine" && cell.routineMode === "test"
@@ -738,7 +786,7 @@ export async function saveWeeklyPanel(input: SavePanelInput): Promise<void> {
             : null;
         const chapterId = countCell?.chapterId ?? null;
         const resourceId = countCell?.resourceId ?? null;
-        const resourceText = textCell?.resourceText ?? "";
+        const resourceText = eventCell?.title ?? textCell?.resourceText ?? (cell.kind === "school" ? cell.label : "");
         const count = countCell?.count ?? 0;
         const chapterTitle = chapterId ? chapterById.get(chapterId)?.title ?? "" : "";
         taskValues.push({
@@ -746,7 +794,7 @@ export async function saveWeeklyPanel(input: SavePanelInput): Promise<void> {
           planDate: dates[day],
           plannedStart: slotDef.startMin,
           plannedEnd: slotDef.endMin,
-          subjectId: cell.subjectId,
+          subjectId: eventCell ? systemSubjectId : cell.kind === "school" ? cell.subjectId : "subjectId" in cell ? cell.subjectId : systemSubjectId,
           resourceId,
           chapterId,
           resourceText,
@@ -756,6 +804,7 @@ export async function saveWeeklyPanel(input: SavePanelInput): Promise<void> {
           routineMode: meta.routineMode,
           targetUnits: count,
           estMinutes: slotDef.endMin - slotDef.startMin,
+          mockExamId: eventCell?.mockExamId ?? null,
         });
       }
     }

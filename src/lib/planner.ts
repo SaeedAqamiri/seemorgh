@@ -52,7 +52,15 @@ export type PlannerInput = {
   examTargets: PlannerExamTarget[];
 };
 
-export type PlannedActionKind = "study" | "review" | "test" | "timedTest" | "exercise";
+export type PlannedActionKind =
+  | "study"
+  | "review"
+  | "test"
+  | "timedTest"
+  | "exercise"
+  | "school"
+  | "exam"
+  | "examAnalysis";
 
 export type PlannedTask = {
   planDate: string;
@@ -63,11 +71,12 @@ export type PlannedTask = {
   chapterId: string | null;
   resourceText: string;
   topic: string;
-  type: "study" | "review" | "test" | "timed_test" | "exercise";
+  type: "study" | "review" | "test" | "timed_test" | "exercise" | "school" | "exam" | "exam_analysis";
   actionKind: PlannedActionKind;
   routineMode: "study" | "test" | null;
   targetUnits: number;
   estMinutes: number;
+  mockExamId?: string | null;
 };
 
 export type GeneratedPlan = {

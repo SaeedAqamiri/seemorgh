@@ -30,6 +30,9 @@ export async function AppShell({
             {user.role === "counselor" ? (
               <>
                 <Link href="/counselor">دانش‌آموزان</Link>
+                <Link href="/counselor/leaderboard">رده‌بندی</Link>
+                <Link href="/counselor/groups">گروه‌ها</Link>
+                <Link href="/counselor/mock-exams">تقویم آزمون</Link>
                 <Link href="/counselor/exams">آزمون‌ها</Link>
                 <Link href="/counselor/questions">بانک سوال</Link>
                 <Link href="/counselor/resources">استخر منابع</Link>
@@ -43,6 +46,7 @@ export async function AppShell({
                 <Link href="/student/resources">منابع</Link>
                 <Link href="/student/progress">وضعیت منابع</Link>
                 <Link href="/student/panel">برنامه‌ریزی</Link>
+                <Link href="/student/mock-exams">تقویم آزمون</Link>
                 <Link href="/student/performance">عملکرد</Link>
                 <Link href="/student/report">گزارش من</Link>
                 <Link href="/student/exam-analysis">تحلیل آزمون</Link>

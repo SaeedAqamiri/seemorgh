@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { GroupLeaderboardView } from "@/components/group-leaderboard";
 import { PerformanceRangeReport } from "@/components/performance-range-report";
 import { ReportRangeForm } from "@/components/report-range-form";
 import { requireStudent } from "@/lib/auth";
@@ -9,8 +10,10 @@ import {
   startOfWeekSaturday,
   todayISO,
 } from "@/lib/dates";
+import { getGroupLeaderboards } from "@/lib/group-performance";
 import { getPerformanceRangeData } from "@/lib/performance";
 import { getReport } from "@/lib/reports";
+import { getGroupForStudent } from "@/lib/student-groups";
 
 export default async function StudentReportPage({
   searchParams,
@@ -35,9 +38,19 @@ export default async function StudentReportPage({
   const rangeFrom = validRange ? from : defaultFrom;
   const rangeTo = validRange ? to : today;
 
-  const [range, savedReport] = await Promise.all([
+  const group = await getGroupForStudent(student.workspaceId, student.id);
+  const [range, savedReport, leaderboards] = await Promise.all([
     getPerformanceRangeData(student.id, rangeFrom, rangeTo),
     getReport(student.id, "performance", rangeFrom),
+    group
+      ? getGroupLeaderboards({
+          workspaceId: student.workspaceId,
+          groupId: group.id,
+          from: rangeFrom,
+          to: rangeTo,
+          viewerId: student.id,
+        })
+      : Promise.resolve(null),
   ]);
 
   const savedNarrative =
@@ -66,6 +79,25 @@ export default async function StudentReportPage({
       ) : null}
 
       <ReportRangeForm from={rangeFrom} to={rangeTo} />
+
+      {leaderboards ? (
+        <div className="card">
+          <div className="section-head">
+            <div>
+              <h2>مقایسه با گروه {leaderboards.group.name}</h2>
+              <small>
+                جایگاه تو در گروه، قهرمان هر درس و قهرمان قهرمانان گروه.
+              </small>
+            </div>
+          </div>
+          <GroupLeaderboardView
+            bundle={leaderboards}
+            viewerName="تو"
+            rangeLabel={`${formatJalaliNumeric(rangeFrom)} تا ${formatJalaliNumeric(rangeTo)}`}
+            variant="compact"
+          />
+        </div>
+      ) : null}
 
       <PerformanceRangeReport
         studentId={student.id}

@@ -29,9 +29,23 @@ CREATE TABLE IF NOT EXISTS sessions (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS sessions_token_hash_unique ON sessions(token_hash);
 
+CREATE TABLE IF NOT EXISTS student_groups (
+  id text PRIMARY KEY,
+  workspace_id text NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  name text NOT NULL,
+  field text NOT NULL DEFAULT 'تجربی',
+  emoji text NOT NULL DEFAULT '🏫',
+  color text NOT NULL DEFAULT '#1f6f4a',
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE student_groups ADD COLUMN IF NOT EXISTS field text NOT NULL DEFAULT 'تجربی';
+CREATE UNIQUE INDEX IF NOT EXISTS student_groups_workspace_name_unique ON student_groups(workspace_id, name);
+CREATE INDEX IF NOT EXISTS student_groups_workspace_idx ON student_groups(workspace_id);
+
 CREATE TABLE IF NOT EXISTS students (
   id text PRIMARY KEY,
   workspace_id text NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  group_id text REFERENCES student_groups(id) ON DELETE SET NULL,
   counselor_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   user_id text REFERENCES users(id) ON DELETE SET NULL,
   name text NOT NULL,
@@ -47,6 +61,8 @@ CREATE TABLE IF NOT EXISTS students (
 CREATE UNIQUE INDEX IF NOT EXISTS students_invite_code_unique ON students(invite_code);
 CREATE UNIQUE INDEX IF NOT EXISTS students_workspace_phone_unique ON students(workspace_id, phone);
 CREATE INDEX IF NOT EXISTS students_workspace_idx ON students(workspace_id);
+ALTER TABLE students ADD COLUMN IF NOT EXISTS group_id text;
+CREATE INDEX IF NOT EXISTS students_group_idx ON students(group_id);
 
 CREATE TABLE IF NOT EXISTS exam_targets (
   id text PRIMARY KEY,
@@ -75,6 +91,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS subjects_workspace_title_unique ON subjects(wo
 ALTER TABLE subjects ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'general';
 ALTER TABLE subjects ADD COLUMN IF NOT EXISTS fields_json jsonb;
 ALTER TABLE subjects ADD COLUMN IF NOT EXISTS color text NOT NULL DEFAULT '#1f6f4a';
+ALTER TABLE subjects ADD COLUMN IF NOT EXISTS is_system boolean NOT NULL DEFAULT false;
 
 CREATE TABLE IF NOT EXISTS resources (
   id text PRIMARY KEY,
@@ -181,8 +198,18 @@ CREATE TABLE IF NOT EXISTS planning_settings (
   student_id text PRIMARY KEY REFERENCES students(id) ON DELETE CASCADE,
   target_date text,
   policy_json jsonb,
+  goal_mock_exam_id text,
+  replan_from_date text,
+  student_level text NOT NULL DEFAULT 'normal',
+  analysis_minutes_per_exam integer NOT NULL DEFAULT 120,
+  subject_speeds_json jsonb,
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE planning_settings ADD COLUMN IF NOT EXISTS goal_mock_exam_id text;
+ALTER TABLE planning_settings ADD COLUMN IF NOT EXISTS replan_from_date text;
+ALTER TABLE planning_settings ADD COLUMN IF NOT EXISTS student_level text NOT NULL DEFAULT 'normal';
+ALTER TABLE planning_settings ADD COLUMN IF NOT EXISTS analysis_minutes_per_exam integer NOT NULL DEFAULT 120;
+ALTER TABLE planning_settings ADD COLUMN IF NOT EXISTS subject_speeds_json jsonb;
 
 CREATE TABLE IF NOT EXISTS weekly_panels (
   id text PRIMARY KEY,
@@ -246,6 +273,7 @@ ALTER TABLE tasks ADD COLUMN IF NOT EXISTS chapter_id text REFERENCES resource_c
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS resource_text text NOT NULL DEFAULT '';
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS action_kind text NOT NULL DEFAULT 'study';
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS routine_mode text;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS mock_exam_id text;
 UPDATE tasks SET action_kind = CASE
   WHEN type = 'test' THEN 'test'
   WHEN type = 'review' THEN 'review'
@@ -400,11 +428,65 @@ CREATE TABLE IF NOT EXISTS external_exams (
   subjects_json jsonb,
   overall_percent integer NOT NULL DEFAULT 0,
   note text NOT NULL DEFAULT '',
+  mock_exam_id text,
   created_by text REFERENCES users(id) ON DELETE SET NULL,
   created_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE external_exams ADD COLUMN IF NOT EXISTS mock_exam_id text;
 CREATE INDEX IF NOT EXISTS external_exams_student_idx ON external_exams(student_id, exam_date);
 CREATE UNIQUE INDEX IF NOT EXISTS external_exams_student_title_date_unique ON external_exams(student_id, title, exam_date);
+
+CREATE TABLE IF NOT EXISTS school_lessons (
+  id text PRIMARY KEY,
+  student_id text NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  weekday integer NOT NULL,
+  slot_index integer NOT NULL,
+  subject_id text NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS school_lessons_student_weekday_slot_unique ON school_lessons(student_id, weekday, slot_index);
+CREATE INDEX IF NOT EXISTS school_lessons_student_idx ON school_lessons(student_id);
+
+CREATE TABLE IF NOT EXISTS mock_exam_programs (
+  id text PRIMARY KEY,
+  workspace_id text NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  provider text NOT NULL,
+  title text NOT NULL,
+  field text NOT NULL,
+  grade text NOT NULL DEFAULT 'دوازدهم',
+  exam_date text NOT NULL,
+  exam_type text NOT NULL DEFAULT 'stage',
+  start_min integer NOT NULL DEFAULT 480,
+  duration_minutes integer NOT NULL DEFAULT 240,
+  analysis_minutes integer NOT NULL DEFAULT 120,
+  budget_json jsonb,
+  source text NOT NULL DEFAULT '',
+  source_url text NOT NULL DEFAULT '',
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS mock_exam_programs_workspace_unique ON mock_exam_programs(workspace_id, provider, title, field, exam_date);
+CREATE INDEX IF NOT EXISTS mock_exam_programs_workspace_idx ON mock_exam_programs(workspace_id, exam_date);
+
+CREATE TABLE IF NOT EXISTS student_mock_exams (
+  id text PRIMARY KEY,
+  student_id text NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  mock_exam_id text NOT NULL REFERENCES mock_exam_programs(id) ON DELETE CASCADE,
+  status text NOT NULL DEFAULT 'selected',
+  source text NOT NULL DEFAULT 'manual',
+  result_exam_id text REFERENCES external_exams(id) ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS student_mock_exams_unique ON student_mock_exams(student_id, mock_exam_id);
+CREATE INDEX IF NOT EXISTS student_mock_exams_student_idx ON student_mock_exams(student_id);
+
+CREATE TABLE IF NOT EXISTS group_mock_exams (
+  id text PRIMARY KEY,
+  group_id text NOT NULL REFERENCES student_groups(id) ON DELETE CASCADE,
+  mock_exam_id text NOT NULL REFERENCES mock_exam_programs(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS group_mock_exams_unique ON group_mock_exams(group_id, mock_exam_id);
+CREATE INDEX IF NOT EXISTS group_mock_exams_group_idx ON group_mock_exams(group_id);
 
 CREATE TABLE IF NOT EXISTS notifications (
   id text PRIMARY KEY,
@@ -477,6 +559,8 @@ CREATE TABLE IF NOT EXISTS psych_tests (
   workspace_id text NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
   title text NOT NULL,
   description text NOT NULL DEFAULT '',
+  category text NOT NULL DEFAULT 'general',
+  source_url text,
   status text NOT NULL DEFAULT 'draft',
   result_rules_json jsonb,
   created_by text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -485,6 +569,8 @@ CREATE TABLE IF NOT EXISTS psych_tests (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS psych_tests_workspace_idx ON psych_tests(workspace_id, created_at DESC);
+ALTER TABLE psych_tests ADD COLUMN IF NOT EXISTS category text NOT NULL DEFAULT 'general';
+ALTER TABLE psych_tests ADD COLUMN IF NOT EXISTS source_url text;
 
 CREATE TABLE IF NOT EXISTS psych_dimensions (
   id text PRIMARY KEY,

@@ -265,8 +265,14 @@ export async function generatePerformanceNarrativeAction(formData: FormData): Pr
   const plannedSubjectsByDay = plan.grid.map((row) => [
     ...new Set(
       row
-        .filter((cell) => cell.kind !== "empty" && cell.kind !== "rest")
-        .map((cell) => subjectTitles.get(cell.subjectId) ?? "درس"),
+        .filter(
+          (cell) =>
+            cell.kind !== "empty" &&
+            cell.kind !== "rest" &&
+            cell.kind !== "school" &&
+            "subjectId" in cell,
+        )
+        .map((cell) => subjectTitles.get("subjectId" in cell ? cell.subjectId : "") ?? "درس"),
     ),
   ]);
 

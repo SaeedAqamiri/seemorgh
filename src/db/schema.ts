@@ -65,6 +65,25 @@ export const sessions = pgTable(
   (table) => [uniqueIndex("sessions_token_hash_unique").on(table.tokenHash)],
 );
 
+export const studentGroups = pgTable(
+  "student_groups",
+  {
+    id: id(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    field: text("field").notNull().default("تجربی"),
+    emoji: text("emoji").notNull().default("🏫"),
+    color: text("color").notNull().default("#1f6f4a"),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("student_groups_workspace_name_unique").on(table.workspaceId, table.name),
+    index("student_groups_workspace_idx").on(table.workspaceId),
+  ],
+);
+
 export const students = pgTable(
   "students",
   {
@@ -72,6 +91,7 @@ export const students = pgTable(
     workspaceId: text("workspace_id")
       .notNull()
       .references(() => workspaces.id, { onDelete: "cascade" }),
+    groupId: text("group_id").references(() => studentGroups.id, { onDelete: "set null" }),
     counselorId: text("counselor_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
@@ -94,6 +114,7 @@ export const students = pgTable(
     uniqueIndex("students_invite_code_unique").on(table.inviteCode),
     uniqueIndex("students_workspace_phone_unique").on(table.workspaceId, table.phone),
     index("students_workspace_idx").on(table.workspaceId),
+    index("students_group_idx").on(table.groupId),
   ],
 );
 
@@ -131,6 +152,7 @@ export const subjects = pgTable(
     fieldsJson: jsonb("fields_json").$type<string[]>(),
     color: text("color").notNull().default("#1f6f4a"),
     weight: integer("weight").notNull().default(3),
+    isSystem: boolean("is_system").notNull().default(false),
     createdAt: createdAt(),
   },
   (table) => [uniqueIndex("subjects_workspace_title_unique").on(table.workspaceId, table.title)],
@@ -293,7 +315,10 @@ export type PanelActionKind =
   | "test"
   | "timedTest"
   | "exercise"
-  | "routine";
+  | "routine"
+  | "school"
+  | "exam"
+  | "examAnalysis";
 
 type PanelTextAction = {
   kind: "study" | "review";
@@ -318,7 +343,36 @@ type PanelRoutineAction = {
   chapterId: string | null;
   count: number;
 };
+
+type PanelSchoolAction = {
+  kind: "school";
+  subjectId: string;
+  label: string;
+};
+
+type PanelEventAction = {
+  kind: "exam" | "examAnalysis";
+  mockExamId: string | null;
+  title: string;
+};
+
 export type StudyGoalMetric = "percent" | "score";
+
+export type StudentLevel = "weak" | "normal" | "strong";
+
+export type SubjectSpeedProfile = {
+  level?: StudentLevel;
+  testsPerHour: number;
+  exercisesPerHour: number;
+};
+
+export type MockExamBudgetItem = {
+  subjectTitle: string;
+  chapters: string[];
+  pageStart?: number;
+  pageEnd?: number;
+  weight?: number;
+};
 
 export const studyGoals = pgTable(
   "study_goals",
@@ -347,6 +401,8 @@ export type PlanningPolicyJson = {
   strategy: "balanced" | "weakest_first" | "exam_weighted";
   minutesPerPercentPoint: number;
   minutesPerTest: number;
+  testsPerHour: number;
+  exercisesPerHour: number;
   testRatioPct: number;
   reviewRatioPct: number;
   maxSubjectsPerDay: number;
@@ -362,6 +418,13 @@ export const planningSettings = pgTable("planning_settings", {
     .references(() => students.id, { onDelete: "cascade" }),
   targetDate: text("target_date"),
   policyJson: jsonb("policy_json").$type<PlanningPolicyJson>(),
+  goalMockExamId: text("goal_mock_exam_id"),
+  replanFromDate: text("replan_from_date"),
+  studentLevel: text("student_level", { enum: ["weak", "normal", "strong"] })
+    .notNull()
+    .default("normal"),
+  analysisMinutesPerExam: integer("analysis_minutes_per_exam").notNull().default(120),
+  subjectSpeedsJson: jsonb("subject_speeds_json").$type<Record<string, SubjectSpeedProfile>>(),
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" })
     .notNull()
     .defaultNow(),
@@ -371,7 +434,9 @@ export type PanelCellJson =
   | { kind: "rest" }
   | PanelTextAction
   | PanelCountAction
-  | PanelRoutineAction;
+  | PanelRoutineAction
+  | PanelSchoolAction
+  | PanelEventAction;
 
 export type WeeklyGridJson = PanelCellJson[][];
 
@@ -417,6 +482,12 @@ export type PerformanceCellJson =
       resourceId: string | null;
       chapterId: string | null;
       count: number;
+    } & PerformanceTimes)
+  | ({ kind: "school"; subjectId: string; label: string } & PerformanceTimes)
+  | ({
+      kind: "exam" | "examAnalysis";
+      mockExamId: string | null;
+      title: string;
     } & PerformanceTimes);
 
 export type PerformanceGridJson = PerformanceCellJson[][];
@@ -482,7 +553,18 @@ export const tasks = pgTable(
     chapterId: text("chapter_id").references(() => resourceChapters.id, { onDelete: "set null" }),
     resourceText: text("resource_text").notNull().default(""),
     topic: text("topic").notNull().default(""),
-    type: text("type", { enum: ["study", "review", "test", "timed_test", "exercise"] })
+    type: text("type", {
+      enum: [
+        "study",
+        "review",
+        "test",
+        "timed_test",
+        "exercise",
+        "school",
+        "exam",
+        "exam_analysis",
+      ],
+    })
       .notNull()
       .default("study"),
     actionKind: text("action_kind").notNull().default("study"),
@@ -496,6 +578,7 @@ export const tasks = pgTable(
     actualEndedAt: timestamp("actual_ended_at", { withTimezone: true, mode: "date" }),
     actualUnits: integer("actual_units").notNull().default(0),
     note: text("note").notNull().default(""),
+    mockExamId: text("mock_exam_id"),
     createdAt: createdAt(),
   },
   (table) => [
@@ -721,6 +804,7 @@ export const externalExams = pgTable(
     subjectsJson: jsonb("subjects_json").$type<ExamSubjectScore[]>(),
     overallPercent: integer("overall_percent").notNull().default(0),
     note: text("note").notNull().default(""),
+    mockExamId: text("mock_exam_id"),
     createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: createdAt(),
   },
@@ -731,6 +815,108 @@ export const externalExams = pgTable(
       table.title,
       table.examDate,
     ),
+  ],
+);
+
+export const schoolLessons = pgTable(
+  "school_lessons",
+  {
+    id: id(),
+    studentId: text("student_id")
+      .notNull()
+      .references(() => students.id, { onDelete: "cascade" }),
+    weekday: integer("weekday").notNull(),
+    slotIndex: integer("slot_index").notNull(),
+    subjectId: text("subject_id")
+      .notNull()
+      .references(() => subjects.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("school_lessons_student_weekday_slot_unique").on(
+      table.studentId,
+      table.weekday,
+      table.slotIndex,
+    ),
+    index("school_lessons_student_idx").on(table.studentId),
+  ],
+);
+
+export const mockExamPrograms = pgTable(
+  "mock_exam_programs",
+  {
+    id: id(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    provider: text("provider").notNull(),
+    title: text("title").notNull(),
+    field: text("field").notNull(),
+    grade: text("grade").notNull().default("دوازدهم"),
+    examDate: text("exam_date").notNull(),
+    examType: text("exam_type", { enum: ["stage", "comprehensive"] })
+      .notNull()
+      .default("stage"),
+    startMin: integer("start_min").notNull().default(480),
+    durationMinutes: integer("duration_minutes").notNull().default(240),
+    analysisMinutes: integer("analysis_minutes").notNull().default(120),
+    budgetJson: jsonb("budget_json").$type<MockExamBudgetItem[]>(),
+    source: text("source").notNull().default(""),
+    sourceUrl: text("source_url").notNull().default(""),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("mock_exam_programs_workspace_unique").on(
+      table.workspaceId,
+      table.provider,
+      table.title,
+      table.field,
+      table.examDate,
+    ),
+    index("mock_exam_programs_workspace_idx").on(table.workspaceId, table.examDate),
+  ],
+);
+
+export const studentMockExams = pgTable(
+  "student_mock_exams",
+  {
+    id: id(),
+    studentId: text("student_id")
+      .notNull()
+      .references(() => students.id, { onDelete: "cascade" }),
+    mockExamId: text("mock_exam_id")
+      .notNull()
+      .references(() => mockExamPrograms.id, { onDelete: "cascade" }),
+    status: text("status", { enum: ["selected", "registered", "taken", "skipped"] })
+      .notNull()
+      .default("selected"),
+    source: text("source", { enum: ["group", "manual"] })
+      .notNull()
+      .default("manual"),
+    resultExamId: text("result_exam_id").references(() => externalExams.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("student_mock_exams_unique").on(table.studentId, table.mockExamId),
+    index("student_mock_exams_student_idx").on(table.studentId),
+  ],
+);
+
+export const groupMockExams = pgTable(
+  "group_mock_exams",
+  {
+    id: id(),
+    groupId: text("group_id")
+      .notNull()
+      .references(() => studentGroups.id, { onDelete: "cascade" }),
+    mockExamId: text("mock_exam_id")
+      .notNull()
+      .references(() => mockExamPrograms.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("group_mock_exams_unique").on(table.groupId, table.mockExamId),
+    index("group_mock_exams_group_idx").on(table.groupId),
   ],
 );
 
@@ -862,6 +1048,12 @@ export const psychTests = pgTable(
       .references(() => workspaces.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
     description: text("description").notNull().default(""),
+    category: text("category", {
+      enum: ["academic", "career", "personal", "wellbeing", "general"],
+    })
+      .notNull()
+      .default("general"),
+    sourceUrl: text("source_url"),
     status: text("status", { enum: ["draft", "published", "archived"] })
       .notNull()
       .default("draft"),
@@ -987,6 +1179,10 @@ export type PerformancePanel = typeof performancePanels.$inferSelect;
 export type Question = typeof questions.$inferSelect;
 export type Exam = typeof exams.$inferSelect;
 export type ExternalExam = typeof externalExams.$inferSelect;
+export type SchoolLesson = typeof schoolLessons.$inferSelect;
+export type MockExamProgram = typeof mockExamPrograms.$inferSelect;
+export type StudentMockExam = typeof studentMockExams.$inferSelect;
+export type GroupMockExam = typeof groupMockExams.$inferSelect;
 export type PsychTest = typeof psychTests.$inferSelect;
 export type PsychDimension = typeof psychDimensions.$inferSelect;
 export type PsychQuestion = typeof psychQuestions.$inferSelect;

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { CSSProperties } from "react";
 import { notFound } from "next/navigation";
 import {
   addAvailabilityAction,
@@ -12,6 +13,8 @@ import {
   saveConstraintsAction,
   updateStudentAction,
 } from "@/app/actions/counselor";
+import { GroupSelect } from "@/components/group-select";
+import { PsychProfileCard } from "@/components/psych-profile-card";
 import { SubmitButton } from "@/components/submit-button";
 import { requireCounselor } from "@/lib/auth";
 import { getPlanForWeek, getStudentDetail, getWeekReport } from "@/lib/counselor";
@@ -29,6 +32,8 @@ import {
 import { aiPlanningConfigured } from "@/lib/ai-plan";
 import { summarizeResourceProgress } from "@/lib/resource-progress";
 import { FIELDS, GRADES, TRACK_LABELS } from "@/lib/subjects";
+import { listStudentGroups } from "@/lib/student-groups";
+import { getStudentPsychProfile } from "@/lib/psych-profile";
 
 const SUCCESS: Record<string, string> = {
   created: "دانش‌آموز ساخته شد.",
@@ -63,6 +68,8 @@ export default async function StudentDetailPage({
 
   const detail = await getStudentDetail(counselor.workspaceId, id);
   if (!detail) notFound();
+  const groups = await listStudentGroups(counselor.workspaceId);
+  const psychProfile = await getStudentPsychProfile(counselor.workspaceId, id);
 
   const requestedWeek = week && isISODate(week) ? week : todayISO();
   const weekStart = startOfWeekSaturday(requestedWeek);
@@ -91,6 +98,16 @@ export default async function StudentDetailPage({
           </small>
         </div>
         <div className="row">
+          {detail.group ? (
+            <Link
+              href={`/counselor/leaderboard?group=${detail.group.id}`}
+              className="group-chip"
+              style={{ "--group-color": detail.group.color } as CSSProperties}
+            >
+              <span>{detail.group.emoji}</span>
+              {detail.group.name}
+            </Link>
+          ) : null}
           <span className={`badge ${detail.student.userId ? "badge-green" : "badge-warn"}`}>
             {detail.student.userId ? "حساب فعال" : "در انتظار فعال‌سازی"}
           </span>
@@ -112,6 +129,8 @@ export default async function StudentDetailPage({
           </code>
         </div>
       ) : null}
+
+      <PsychProfileCard profile={psychProfile} studentId={id} />
 
       <div className="grid grid-3">
         <div className="stat">
@@ -467,6 +486,23 @@ export default async function StudentDetailPage({
                   </option>
                 ))}
               </select>
+            </div>
+            <div className="field">
+              <label>گروه آموزشی (هم‌رشته)</label>
+              <GroupSelect
+                groups={groups.map((group) => ({
+                  id: group.id,
+                  name: group.name,
+                  emoji: group.emoji,
+                  field: group.field,
+                }))}
+                initialField={detail.student.field}
+                defaultValue={detail.student.groupId}
+              />
+            </div>
+            <div className="field">
+              <label>یا گروه جدید (اختیاری)</label>
+              <input name="newGroup" placeholder="نام گروه جدید" />
             </div>
             <div className="field">
               <label>موبایل والد</label>

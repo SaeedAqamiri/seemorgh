@@ -4,7 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getDb } from "@/db/client";
-import { planningSettings, plans, studyGoals, tasks } from "@/db/schema";
+import { planningSettings, plans, studyGoals, tasks, type StudentLevel as DbStudentLevel } from "@/db/schema";
 import { requireCounselor } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import {
@@ -15,11 +15,14 @@ import {
   scheduleAutoPlan,
   type AutoPlanInput,
   type GoalMetric,
+  type PlanningLevel,
   type PlanningPolicy,
   type StudyGoalInput,
+  type SubjectSpeed,
 } from "@/lib/auto-plan";
 import { aiAutoPlanningConfigured, generateAiAutoAllocation } from "@/lib/ai-auto-plan";
-import { getAutoPlanContext } from "@/lib/auto-plan-data";
+import { examAnchorFor, getAutoPlanContext } from "@/lib/auto-plan-data";
+import { saveStudentMockExamSelection, studentMockExamPrograms } from "@/lib/mock-exams";
 import { addDays, isISODate, todayISO } from "@/lib/dates";
 import { buildGridFromTasks, saveGeneratedPanel } from "@/lib/panel";
 import type { PlannerResource } from "@/lib/planner";
@@ -43,8 +46,15 @@ function fail(path: string, message: string): never {
 type SavedSetup = {
   studentId: string;
   targetDate: string;
+  startDate: string;
+  replanFromDate: string | null;
   policy: PlanningPolicy;
   goals: StudyGoalInput[];
+  level: PlanningLevel;
+  analysisMinutesPerExam: number;
+  subjectSpeeds: Record<string, SubjectSpeed>;
+  selectedMockExamIds: string[];
+  goalMockExamId: string | null;
 };
 
 async function parseAndSaveSetup(formData: FormData): Promise<SavedSetup> {
@@ -55,18 +65,44 @@ async function parseAndSaveSetup(formData: FormData): Promise<SavedSetup> {
   const context = await getAutoPlanContext(counselor.workspaceId, studentId);
   if (!context) fail("/counselor", "دانش‌آموز پیدا نشد.");
 
+  const selectedMockExamIds = formData.getAll("mockExamId").map((value) => String(value));
+  await saveStudentMockExamSelection(studentId, selectedMockExamIds);
+  const selectedPrograms = await studentMockExamPrograms(studentId);
+  const requestedGoalId = field(formData, "goalMockExamId");
+  const goalProgram =
+    selectedPrograms.find((program) => program.id === requestedGoalId) ??
+    [...selectedPrograms].sort((a, b) => b.examDate.localeCompare(a.examDate))[0];
   const targetDateRaw = field(formData, "targetDate");
-  const targetDate = isISODate(targetDateRaw)
-    ? targetDateRaw
-    : addDays(todayISO(), 90);
+  const targetDate = goalProgram?.examDate ?? (isISODate(targetDateRaw) ? targetDateRaw : addDays(todayISO(), 90));
   if (targetDate < todayISO()) {
     fail(studentPath(studentId), "تاریخ هدف نباید قبل از امروز باشد.");
+  }
+  const startDateRaw = field(formData, "startDate");
+  const startDate = isISODate(startDateRaw) && startDateRaw >= todayISO() ? startDateRaw : todayISO();
+  const replanFromRaw = field(formData, "replanFromDate");
+  const replanFromDate = isISODate(replanFromRaw) ? replanFromRaw : null;
+  const levelRaw = field(formData, "studentLevel");
+  const level: PlanningLevel = levelRaw === "weak" || levelRaw === "strong" ? levelRaw : "normal";
+  const analysisMinutesPerExam = Math.round(clampNumber(numberField(formData, "analysisMinutesPerExam") || 120, 0, 720));
+  const subjectSpeeds: Record<string, SubjectSpeed> = {};
+  for (const subject of context.detail.subjects) {
+    const testsRaw = field(formData, `testsPerHour_${subject.id}`);
+    const exercisesRaw = field(formData, `exercisesPerHour_${subject.id}`);
+    if (!testsRaw && !exercisesRaw) continue;
+    const tests = Number(testsRaw);
+    const exercises = Number(exercisesRaw);
+    subjectSpeeds[subject.id] = {
+      testsPerHour: Number.isFinite(tests) && tests > 0 ? tests : 40,
+      exercisesPerHour: Number.isFinite(exercises) && exercises > 0 ? exercises : 30,
+    };
   }
 
   const policy = normalizePolicy({
     strategy: field(formData, "strategy"),
     minutesPerPercentPoint: numberField(formData, "minutesPerPercentPoint"),
     minutesPerTest: numberField(formData, "minutesPerTest"),
+    testsPerHour: numberField(formData, "testsPerHour"),
+    exercisesPerHour: numberField(formData, "exercisesPerHour"),
     testRatioPct: numberField(formData, "testRatioPct"),
     reviewRatioPct: numberField(formData, "reviewRatioPct"),
     maxSubjectsPerDay: numberField(formData, "maxSubjectsPerDay"),
@@ -130,15 +166,41 @@ async function parseAndSaveSetup(formData: FormData): Promise<SavedSetup> {
         studentId,
         targetDate,
         policyJson: policy,
+        goalMockExamId: goalProgram?.id ?? null,
+        replanFromDate,
+        studentLevel: level as DbStudentLevel,
+        analysisMinutesPerExam,
+        subjectSpeedsJson: subjectSpeeds,
         updatedAt: new Date(),
       })
       .onConflictDoUpdate({
         target: planningSettings.studentId,
-        set: { targetDate, policyJson: policy, updatedAt: new Date() },
+        set: {
+          targetDate,
+          policyJson: policy,
+          goalMockExamId: goalProgram?.id ?? null,
+          replanFromDate,
+          studentLevel: level as DbStudentLevel,
+          analysisMinutesPerExam,
+          subjectSpeedsJson: subjectSpeeds,
+          updatedAt: new Date(),
+        },
       });
   });
 
-  return { studentId, targetDate, policy, goals };
+  return {
+    studentId,
+    targetDate,
+    startDate,
+    replanFromDate,
+    policy,
+    goals,
+    level,
+    analysisMinutesPerExam,
+    subjectSpeeds,
+    selectedMockExamIds,
+    goalMockExamId: goalProgram?.id ?? null,
+  };
 }
 
 function plannerInputFor(
@@ -158,7 +220,7 @@ function plannerInputFor(
   }));
 
   return {
-    startDate: todayISO(),
+    startDate: setup.startDate,
     targetDate: setup.targetDate,
     availability: context.detail.availability.map((slot) => ({
       weekday: slot.weekday,
@@ -173,6 +235,12 @@ function plannerInputFor(
     goals: setup.goals,
     resources,
     policy: setup.policy,
+    schoolPeriods: context.schoolPeriods,
+    exams: context.mockExams.map((program) => examAnchorFor(program, context.analysisMinutesPerExam)),
+    level: setup.level,
+    subjectSpeeds: setup.subjectSpeeds,
+    goalExamId: setup.goalMockExamId,
+    systemSubjectId: context.systemSubjectId,
   };
 }
 
@@ -247,7 +315,7 @@ export async function generateAutoPlanAction(formData: FormData): Promise<void> 
     );
   }
 
-  const overwrite = field(formData, "overwrite") === "1";
+  const overwrite = field(formData, "overwrite") === "1" || field(formData, "mode") === "replan";
   const db = await getDb();
   let created = 0;
   let skipped = 0;
@@ -317,6 +385,7 @@ export async function generateAutoPlanAction(formData: FormData): Promise<void> 
             routineMode: task.routineMode,
             targetUnits: task.targetUnits,
             estMinutes: task.estMinutes,
+            mockExamId: task.mockExamId ?? null,
           })),
         );
       }
@@ -338,6 +407,7 @@ export async function generateAutoPlanAction(formData: FormData): Promise<void> 
           actionKind: task.actionKind,
           routineMode: task.routineMode,
           targetUnits: task.targetUnits,
+          mockExamId: task.mockExamId ?? null,
         })),
       ),
       dailyRoutine: week.dailyRoutine,
@@ -356,6 +426,7 @@ export async function generateAutoPlanAction(formData: FormData): Promise<void> 
     entityId: setup.studentId,
     diff: {
       targetDate: setup.targetDate,
+      startDate: setup.startDate,
       weeks: created,
       skipped,
       source,

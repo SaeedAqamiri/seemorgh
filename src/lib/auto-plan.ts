@@ -26,6 +26,8 @@ export type PlanningPolicy = {
   strategy: PlanningStrategy;
   minutesPerPercentPoint: number;
   minutesPerTest: number;
+  testsPerHour: number;
+  exercisesPerHour: number;
   testRatioPct: number;
   reviewRatioPct: number;
   maxSubjectsPerDay: number;
@@ -35,10 +37,40 @@ export type PlanningPolicy = {
   notes: string;
 };
 
+export type PlanningLevel = "weak" | "normal" | "strong";
+
+export type SubjectSpeed = { testsPerHour: number; exercisesPerHour: number };
+
+export type PlannerSchoolPeriod = {
+  weekday: number;
+  startMin: number;
+  endMin: number;
+  subjectId: string;
+  subjectTitle: string;
+};
+
+export type PlannerExamBudget = {
+  subjectTitle: string;
+  chapters: string[];
+  weight?: number;
+};
+
+export type PlannerExamAnchor = {
+  id: string;
+  title: string;
+  date: string;
+  startMin: number;
+  durationMinutes: number;
+  analysisMinutes: number;
+  budget: PlannerExamBudget[];
+};
+
 export const DEFAULT_PLANNING_POLICY: PlanningPolicy = {
   strategy: "balanced",
   minutesPerPercentPoint: 60,
   minutesPerTest: 1.5,
+  testsPerHour: 40,
+  exercisesPerHour: 30,
   testRatioPct: 75,
   reviewRatioPct: 10,
   maxSubjectsPerDay: 3,
@@ -57,6 +89,12 @@ export type AutoPlanInput = {
   goals: StudyGoalInput[];
   resources: PlannerResource[];
   policy: PlanningPolicy;
+  schoolPeriods?: PlannerSchoolPeriod[];
+  exams?: PlannerExamAnchor[];
+  level?: PlanningLevel;
+  subjectSpeeds?: Record<string, SubjectSpeed>;
+  goalExamId?: string | null;
+  systemSubjectId?: string;
 };
 
 export type SubjectAllocation = {
@@ -136,6 +174,16 @@ export function normalizePolicy(value: unknown): PlanningPolicy {
       0.5,
       10,
     ),
+    testsPerHour: clampNumber(
+      Number(source.testsPerHour ?? DEFAULT_PLANNING_POLICY.testsPerHour),
+      5,
+      120,
+    ),
+    exercisesPerHour: clampNumber(
+      Number(source.exercisesPerHour ?? DEFAULT_PLANNING_POLICY.exercisesPerHour),
+      5,
+      120,
+    ),
     testRatioPct: Math.round(
       clampNumber(Number(source.testRatioPct ?? DEFAULT_PLANNING_POLICY.testRatioPct), 0, 90),
     ),
@@ -159,16 +207,69 @@ export function normalizePolicy(value: unknown): PlanningPolicy {
   };
 }
 
+type Interval = { startMin: number; endMin: number };
+
+function subtractIntervals(windows: Interval[], busy: Interval[]): Interval[] {
+  let current = windows.map((window) => ({ ...window }));
+  for (const block of busy) {
+    const next: Interval[] = [];
+    for (const window of current) {
+      if (block.endMin <= window.startMin || block.startMin >= window.endMin) {
+        next.push(window);
+        continue;
+      }
+      if (block.startMin > window.startMin) {
+        next.push({ startMin: window.startMin, endMin: block.startMin });
+      }
+      if (block.endMin < window.endMin) {
+        next.push({ startMin: block.endMin, endMin: window.endMin });
+      }
+    }
+    current = next;
+  }
+  return current.filter((window) => window.endMin > window.startMin);
+}
+
+export function capacityBusyBlocks(
+  date: string,
+  schoolPeriods: PlannerSchoolPeriod[] = [],
+  exams: PlannerExamAnchor[] = [],
+): Interval[] {
+  const weekday = weekdayIndex(date);
+  const blocks: Interval[] = schoolPeriods
+    .filter((period) => period.weekday === weekday)
+    .map((period) => ({ startMin: period.startMin, endMin: period.endMin }));
+  for (const exam of exams) {
+    if (exam.date === date) {
+      blocks.push({
+        startMin: exam.startMin,
+        endMin: exam.startMin + exam.durationMinutes,
+      });
+      if (exam.analysisMinutes > 0) {
+        blocks.push({
+          startMin: exam.startMin + exam.durationMinutes,
+          endMin: Math.min(24 * 60, exam.startMin + exam.durationMinutes + exam.analysisMinutes),
+        });
+      }
+    }
+  }
+  return blocks;
+}
+
 export function dateCapacity(
   availability: PlannerAvailability[],
   constraints: PlannerConstraints,
   date: string,
+  schoolPeriods: PlannerSchoolPeriod[] = [],
+  exams: PlannerExamAnchor[] = [],
 ): number {
   const weekday = weekdayIndex(date);
   if (weekday === constraints.restWeekday) return 0;
-  const total = availability
+  const windows = availability
     .filter((slot) => slot.weekday === weekday)
-    .reduce((sum, slot) => sum + Math.max(0, slot.endMin - slot.startMin), 0);
+    .map((slot) => ({ startMin: slot.startMin, endMin: slot.endMin }));
+  const free = subtractIntervals(windows, capacityBusyBlocks(date, schoolPeriods, exams));
+  const total = free.reduce((sum, slot) => sum + Math.max(0, slot.endMin - slot.startMin), 0);
   const capped = Math.min(total, Math.max(0, constraints.maxDailyMinutes));
   const buffer = clampNumber(constraints.bufferPct, 0, 80);
   return Math.max(0, Math.floor((capped * (100 - buffer)) / 100));
@@ -180,6 +281,34 @@ export function planDates(input: Pick<AutoPlanInput, "startDate" | "targetDate">
   if (!end || end < start) return [];
   const total = Math.min(daysBetween(start, end), 370);
   return Array.from({ length: total + 1 }, (_, index) => addDays(start, index));
+}
+
+export function levelFactor(level: PlanningLevel | undefined): number {
+  if (level === "strong") return 1.2;
+  if (level === "weak") return 0.7;
+  return 1;
+}
+
+export function subjectSpeedFor(input: AutoPlanInput, subjectId: string): SubjectSpeed {
+  const override = input.subjectSpeeds?.[subjectId];
+  const factor = levelFactor(input.level);
+  return {
+    testsPerHour: Math.max(1, override?.testsPerHour ?? input.policy.testsPerHour * factor),
+    exercisesPerHour: Math.max(1, override?.exercisesPerHour ?? input.policy.exercisesPerHour * factor),
+  };
+}
+
+function examFocusFor(input: AutoPlanInput, subjectId: string, subjectTitle: string): number {
+  const exams = [...(input.exams ?? [])].sort((a, b) => a.date.localeCompare(b.date));
+  if (exams.length === 0) return 0;
+  let score = 0;
+  for (const exam of exams.slice(0, 4)) {
+    const item = exam.budget.find(
+      (entry) => entry.subjectTitle === subjectTitle || entry.subjectTitle === subjectId,
+    );
+    if (item) score += item.weight ?? Math.max(1, item.chapters.length);
+  }
+  return Math.min(1.5, score / 8);
 }
 
 type GoalDemand = {
@@ -217,7 +346,7 @@ function goalDemand(input: AutoPlanInput, goal: StudyGoalInput): GoalDemand {
     goal,
     gapPct,
     requiredMinutes,
-    demand: Math.max(0.08, gapFactor * weightFactor),
+    demand: Math.max(0.08, gapFactor * weightFactor * (1 + examFocusFor(input, goal.subjectId, goal.subjectTitle))),
   };
 }
 
@@ -238,7 +367,7 @@ export function buildDeterministicAllocation(input: AutoPlanInput): AutoAllocati
   const warnings: string[] = [];
   const dates = planDates(input);
   const capacity = dates.reduce(
-    (sum, date) => sum + dateCapacity(input.availability, input.constraints, date),
+    (sum, date) => sum + dateCapacity(input.availability, input.constraints, date, input.schoolPeriods ?? [], input.exams ?? []),
     0,
   );
 
@@ -278,6 +407,8 @@ export function buildDeterministicAllocation(input: AutoPlanInput): AutoAllocati
     if (!Number.isFinite(minutes) || minutes <= 0) continue;
 
     const scale = metricScale(item.goal.metric);
+    const speed = subjectSpeedFor(input, item.goal.subjectId);
+    const minutesPerTest = 60 / speed.testsPerHour;
     const clampedGap = Math.max(0, item.goal.targetValue - item.goal.currentValue);
     // Score-based (final exam) goals lean towards study; konkur percent goals lean towards tests.
     const testRatio =
@@ -287,7 +418,7 @@ export function buildDeterministicAllocation(input: AutoPlanInput): AutoAllocati
     const reviewMinutes = (minutes * input.policy.reviewRatioPct) / 100;
     const testMinutes = (minutes * testRatio) / 100;
     const studyMinutes = Math.max(0, minutes - reviewMinutes - testMinutes);
-    const tests = Math.round(testMinutes / input.policy.minutesPerTest);
+    const tests = Math.round(testMinutes / minutesPerTest);
 
     const subjectResourceList = subjectResources(input, item.goal.subjectId);
     if (subjectResourceList.length === 0) {
@@ -407,7 +538,7 @@ export function sanitizeAutoAllocation(
   );
   const dates = planDates(input);
   const capacity = dates.reduce(
-    (sum, date) => sum + dateCapacity(input.availability, input.constraints, date),
+    (sum, date) => sum + dateCapacity(input.availability, input.constraints, date, input.schoolPeriods ?? [], input.exams ?? []),
     0,
   );
 
@@ -493,10 +624,11 @@ type ResourceState = {
 };
 
 function allocationMinutes(input: AutoPlanInput, subject: SubjectAllocation): number {
+  const speed = subjectSpeedFor(input, subject.subjectId);
   return (
     subject.studyMinutes +
     subject.reviewMinutes +
-    subject.tests * input.policy.minutesPerTest
+    subject.tests * (60 / speed.testsPerHour)
   );
 }
 
@@ -537,7 +669,8 @@ function buildWeekBudgets(
     );
     const weightSum = weights.reduce((sum, weight) => sum + weight, 0);
     const totalMinutes = allocationMinutes(input, subject);
-    const testShare = subject.tests * input.policy.minutesPerTest;
+    const speed = subjectSpeedFor(input, subject.subjectId);
+    const testShare = subject.tests * (60 / speed.testsPerHour);
 
     for (let index = 0; index < weekStarts.length; index += 1) {
       const ratio =
@@ -567,10 +700,39 @@ function buildResourceStates(input: AutoPlanInput): Map<string, ResourceState> {
   return states;
 }
 
+function normalizeTopic(value: string): string {
+  return value
+    .replace(/[۰-۹]/g, (digit) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit)))
+    .replace(/\s*[—–-]\s*/g, " ")
+    .replace(/فصل\s*\d+/g, "")
+    .replace(/درس\s*\d+/g, "")
+    .replace(/[()（）]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function chapterMatches(target: string, title: string): boolean {
+  const a = normalizeTopic(target);
+  const b = normalizeTopic(title);
+  if (!a || !b) return false;
+  if (a.includes(b) || b.includes(a)) return true;
+  const tokens = a.split(" ").filter((token) => token.length > 2);
+  return tokens.length > 0 && tokens.filter((token) => b.includes(token)).length >= Math.ceil(tokens.length / 2);
+}
+
+function targetChaptersForDate(input: AutoPlanInput, date: string): string[] {
+  const next = (input.exams ?? [])
+    .filter((exam) => exam.date >= date)
+    .sort((a, b) => a.date.localeCompare(b.date))[0];
+  if (!next) return [];
+  return next.budget.flatMap((item) => item.chapters);
+}
+
 function pickResource(
   states: Map<string, ResourceState>,
   subjectId: string,
   type: "test" | "study" | "review",
+  targetChapters: string[] = [],
 ): ResourceState | null {
   const candidates = [...states.values()]
     .filter(
@@ -592,6 +754,15 @@ function pickResource(
       };
       const diff = typeScore(a) - typeScore(b);
       if (diff !== 0) return diff;
+      const matchScore = (state: ResourceState) =>
+        targetChapters.length > 0 &&
+        (state.resource.chapters ?? []).some((chapter) =>
+          targetChapters.some((target) => chapterMatches(target, chapter.title)),
+        )
+          ? 1
+          : 0;
+      const matchDiff = matchScore(b) - matchScore(a);
+      if (matchDiff !== 0) return matchDiff;
       if (b.resource.priority !== a.resource.priority) {
         return b.resource.priority - a.resource.priority;
       }
@@ -624,13 +795,15 @@ function unitsForBlock(
   type: "test" | "study" | "review",
   minutes: number,
   resource: ResourceState | null,
-  policy: PlanningPolicy,
+  input: AutoPlanInput,
+  subjectId: string,
 ): number {
   if (type === "test") {
+    const speed = subjectSpeedFor(input, subjectId);
     const perUnit =
       resource?.resource.unitType === "exercise"
-        ? minutesPerUnit(resource.resource)
-        : policy.minutesPerTest;
+        ? 60 / speed.exercisesPerHour
+        : 60 / speed.testsPerHour;
     return Math.max(1, Math.round(minutes / perUnit));
   }
   if (!resource) return 0;
@@ -648,10 +821,15 @@ function takeUnits(
   return { state, units: taken };
 }
 
+function countedTask(task: PlannedTask): boolean {
+  return task.type !== "school" && task.type !== "exam" && task.type !== "exam_analysis";
+}
+
 function routineForWeek(tasks: PlannedTask[], goals: StudyGoalInput[]): string {
-  if (tasks.length === 0) return "";
+  const counted = tasks.filter(countedTask);
+  if (counted.length === 0) return "";
   const bySubject = new Map<string, number>();
-  for (const task of tasks) {
+  for (const task of counted) {
     bySubject.set(task.subjectId, (bySubject.get(task.subjectId) ?? 0) + task.estMinutes);
   }
   const top = [...bySubject.entries()]
@@ -686,10 +864,12 @@ function scheduleWeek(
   const dates = weekDates(weekStart).filter(
     (date) => date >= input.startDate && date <= input.targetDate,
   );
+  const schoolPeriods = input.schoolPeriods ?? [];
+  const exams = input.exams ?? [];
   const dayCapacities = new Map(
     dates.map((date) => [
       date,
-      dateCapacity(input.availability, input.constraints, date),
+      dateCapacity(input.availability, input.constraints, date, schoolPeriods, exams),
     ]),
   );
   const capacityMinutes = dates.reduce(
@@ -716,7 +896,7 @@ function scheduleWeek(
     );
   } else if (input.policy.fillCapacity && total < capacityMinutes && total > 0) {
     const extra = capacityMinutes - total;
-    const extraShare = extra / buckets.length;
+    const extraShare = extra / Math.max(1, buckets.length);
     for (const bucket of buckets) {
       bucket.studyMinutes += extraShare;
     }
@@ -728,12 +908,80 @@ function scheduleWeek(
   }
 
   const tasks: PlannedTask[] = [];
+  const systemSubjectId = input.systemSubjectId ?? input.goals[0]?.subjectId ?? "";
 
   for (const date of dates) {
-    const windows = mergeWindows(
+    const weekday = weekdayIndex(date);
+
+    for (const period of schoolPeriods.filter((item) => item.weekday === weekday)) {
+      tasks.push({
+        planDate: date,
+        plannedStart: period.startMin,
+        plannedEnd: period.endMin,
+        subjectId: period.subjectId,
+        resourceId: "",
+        chapterId: null,
+        resourceText: period.subjectTitle,
+        topic: period.subjectTitle,
+        type: "school",
+        actionKind: "school",
+        routineMode: null,
+        targetUnits: 0,
+        estMinutes: Math.max(0, period.endMin - period.startMin),
+        mockExamId: null,
+      });
+    }
+
+    for (const exam of exams.filter((item) => item.date === date)) {
+      const examEnd = Math.min(24 * 60, exam.startMin + exam.durationMinutes);
+      tasks.push({
+        planDate: date,
+        plannedStart: exam.startMin,
+        plannedEnd: examEnd,
+        subjectId: systemSubjectId,
+        resourceId: "",
+        chapterId: null,
+        resourceText: exam.title,
+        topic: exam.title,
+        type: "exam",
+        actionKind: "exam",
+        routineMode: null,
+        targetUnits: 0,
+        estMinutes: Math.max(0, examEnd - exam.startMin),
+        mockExamId: exam.id,
+      });
+      if (exam.analysisMinutes > 0) {
+        const analysisStart = Math.min(22 * 60, examEnd + 30);
+        const analysisEnd = Math.min(24 * 60, analysisStart + exam.analysisMinutes);
+        if (analysisEnd > analysisStart) {
+          tasks.push({
+            planDate: date,
+            plannedStart: analysisStart,
+            plannedEnd: analysisEnd,
+            subjectId: systemSubjectId,
+            resourceId: "",
+            chapterId: null,
+            resourceText: `تحلیل ${exam.title}`,
+            topic: `تحلیل ${exam.title}`,
+            type: "exam_analysis",
+            actionKind: "examAnalysis",
+            routineMode: null,
+            targetUnits: 0,
+            estMinutes: analysisEnd - analysisStart,
+            mockExamId: exam.id,
+          });
+        }
+      }
+    }
+
+    const baseWindows = mergeWindows(
       input.availability
-        .filter((slot) => slot.weekday === weekdayIndex(date))
+        .filter((slot) => slot.weekday === weekday)
         .map((slot) => ({ startMin: slot.startMin, endMin: slot.endMin })),
+    );
+    const windows = subtractIntervals(
+      baseWindows,
+      capacityBusyBlocks(date, schoolPeriods, exams),
     );
     if (windows.length === 0) continue;
 
@@ -742,6 +990,7 @@ function scheduleWeek(
     let cursor = windows[0].startMin;
     let lastSubjectId: string | null = null;
     const daySubjects = new Set<string>();
+    const targetChapters = targetChaptersForDate(input, date);
     let safety = 0;
 
     while (dayRemaining >= input.policy.minBlockMinutes && safety < 80) {
@@ -795,16 +1044,20 @@ function scheduleWeek(
       const placement = placeBlock(windows, cursor, duration);
       if (!placement) break;
 
-      const resourceState = pickResource(states, chosen.subjectId, option.type);
-      const rawUnits = unitsForBlock(option.type, duration, resourceState, input.policy);
+      const resourceState = pickResource(states, chosen.subjectId, option.type, targetChapters);
+      const rawUnits = unitsForBlock(option.type, duration, resourceState, input, chosen.subjectId);
       const taken =
         option.type === "test" && !resourceState
           ? { state: null, units: rawUnits }
           : takeUnits(resourceState, rawUnits);
       const targetUnits = resourceState ? taken.units : rawUnits;
+      const matchedChapterEntry = resourceState?.resource.chapters?.find((chapter) =>
+        targetChapters.some((target) => chapterMatches(target, chapter.title)),
+      );
+      const matchedChapter = matchedChapterEntry?.title;
       const topic =
         option.type === "test" || !resourceState
-          ? resourceState?.resource.title ?? chosen.subjectTitle
+          ? matchedChapter ?? resourceState?.resource.title ?? chosen.subjectTitle
           : resourceTopic(resourceState, targetUnits, chosen.subjectTitle);
 
       const isExerciseResource = resourceState?.resource.unitType === "exercise";
@@ -822,7 +1075,7 @@ function scheduleWeek(
         plannedEnd: placement.end,
         subjectId: chosen.subjectId,
         resourceId: taken.state?.resource.id ?? resourceState?.resource.id ?? "",
-        chapterId: null,
+        chapterId: matchedChapterEntry?.id ?? null,
         resourceText: topic,
         topic,
         type: taskType,
@@ -830,6 +1083,7 @@ function scheduleWeek(
         routineMode: null,
         targetUnits,
         estMinutes: duration,
+        mockExamId: null,
       });
 
       if (option.type === "test") chosen.testMinutes -= duration;
@@ -855,7 +1109,7 @@ function scheduleWeek(
   }
 
   const bySubject: GeneratedPlan["stats"]["bySubject"] = {};
-  for (const task of tasks) {
+  for (const task of tasks.filter(countedTask)) {
     const title =
       input.goals.find((goal) => goal.subjectId === task.subjectId)?.subjectTitle ??
       task.subjectId;
@@ -864,14 +1118,15 @@ function scheduleWeek(
     bySubject[task.subjectId].units += task.targetUnits;
   }
 
+  const countedTasks = tasks.filter(countedTask);
   return {
     weekStart,
     tasks,
     warnings,
     stats: {
       capacityMinutes,
-      plannedMinutes: tasks.reduce((sum, task) => sum + task.estMinutes, 0),
-      plannedUnits: tasks.reduce((sum, task) => sum + task.targetUnits, 0),
+      plannedMinutes: countedTasks.reduce((sum, task) => sum + task.estMinutes, 0),
+      plannedUnits: countedTasks.reduce((sum, task) => sum + task.targetUnits, 0),
       bySubject,
     },
     dailyRoutine: routineForWeek(tasks, input.goals),
@@ -912,7 +1167,7 @@ export function scheduleAutoPlan(
     weekDates(weekStart)
       .filter((date) => date >= input.startDate && date <= input.targetDate)
       .reduce(
-        (sum, date) => sum + dateCapacity(input.availability, input.constraints, date),
+        (sum, date) => sum + dateCapacity(input.availability, input.constraints, date, input.schoolPeriods ?? [], input.exams ?? []),
         0,
       ),
   );

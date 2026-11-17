@@ -51,4 +51,7 @@ export const AUDIT_LABELS: Record<string, string> = {
   "exam.grade": "تصحیح پاسخ",
   "student.archive": "بایگانی دانش‌آموز",
   "report.narrative": "تولید روایت تحلیلی گزارش",
+  "group.create": "ساخت گروه دانش‌آموزی",
+  "group.update": "ویرایش گروه دانش‌آموزی",
+  "group.delete": "حذف گروه دانش‌آموزی",
 };

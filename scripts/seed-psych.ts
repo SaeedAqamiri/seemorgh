@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { getDb } from "../src/db/client";
 import {
   psychDimensions,
@@ -10,6 +10,11 @@ import {
   type PsychDimension,
   type PsychResultRule,
 } from "../src/db/schema";
+import {
+  bandsFor,
+  PSYCH_TEST_CATALOG,
+  type CatalogTest,
+} from "../src/lib/psych-catalog";
 
 const TEST_TITLE = "آزمون ۱۶ تیپ شخصیتی (MBTI)";
 
@@ -181,43 +186,40 @@ const RULES: PsychResultRule[] = [
   { code: "ENTJ", title: "فرمانده", body: "جسور، راهبردی و نتیجه‌محور هستی. اهداف بزرگ را به برنامه تبدیل می‌کنی و از تصمیم‌های سخت فرار نمی‌کنی. همدلی و شنیدن صداهای مختلف، تیم‌سازی تو را قوی‌تر می‌کند." },
 ];
 
-async function main() {
-  const db = await getDb();
-  const [workspace] = await db
-    .select()
-    .from(workspaces)
-    .where(eq(workspaces.name, "دفتر مشاوره نمونه"))
-    .limit(1);
-  if (!workspace) {
-    throw new Error("workspace missing; run `bun run db:seed` or `bun run db:import:example` first");
-  }
-  const [counselor] = await db
-    .select()
-    .from(users)
-    .where(and(eq(users.workspaceId, workspace.id), eq(users.role, "counselor")))
-    .limit(1);
-  if (!counselor) throw new Error("counselor missing");
+function fa(number: number): string {
+  return number.toLocaleString("fa-IR");
+}
 
+async function seedMbti(
+  workspaceId: string,
+  counselorId: string,
+): Promise<"created" | "existing"> {
+  const db = await getDb();
   const [existing] = await db
     .select({ id: psychTests.id })
     .from(psychTests)
-    .where(and(eq(psychTests.workspaceId, workspace.id), eq(psychTests.title, TEST_TITLE)))
+    .where(and(eq(psychTests.workspaceId, workspaceId), eq(psychTests.title, TEST_TITLE)))
     .limit(1);
   if (existing) {
-    console.log(`psych demo already exists: ${TEST_TITLE}`);
-    process.exit(0);
+    await db
+      .update(psychTests)
+      .set({ category: "personal", updatedAt: new Date() })
+      .where(eq(psychTests.id, existing.id));
+    return "existing";
   }
 
   const [test] = await db
     .insert(psychTests)
     .values({
-      workspaceId: workspace.id,
+      workspaceId,
       title: TEST_TITLE,
       description:
         "آزمون کوتاه ۱۲ سوالی برای آشنایی با چهار بُعد شخصیتی و یکی از ۱۶ تیپ. نتیجه صرفاً برای خودشناسی است و جای ارزیابی تخصصی را نمی‌گیرد.",
+      category: "personal",
+      sourceUrl: "https://www.psychologytoday.com/us/tests/personality",
       status: "published",
       resultRulesJson: RULES,
-      createdBy: counselor.id,
+      createdBy: counselorId,
       publishedAt: new Date(),
     })
     .returning();
@@ -258,7 +260,132 @@ async function main() {
     );
   }
 
-  console.log(`psych demo ready: ${TEST_TITLE} (${QUESTIONS.length} questions, ${RULES.length} results)`);
+  return "created";
+}
+
+async function seedCatalogTest(
+  workspaceId: string,
+  counselorId: string,
+  catalog: CatalogTest,
+): Promise<"created" | "existing"> {
+  const db = await getDb();
+  const [existing] = await db
+    .select({ id: psychTests.id })
+    .from(psychTests)
+    .where(and(eq(psychTests.workspaceId, workspaceId), eq(psychTests.title, catalog.title)))
+    .limit(1);
+  if (existing) {
+    await db
+      .update(psychTests)
+      .set({
+        category: catalog.category,
+        sourceUrl: catalog.sourceUrl ?? null,
+        updatedAt: new Date(),
+      })
+      .where(eq(psychTests.id, existing.id));
+    return "existing";
+  }
+
+  const [test] = await db
+    .insert(psychTests)
+    .values({
+      workspaceId,
+      title: catalog.title,
+      description: catalog.description,
+      category: catalog.category,
+      sourceUrl: catalog.sourceUrl ?? null,
+      status: "published",
+      createdBy: counselorId,
+      publishedAt: new Date(),
+    })
+    .returning();
+
+  const questionCounts = new Map<string, number>();
+  for (const question of catalog.questions) {
+    questionCounts.set(question.dimension, (questionCounts.get(question.dimension) ?? 0) + 1);
+  }
+
+  const dimensionIds = new Map<string, string>();
+  for (const [index, dimension] of catalog.dimensions.entries()) {
+    const [row] = await db
+      .insert(psychDimensions)
+      .values({
+        testId: test.id,
+        sortOrder: index,
+        title: dimension.title,
+        description: dimension.description,
+        bandsJson: bandsFor(dimension, questionCounts.get(dimension.key) ?? 1),
+      })
+      .returning({ id: psychDimensions.id });
+    dimensionIds.set(dimension.key, row.id);
+  }
+
+  const scaleLabels: Record<string, string[]> = {
+    agreement: ["کاملاً مخالفم", "مخالفم", "نظری ندارم", "موافقم", "کاملاً موافقم"],
+    frequency: ["هرگز", "به‌ندرت", "گاهی", "اغلب", "همیشه"],
+  };
+
+  for (const [index, question] of catalog.questions.entries()) {
+    const dimensionId = dimensionIds.get(question.dimension);
+    if (!dimensionId) throw new Error(`dimension missing: ${question.dimension}`);
+    const [questionRow] = await db
+      .insert(psychQuestions)
+      .values({ testId: test.id, sortOrder: index, body: question.body })
+      .returning({ id: psychQuestions.id });
+
+    const labels = scaleLabels[question.scale ?? "agreement"];
+    await db.insert(psychOptions).values(
+      labels.map((body, optionIndex) => ({
+        questionId: questionRow.id,
+        sortOrder: optionIndex,
+        body,
+        scoresJson: { [dimensionId]: optionIndex },
+      })),
+    );
+  }
+
+  return "created";
+}
+
+async function main() {
+  const db = await getDb();
+  const [workspace] = await db
+    .select()
+    .from(workspaces)
+    .where(eq(workspaces.name, "دفتر مشاوره نمونه"))
+    .limit(1);
+  if (!workspace) {
+    throw new Error("workspace missing; run `bun run db:seed` or `bun run db:import:example` first");
+  }
+  const [counselor] = await db
+    .select()
+    .from(users)
+    .where(and(eq(users.workspaceId, workspace.id), eq(users.role, "counselor")))
+    .limit(1);
+  if (!counselor) throw new Error("counselor missing");
+
+  const mbti = await seedMbti(workspace.id, counselor.id);
+
+  let created = 0;
+  let existing = 0;
+  for (const catalog of PSYCH_TEST_CATALOG) {
+    const result = await seedCatalogTest(workspace.id, counselor.id, catalog);
+    if (result === "created") created += 1;
+    else existing += 1;
+  }
+
+  const all = await db
+    .select()
+    .from(psychTests)
+    .where(eq(psychTests.workspaceId, workspace.id));
+  const [questionStats] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(psychQuestions);
+
+  console.log(
+    `psych library ready: ${fa(all.length)} tests total (${fa(created)} new, ${fa(existing)} existing catalog tests; MBTI ${mbti}).`,
+  );
+  console.log(`catalog: ${fa(PSYCH_TEST_CATALOG.length)} tests, ${fa(questionStats?.count ?? 0)} questions in database.`);
   process.exit(0);
 }
 

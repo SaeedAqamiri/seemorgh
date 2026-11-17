@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { saveBellSlotsAction, saveWeeklyPanelAction } from "@/app/actions/panel";
+import { saveBellSlotsAction, saveSchoolScheduleAction, saveWeeklyPanelAction } from "@/app/actions/panel";
 import { BellScheduleEditor } from "@/components/bell-schedule-editor";
+import { SchoolScheduleEditor, type SchoolLessonState } from "@/components/school-schedule-editor";
 import { WeekGridEditor, type PanelCellState } from "@/components/week-panel";
 import { requireCounselor } from "@/lib/auth";
 import { getStudentDetail } from "@/lib/counselor";
 import { getPanelOptions, getWeeklyPanelView, slotLabel } from "@/lib/panel";
+import { getSchoolLessons } from "@/lib/school-schedule";
 import {
   addDays,
   formatJalaliNumeric,
@@ -37,9 +39,10 @@ export default async function CounselorPanelPage({
   const detail = await getStudentDetail(counselor.workspaceId, id);
   if (!detail) notFound();
 
-  const [panelView, options] = await Promise.all([
+  const [panelView, options, schoolLessons] = await Promise.all([
     getWeeklyPanelView(id, weekStart),
     getPanelOptions(counselor.workspaceId, id),
+    getSchoolLessons(id),
   ]);
 
   const dates = weekDates(weekStart);
@@ -105,6 +108,22 @@ export default async function CounselorPanelPage({
           weekStart={weekStart}
           initialSlots={panelView.slots}
           action={saveBellSlotsAction}
+        />
+      </div>
+
+      <div className="card">
+        <div className="section-head">
+          <h2>برنامه هفتگی مدرسه</h2>
+          <small>زنگ‌های مدرسه و درس هر زنگ؛ این برنامه مبنای برنامه‌ریزی خودکار است.</small>
+        </div>
+        <SchoolScheduleEditor
+          studentId={id}
+          weekdayLabels={[...WEEKDAY_LABELS]}
+          slotLabels={slotLabels}
+          initialLessons={schoolLessons as unknown as SchoolLessonState[]}
+          subjects={options.subjects}
+          subjectGroups={options.subjectGroups}
+          action={saveSchoolScheduleAction}
         />
       </div>
 

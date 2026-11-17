@@ -7,6 +7,7 @@ import {
   plans,
   resources,
   studentConstraints,
+  studentGroups,
   students,
   subjects,
   tasks,
@@ -14,6 +15,7 @@ import {
 import { startOfWeekSaturday, tehranMinutesOf, todayISO, weekDates } from "./dates";
 import { ensureSubjectCatalog, listSubjectsForField } from "./subject-catalog";
 import { chaptersByResourceIds, ensureChaptersFromJson } from "./resource-chapters";
+import { ensureStudentGroups, getGroupForStudent, type StudentGroup } from "./student-groups";
 import type { ResourceChapterRow } from "@/db/schema";
 
 export type StudentListItem = {
@@ -25,6 +27,10 @@ export type StudentListItem = {
   track: string;
   inviteCode: string;
   hasAccount: boolean;
+  groupId: string | null;
+  groupName: string | null;
+  groupEmoji: string | null;
+  groupColor: string | null;
   planStatus: "draft" | "approved" | "active" | "archived" | null;
   planWeekStart: string | null;
   doneTasks: number;
@@ -45,9 +51,17 @@ export async function listStudents(
   const weekStart = startOfWeekSaturday(todayISO());
   const today = todayISO();
 
+  await ensureStudentGroups(workspaceId);
+
   const rows = await db
-    .select()
+    .select({
+      student: students,
+      groupName: studentGroups.name,
+      groupEmoji: studentGroups.emoji,
+      groupColor: studentGroups.color,
+    })
     .from(students)
+    .leftJoin(studentGroups, eq(students.groupId, studentGroups.id))
     .where(
       and(
         eq(students.workspaceId, workspaceId),
@@ -59,7 +73,7 @@ export async function listStudents(
 
   if (rows.length === 0) return [];
 
-  const ids = rows.map((row) => row.id);
+  const ids = rows.map((row) => row.student.id);
 
   const planRows = await db
     .select()
@@ -107,7 +121,8 @@ export async function listStudents(
   const todayByStudent = new Map(todayStats.map((row) => [row.studentId, row]));
   const resourceByStudent = new Map(resourceRows.map((row) => [row.studentId, row]));
 
-  return rows.map((student) => {
+  return rows.map((row) => {
+    const student = row.student;
     const plan = planByStudent.get(student.id);
     const stats = plan ? taskStatsByPlan.get(plan.id) : undefined;
     const todayRow = todayByStudent.get(student.id);
@@ -123,6 +138,10 @@ export async function listStudents(
       track: student.track,
       inviteCode: student.inviteCode,
       hasAccount: Boolean(student.userId),
+      groupId: student.groupId,
+      groupName: row.groupName,
+      groupEmoji: row.groupEmoji,
+      groupColor: row.groupColor,
       planStatus: plan?.status ?? null,
       planWeekStart: plan?.weekStart ?? null,
       doneTasks: stats?.done ?? 0,
@@ -158,6 +177,7 @@ export type StudentDetail = {
   constraints: typeof studentConstraints.$inferSelect;
   subjects: Awaited<ReturnType<typeof listSubjectsForField>>;
   plans: (typeof plans.$inferSelect)[];
+  group: StudentGroup | null;
 };
 
 export async function getStudentDetail(
@@ -165,6 +185,7 @@ export async function getStudentDetail(
   studentId: string,
 ): Promise<StudentDetail | null> {
   const db = await getDb();
+  await ensureStudentGroups(workspaceId);
   const [student] = await db
     .select()
     .from(students)
@@ -280,6 +301,7 @@ export async function getStudentDetail(
     constraints,
     subjects: subjectRows,
     plans: planRows,
+    group: await getGroupForStudent(workspaceId, studentId),
   };
 }
 
@@ -361,8 +383,11 @@ export async function getWeekReport(
     };
   }
 
+  const counted = planData.tasks.filter(
+    (task) => task.type !== "school" && task.type !== "exam" && task.type !== "exam_analysis",
+  );
   const byDay = dates.map((date) => {
-    const dayTasks = planData.tasks.filter((task) => task.planDate === date);
+    const dayTasks = counted.filter((task) => task.planDate === date);
     return {
       date,
       total: dayTasks.length,
@@ -393,7 +418,7 @@ export async function getWeekReport(
   let eligibleDays = 0;
 
   for (const date of dates) {
-    const dayTasks = planData.tasks
+    const dayTasks = counted
       .filter((task) => task.planDate === date)
       .sort((a, b) => a.plannedStart - b.plannedStart);
     const first = dayTasks[0];
@@ -409,16 +434,16 @@ export async function getWeekReport(
   return {
     weekStart,
     dates,
-    plannedMinutes: planData.tasks.reduce((sum, task) => sum + task.estMinutes, 0),
-    doneMinutes: planData.tasks
+    plannedMinutes: counted.reduce((sum, task) => sum + task.estMinutes, 0),
+    doneMinutes: counted
       .filter((task) => task.status === "done")
       .reduce((sum, task) => sum + task.estMinutes, 0),
-    doneTasks: planData.tasks.filter((task) => task.status === "done").length,
-    totalTasks: planData.tasks.length,
+    doneTasks: counted.filter((task) => task.status === "done").length,
+    totalTasks: counted.length,
     activeDays: byDay.filter((day) => day.done > 0).length,
     correctStarts,
     eligibleDays,
-    testsDone: planData.tasks.filter((task) => task.status === "done" && (task.type === "test" || task.type === "timed_test" || task.type === "exercise")).length,
+    testsDone: counted.filter((task) => task.status === "done" && (task.type === "test" || task.type === "timed_test" || task.type === "exercise")).length,
     byDay,
   };
 }

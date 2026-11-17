@@ -4,6 +4,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { requireStudent } from "@/lib/auth";
 import { formatTehranDateTime } from "@/lib/dates";
 import { listPsychTests, listUserPsychAttempts } from "@/lib/psych-server";
+import { PSYCH_CATEGORY_LABELS, PSYCH_CATEGORY_ORDER } from "@/lib/psych-catalog";
 
 export default async function StudentPsychTestsPage({
   searchParams,
@@ -17,7 +18,18 @@ export default async function StudentPsychTestsPage({
     listPsychTests(user.workspaceId),
     listUserPsychAttempts(user.id),
   ]);
-  const tests = allTests.filter((test) => test.status === "published");
+  const tests = allTests
+    .filter((test) => test.status === "published")
+    .sort((first, second) => {
+      const firstIndex = PSYCH_CATEGORY_ORDER.indexOf(
+        first.category as (typeof PSYCH_CATEGORY_ORDER)[number],
+      );
+      const secondIndex = PSYCH_CATEGORY_ORDER.indexOf(
+        second.category as (typeof PSYCH_CATEGORY_ORDER)[number],
+      );
+      if (firstIndex !== secondIndex) return firstIndex - secondIndex;
+      return first.title.localeCompare(second.title, "fa");
+    });
 
   const attemptsByTest = new Map<string, typeof attempts>();
   for (const row of attempts) {
@@ -55,7 +67,10 @@ export default async function StudentPsychTestsPage({
                 <div className="row between" style={{ alignItems: "flex-start" }}>
                   <div>
                     <h2>{test.title}</h2>
-                    <small>
+                    <span className="badge" style={{ marginBottom: "0.35rem" }}>
+                      {PSYCH_CATEGORY_LABELS[test.category] ?? test.category}
+                    </span>
+                    <small style={{ display: "block" }}>
                       {test.dimensionCount.toLocaleString("fa-IR")} بُعد —{" "}
                       {test.questionCount.toLocaleString("fa-IR")} سوال
                     </small>

@@ -455,6 +455,7 @@ export async function getStudentTrendAnalysis(input: {
       if (!date || date < input.from || date > input.to) continue;
       for (const cell of grid[day]) {
         if (cell.kind === "empty" || cell.kind === "rest") continue;
+        if (!("subjectId" in cell) || !cell.subjectId) continue;
         const title = subjectTitles.get(cell.subjectId);
         if (!title) continue;
         const key = normalizeTitle(title);

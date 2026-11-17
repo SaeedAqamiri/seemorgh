@@ -5,13 +5,16 @@ import { SubmitButton } from "./submit-button";
 import { subjectSupportsTests } from "@/lib/subjects";
 
 export type PanelCellState = {
-  kind: "empty" | "rest" | "study" | "review" | "test" | "timedTest" | "exercise" | "routine";
+  kind: "empty" | "rest" | "study" | "review" | "test" | "timedTest" | "exercise" | "routine" | "school" | "exam" | "examAnalysis";
   subjectId?: string;
   resourceText?: string;
   resourceId?: string | null;
   chapterId?: string | null;
   count?: number;
   routineMode?: "study" | "test";
+  label?: string;
+  title?: string;
+  mockExamId?: string | null;
 };
 
 type SubjectOption = { id: string; title: string; kind: string; color: string };
@@ -53,6 +56,9 @@ const KIND_OPTIONS: { value: PanelCellState["kind"]; label: string }[] = [
   { value: "timedTest", label: "تست زمان‌دار" },
   { value: "exercise", label: "تمرین" },
   { value: "routine", label: "روتین" },
+  { value: "school", label: "مدرسه" },
+  { value: "exam", label: "آزمون آزمایشی" },
+  { value: "examAnalysis", label: "تحلیل آزمون" },
 ];
 
 const ACTION_LABELS: Record<PanelCellState["kind"], string> = {
@@ -64,6 +70,9 @@ const ACTION_LABELS: Record<PanelCellState["kind"], string> = {
   timedTest: "تست زمان‌دار",
   exercise: "تمرین",
   routine: "روتین",
+  school: "مدرسه",
+  exam: "آزمون آزمایشی",
+  examAnalysis: "تحلیل آزمون",
 };
 
 function isCountKind(kind: PanelCellState["kind"]): boolean {
@@ -85,6 +94,8 @@ function cloneGrid(grid: PanelCellState[][]): PanelCellState[][] {
 function defaultCell(kind: PanelCellState["kind"]): PanelCellState {
   if (kind === "empty") return { kind: "empty" };
   if (kind === "rest") return { kind: "rest" };
+  if (kind === "school") return { kind, subjectId: "", label: "" };
+  if (kind === "exam" || kind === "examAnalysis") return { kind, mockExamId: null, title: "" };
   if (kind === "study" || kind === "review") return { kind, subjectId: "", resourceText: "" };
   if (kind === "routine") {
     return {
@@ -239,6 +250,14 @@ export function WeekGridEditor(props: WeekGridEditorProps) {
   const cellLabel = (cell: PanelCellState) => {
     if (cell.kind === "empty") return <span className="muted">—</span>;
     if (cell.kind === "rest") return <span className="panel-rest action-rest">استراحت</span>;
+    if (cell.kind === "exam" || cell.kind === "examAnalysis") {
+      return (
+        <div className={`panel-action action-${cell.kind}`}>
+          <strong>{ACTION_LABELS[cell.kind]}</strong>
+          {cell.title ? <div className="muted" style={{ fontSize: "0.72rem" }}>{cell.title}</div> : null}
+        </div>
+      );
+    }
     const subject = cell.subjectId ? subjectById.get(cell.subjectId) : undefined;
     const title = subject?.title ?? "درس";
     const color = subject?.color ?? "#1f6f4a";
@@ -271,7 +290,8 @@ export function WeekGridEditor(props: WeekGridEditorProps) {
   };
 
   const actionControls = (day: number, slot: number, cell: PanelCellState) => {
-    const needsSubject = cell.kind !== "empty" && cell.kind !== "rest";
+    const isEvent = cell.kind === "exam" || cell.kind === "examAnalysis";
+    const needsSubject = cell.kind !== "empty" && cell.kind !== "rest" && !isEvent;
     const group = groupFor(day, slot, cell);
     const subjectIds = group === "general" ? props.subjectGroups.general : props.subjectGroups.specialized;
     const availableSubjects = subjectIds
@@ -287,6 +307,16 @@ export function WeekGridEditor(props: WeekGridEditorProps) {
 
     return (
       <>
+        {isEvent ? (
+          <input
+            type="text"
+            aria-label={`عنوان ${props.weekdayLabels[day]} زنگ ${slot + 1}`}
+            placeholder="عنوان آزمون یا تحلیل…"
+            value={cell.title ?? ""}
+            onChange={(event) => updateCell(day, slot, { ...cell, title: event.target.value })}
+          />
+        ) : null}
+
         {isRoutine ? (
           <select
             aria-label={`نوع روتین ${props.weekdayLabels[day]} زنگ ${slot + 1}`}

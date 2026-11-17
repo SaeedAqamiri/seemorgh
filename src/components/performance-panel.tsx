@@ -5,7 +5,7 @@ import { SubmitButton } from "./submit-button";
 import { subjectSupportsTests } from "@/lib/subjects";
 
 export type PerfCellState = {
-  kind: "empty" | "rest" | "study" | "review" | "test" | "timedTest" | "exercise" | "routine";
+  kind: "empty" | "rest" | "study" | "review" | "test" | "timedTest" | "exercise" | "routine" | "school" | "exam" | "examAnalysis";
   subjectId?: string;
   resourceText?: string;
   resourceId?: string | null;
@@ -14,6 +14,9 @@ export type PerfCellState = {
   routineMode?: "study" | "test";
   minutes?: number;
   note?: string;
+  label?: string;
+  title?: string;
+  mockExamId?: string | null;
 };
 
 type SubjectOption = { id: string; title: string; kind: string; color: string };
@@ -57,6 +60,9 @@ const KIND_OPTIONS: { value: PerfCellState["kind"]; label: string }[] = [
   { value: "timedTest", label: "تست زمان‌دار" },
   { value: "exercise", label: "تمرین" },
   { value: "routine", label: "روتین" },
+  { value: "school", label: "مدرسه" },
+  { value: "exam", label: "آزمون آزمایشی" },
+  { value: "examAnalysis", label: "تحلیل آزمون" },
 ];
 
 const ACTION_LABELS: Record<PerfCellState["kind"], string> = {
@@ -68,6 +74,9 @@ const ACTION_LABELS: Record<PerfCellState["kind"], string> = {
   timedTest: "تست زمان‌دار",
   exercise: "تمرین",
   routine: "روتین",
+  school: "مدرسه",
+  exam: "آزمون آزمایشی",
+  examAnalysis: "تحلیل آزمون",
 };
 
 const VIEW_OPTIONS: { value: ViewMode; label: string }[] = [
@@ -95,6 +104,10 @@ function cloneGrid(grid: PerfCellState[][]): PerfCellState[][] {
 function defaultCell(kind: PerfCellState["kind"], minutes: number, note = ""): PerfCellState {
   if (kind === "empty") return { kind: "empty" };
   if (kind === "rest") return { kind: "rest" };
+  if (kind === "school") return { kind, subjectId: "", label: "", minutes, note };
+  if (kind === "exam" || kind === "examAnalysis") {
+    return { kind, mockExamId: null, title: "", minutes, note };
+  }
   if (kind === "study" || kind === "review") {
     return { kind, subjectId: "", resourceText: "", minutes, note };
   }
@@ -264,6 +277,17 @@ export function PerformancePanel(props: PerformancePanelProps) {
   const perfLabel = (cell: PerfCellState) => {
     if (cell.kind === "empty") return <span className="muted">—</span>;
     if (cell.kind === "rest") return <span className="panel-rest action-rest">استراحت</span>;
+    if (cell.kind === "exam" || cell.kind === "examAnalysis") {
+      return (
+        <div className={`panel-action action-${cell.kind}`}>
+          <strong>{ACTION_LABELS[cell.kind]}</strong>
+          {cell.title ? <div className="muted" style={{ fontSize: "0.72rem" }}>{cell.title}</div> : null}
+          <div className="muted" style={{ fontSize: "0.72rem" }}>
+            {Number.isFinite(cell.minutes) ? `${(cell.minutes ?? 0).toLocaleString("fa-IR")} دقیقه` : "—"}
+          </div>
+        </div>
+      );
+    }
     const subject = cell.subjectId ? subjectById.get(cell.subjectId) : undefined;
     const title = subject?.title ?? "درس";
     const color = subject?.color ?? "#1f6f4a";
@@ -315,6 +339,7 @@ export function PerformancePanel(props: PerformancePanelProps) {
         ? !supportsTestsFor(perf.subjectId)
         : group === "general";
 
+      const isEvent = perf.kind === "exam" || perf.kind === "examAnalysis";
       return (
         <div className="perf-edit-wrap">
           <span className="perf-tag">برنامه: {planned}</span>
@@ -335,6 +360,15 @@ export function PerformancePanel(props: PerformancePanelProps) {
                 </option>
               ))}
             </select>
+            {isEvent ? (
+              <input
+                type="text"
+                placeholder="عنوان آزمون یا تحلیل…"
+                aria-label={`عنوان ${props.weekdayLabels[day]} زنگ ${slot + 1}`}
+                value={perf.title ?? ""}
+                onChange={(event) => updateCell(day, slot, { ...perf, title: event.target.value })}
+              />
+            ) : null}
             {perf.kind === "routine" ? (
               <select
                 aria-label={`نوع روتین ${props.weekdayLabels[day]} زنگ ${slot + 1}`}
@@ -347,7 +381,7 @@ export function PerformancePanel(props: PerformancePanelProps) {
                 <option value="study">روتین مطالعه</option>
               </select>
             ) : null}
-            {perf.kind !== "empty" && perf.kind !== "rest" ? (
+            {perf.kind !== "empty" && perf.kind !== "rest" && !isEvent ? (
               <>
                 <select
                   aria-label={`گروه درس ${props.weekdayLabels[day]} زنگ ${slot + 1}`}

@@ -23,6 +23,9 @@ const TYPE_LABELS: Record<string, string> = {
   review: "مرور",
   test: "تست آموزشی",
   timed_test: "تست زمان‌دار",
+  school: "مدرسه",
+  exam: "آزمون آزمایشی",
+  exam_analysis: "تحلیل آزمون",
   exercise: "تمرین",
 };
 

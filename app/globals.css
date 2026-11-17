@@ -482,6 +482,21 @@ tr:last-child td {
   font-weight: 400;
 }
 
+.action-school {
+  font-weight: 500;
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.action-exam {
+  font-weight: 700;
+  background: rgba(250, 204, 21, 0.14);
+}
+
+.action-examAnalysis {
+  font-weight: 500;
+  background: rgba(59, 130, 246, 0.1);
+}
+
 .task-action-study {
   font-weight: 400;
 }
@@ -506,6 +521,19 @@ tr:last-child td {
   text-decoration: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
+}
+
+.task-action-school {
+  font-weight: 500;
+  opacity: 0.85;
+}
+
+.task-action-exam {
+  font-weight: 700;
+}
+
+.task-action-exam_analysis {
+  font-weight: 500;
 }
 
 .panel-rest {
@@ -874,6 +902,526 @@ tr:last-child td {
   padding: 0.8rem 1rem;
   display: grid;
   gap: 0.4rem;
+}
+
+
+/* ── Student groups ─────────────────────────────────────────────── */
+.group-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--group-color, #1f6f4a) 68%, #0b1a12);
+  background: color-mix(in srgb, var(--group-color, #1f6f4a) 12%, #fff);
+  border: 1px solid color-mix(in srgb, var(--group-color, #1f6f4a) 30%, #fff);
+  white-space: nowrap;
+}
+a.group-chip:hover {
+  text-decoration: none;
+  background: color-mix(in srgb, var(--group-color, #1f6f4a) 20%, #fff);
+}
+
+.group-admin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 1rem;
+}
+
+.group-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 4px solid var(--group-color, var(--brand));
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1rem;
+}
+
+.group-card-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.group-card-head > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.group-card-emoji {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  border-radius: 12px;
+  font-size: 1.35rem;
+  background: color-mix(in srgb, var(--group-color, var(--brand)) 12%, #fff);
+  border: 1px solid color-mix(in srgb, var(--group-color, var(--brand)) 25%, #fff);
+}
+
+.group-edit summary {
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.group-edit summary:hover {
+  color: var(--brand);
+}
+
+.group-delete {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: auto;
+  padding-top: 0.4rem;
+  border-top: 1px dashed var(--border);
+}
+
+/* ── Group leaderboard ──────────────────────────────────────────── */
+.lb-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.lb-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 1rem 1.1rem;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--group-color, var(--brand)) 26%, var(--border));
+  background:
+    radial-gradient(circle at 100% 0, color-mix(in srgb, var(--group-color, var(--brand)) 22%, transparent), transparent 58%),
+    linear-gradient(135deg, color-mix(in srgb, var(--group-color, var(--brand)) 8%, #fff), #fff);
+}
+
+.lb-hero-main {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.lb-hero-emoji {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  flex: 0 0 54px;
+  font-size: 1.8rem;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+.lb-hero-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+.lb-tabs {
+  display: inline-flex;
+  gap: 0.2rem;
+  padding: 0.25rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid var(--border);
+}
+
+.lb-tab {
+  min-height: 36px;
+  padding: 0.35rem 1rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.lb-tab:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.lb-tab.is-active {
+  background: var(--group-color, var(--brand));
+  color: #fff;
+}
+
+.lb-tab.is-active:hover {
+  background: color-mix(in srgb, var(--group-color, var(--brand)) 85%, #000);
+}
+
+.lb-viewer-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+  padding: 0.6rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--brand) 25%, var(--border));
+  background: linear-gradient(90deg, var(--brand-soft), #fff);
+  font-size: 0.86rem;
+}
+
+.lb-viewer-avatar {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: 50%;
+  background: var(--brand);
+  color: #fff;
+  font-weight: 800;
+}
+
+.lb-viewer-stat {
+  margin-inline-start: auto;
+  color: var(--brand-strong);
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.lb-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.lb-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.lb-section-head h3 {
+  margin: 0;
+}
+
+.lb-podium {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  padding: 0.9rem 0.25rem 0.2rem;
+}
+
+.podium-card {
+  --podium: #94a3b8;
+  flex: 1 1 150px;
+  max-width: 230px;
+  text-align: center;
+  padding: 0.9rem 0.7rem;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, #fff, color-mix(in srgb, var(--podium) 16%, #fff));
+  box-shadow: var(--shadow);
+}
+
+.podium-1 {
+  --podium: #eab308;
+  transform: translateY(-10px);
+}
+
+.podium-2 {
+  --podium: #94a3b8;
+}
+
+.podium-3 {
+  --podium: #b9773f;
+}
+
+.podium-medal {
+  font-size: 1.55rem;
+  line-height: 1;
+}
+
+.podium-rank {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  margin: 0 auto;
+  border-radius: 50%;
+  font-size: 1rem;
+  font-weight: 800;
+  color: #fff;
+  background: var(--podium);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.45);
+}
+
+.podium-1 .podium-rank {
+  width: 40px;
+  height: 40px;
+  font-size: 1.15rem;
+}
+
+.medal-badge {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  border-radius: 50%;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.medal-badge.is-gold {
+  background: linear-gradient(135deg, #f5c518, #d99b00);
+}
+
+.medal-badge.is-silver {
+  background: linear-gradient(135deg, #b6c0cb, #8794a3);
+}
+
+.medal-badge.is-bronze {
+  background: linear-gradient(135deg, #cf8a55, #a4642f);
+}
+
+.medal-badge.is-plain {
+  background: var(--muted);
+}
+
+.podium-avatar {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  margin: 0.35rem auto;
+  border-radius: 50%;
+  background: var(--podium);
+  color: #fff;
+  font-weight: 800;
+  font-size: 1.1rem;
+}
+
+.podium-name {
+  font-weight: 700;
+  font-size: 0.92rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.podium-count {
+  margin-top: 0.15rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in srgb, var(--podium) 55%, #1d241f);
+}
+
+.podium-count small {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.lb-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 0.8rem;
+}
+
+.champ-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.75rem 0.8rem;
+  border: 1px solid var(--border);
+  border-top: 4px solid var(--brand);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.champ-card.is-you-champ {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 20%, transparent), var(--shadow);
+}
+
+.champ-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.champ-head strong {
+  font-size: 0.9rem;
+}
+
+.champ-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: 0 0 10px;
+}
+
+.champ-unit {
+  margin-inline-start: auto;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.champ-winner {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.champ-medal {
+  font-size: 1.1rem;
+}
+
+.champ-avatar {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.9rem;
+}
+
+.champ-name {
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+
+.champ-count {
+  margin-inline-start: auto;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.95rem;
+}
+
+.champ-count small {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.champ-empty {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.champ-runners {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.champ-runner {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.73rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+.champ-runner b {
+  color: var(--text);
+}
+
+.champ-you {
+  border-top: 1px dashed var(--border);
+  padding-top: 0.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.champ-you-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+}
+
+.lb-bar {
+  position: relative;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.lb-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--brand), #34a071);
+  transition: width 0.5s ease;
+}
+
+.lb-bar-avg {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  background: var(--muted);
+  opacity: 0.7;
+}
+
+.is-compact .lb-hero {
+  padding: 0.75rem 0.85rem;
+}
+
+.is-compact .lb-hero-emoji {
+  width: 44px;
+  height: 44px;
+  flex-basis: 44px;
+  font-size: 1.4rem;
+}
+
+.is-compact .lb-grid {
+  grid-template-columns: repeat(auto-fill, minmax(225px, 1fr));
+}
+
+@media (max-width: 760px) {
+  .lb-hero {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .lb-tabs {
+    justify-content: center;
+  }
+
+  .lb-viewer-stat {
+    margin-inline-start: 0;
+  }
+
+  .podium-1 {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lb-bar-fill {
+    transition: none;
+  }
 }
 
 @media print {

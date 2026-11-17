@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { saveBellSlotsAction, saveWeeklyPanelAction } from "@/app/actions/panel";
+import { saveBellSlotsAction, saveSchoolScheduleAction, saveWeeklyPanelAction } from "@/app/actions/panel";
 import { BellScheduleEditor } from "@/components/bell-schedule-editor";
+import { SchoolScheduleEditor, type SchoolLessonState } from "@/components/school-schedule-editor";
 import { WeekGridEditor, type PanelCellState } from "@/components/week-panel";
 import { requireStudent } from "@/lib/auth";
 import {
@@ -13,6 +14,7 @@ import {
   weekDates,
 } from "@/lib/dates";
 import { getPanelOptions, getWeeklyPanelView, slotLabel } from "@/lib/panel";
+import { getSchoolLessons } from "@/lib/school-schedule";
 
 const SUCCESS: Record<string, string> = {
   saved: "پنل هفته با موفقیت ثبت شد.",
@@ -29,9 +31,10 @@ export default async function StudentPanelPage({
   const requestedWeek = week && isISODate(week) ? week : todayISO();
   const weekStart = startOfWeekSaturday(requestedWeek);
 
-  const [panelView, options] = await Promise.all([
+  const [panelView, options, schoolLessons] = await Promise.all([
     getWeeklyPanelView(student.id, weekStart),
     getPanelOptions(user.workspaceId, student.id),
+    getSchoolLessons(student.id),
   ]);
 
   const dates = weekDates(weekStart);
@@ -79,6 +82,22 @@ export default async function StudentPanelPage({
           weekStart={weekStart}
           initialSlots={panelView.slots}
           action={saveBellSlotsAction}
+        />
+      </div>
+
+      <div className="card">
+        <div className="section-head">
+          <h2>برنامه هفتگی مدرسه</h2>
+          <small>زنگ‌های مدرسه و درس هر زنگ؛ این برنامه مبنای برنامه‌ریزی خودکار است.</small>
+        </div>
+        <SchoolScheduleEditor
+          studentId={student.id}
+          weekdayLabels={[...WEEKDAY_LABELS]}
+          slotLabels={slotLabels}
+          initialLessons={schoolLessons as unknown as SchoolLessonState[]}
+          subjects={options.subjects}
+          subjectGroups={options.subjectGroups}
+          action={saveSchoolScheduleAction}
         />
       </div>
 
