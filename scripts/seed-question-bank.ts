@@ -111,7 +111,7 @@ const QUESTIONS: SeedQuestion[] = [
   { subject: "اقتصاد", topic: "سیاست پولی", difficulty: "very_hard", body: "افزایش نرخ بهره توسط بانک مرکزی معمولاً چه اثری دارد؟", options: ["افزایش تورم", "کاهش سرمایه‌گذاری و فشار بر تورم", "افزایش مصرف", "کاهش بیکاری"], correct: 2, explanation: "افزایش نرخ بهره هزینهٔ وام را بالا می‌برد و سرمایه‌گذاری و تورم را مهار می‌کند.", sourceType: "authored", sourceTitle: "تالیف سیمرغ", tags: "سیاست پولی" },
 ];
 
-async function main() {
+export async function seedQuestionBank(): Promise<{ inserted: number; skipped: number }> {
   const db = await getDb();
   const [counselor] = await db
     .select()
@@ -120,8 +120,7 @@ async function main() {
     .limit(1);
 
   if (!counselor) {
-    console.error("هیچ مشاوری پیدا نشد. اول bun run db:seed را اجرا کنید.");
-    process.exit(1);
+    throw new Error("هیچ مشاوری پیدا نشد. اول bun run db:seed را اجرا کنید.");
   }
 
   const subjectRows = await db
@@ -215,11 +214,18 @@ async function main() {
     inserted += 1;
   }
 
+  return { inserted, skipped };
+}
+
+async function main() {
+  const { inserted, skipped } = await seedQuestionBank();
   console.log(`بانک سوال: ${inserted} سوال جدید اضافه شد، ${skipped} سوال از قبل وجود داشت.`);
   process.exit(0);
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+if (process.argv[1]?.endsWith("seed-question-bank.ts")) {
+  main().catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+}

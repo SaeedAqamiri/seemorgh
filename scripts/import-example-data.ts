@@ -30,7 +30,11 @@ async function main() {
       console.log(`${name}: 0`);
       continue;
     }
-    await db.insert(table as never).values(rows as never).onConflictDoNothing();
+    const BATCH_SIZE = 500;
+    for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+      const batch = rows.slice(i, i + BATCH_SIZE);
+      await db.insert(table as never).values(batch as never).onConflictDoNothing();
+    }
     console.log(`${name}: ${rows.length}`);
   }
 
