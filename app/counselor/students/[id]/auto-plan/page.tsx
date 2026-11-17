@@ -1,11 +1,18 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
+  generateAiAutoPlanAction,
   generateAutoPlanAction,
+  replanAutoPlanAction,
   savePlanningSetupAction,
 } from "@/app/actions/auto-plan";
+import {
+  prepareAutoPlanAction,
+  runCounselingAction,
+} from "@/app/actions/counseling";
 import { SubmitButton } from "@/components/submit-button";
 import { PsychProfileCard } from "@/components/psych-profile-card";
+import { CounselingReportCard } from "@/components/counseling-report-card";
 import { aiAutoPlanningConfigured } from "@/lib/ai-auto-plan";
 import { defaultCurrentFor, defaultTargetFor, getAutoPlanContext } from "@/lib/auto-plan-data";
 import {
@@ -14,11 +21,13 @@ import {
   type GoalMetric,
 } from "@/lib/auto-plan";
 import { requireCounselor } from "@/lib/auth";
+import { getLatestCounselingReport } from "@/lib/counseling-report";
 import { summarizeResourceProgress } from "@/lib/resource-progress";
 import {
   addDays,
   formatJalali,
   formatJalaliNumeric,
+  formatTehranDateTime,
   isISODate,
   startOfWeekSaturday,
   todayISO,
@@ -41,14 +50,18 @@ export default async function AutoPlanPage({
     weeks?: string;
     source?: string;
     skipped?: string;
+    stage?: string;
+    counseling?: string;
   }>;
 }) {
   const counselor = await requireCounselor();
   const { id } = await params;
-  const { success, error, weeks, source, skipped } = await searchParams;
+  const { success, error, weeks, source, skipped, stage, counseling } = await searchParams;
 
   const context = await getAutoPlanContext(counselor.workspaceId, id);
   if (!context) notFound();
+  const counselingReport = await getLatestCounselingReport(id);
+  const reviewStage = stage === "review";
 
   const { detail, goals, policy, targetDate, currentPercentBySubject } = context;
   const selectedIds = new Set(context.mockExams.map((program) => program.id));
@@ -121,7 +134,96 @@ export default async function AutoPlanPage({
             : ""}
         </div>
       ) : null}
+      {counseling === "reused" ? (
+        <div className="alert alert-warn">
+          برنامه‌ریزی خودکار از <strong>آخرین گزارش مشاوره موجود</strong> استفاده کرد و تحلیل
+          جدیدی ساخته نشد (صرفه‌جویی در هزینه AI). اگر گزارش مناسب نیست یا قدیمی است، یک‌بار دکمه
+          «مشاوره تحصیلی» را بزنید تا تحلیل تازه ساخته شود و بعد برنامه‌ریزی خودکار را انجام دهید.
+        </div>
+      ) : counseling ? (
+        <div className="alert alert-success">
+          گزارش مشاوره‌ای موجود نبود؛ یک‌بار تحلیل مشاوره جدید ساخته و ذخیره شد و نتیجه در همین
+          صفحه قابل مشاهده است. از این پس برنامه‌ریزی خودکار همین گزارش را استفاده می‌کند.
+        </div>
+      ) : null}
+      {reviewStage && counselingReport ? (
+        <div className="alert alert-warn">
+          <strong>برنامه‌ریزی خودکار — مرحله بازبینی:</strong> برنامه بر اساس آخرین گزارش مشاوره
+          ({formatTehranDateTime(counselingReport.createdAt)}
+          {counselingReport.source === "ai" ? " — تحلیل AI" : " — تحلیل پایه"}) تنظیم می‌شود.
+          نتیجه تحلیل پایین نمایش داده شده است؛ تنظیمات زیر (اهداف دروس، آزمون‌ها و سیاست‌ها) را
+          بازبینی کنید و در صورت نیاز اصلاح کنید، سپس دکمه «تأیید و انجام برنامه‌ریزی خودکار» را
+          بزنید. اگر گزارش قدیمی است یا مورد پسندتان نیست، اول «مشاوره تحصیلی» را بزنید.
+        </div>
+      ) : null}
       {error ? <div className="alert alert-error">{error}</div> : null}
+
+      <div className="card">
+        <div className="section-head">
+          <div>
+            <h2>مشاوره تحصیلی و برنامه‌ریزی خودکار</h2>
+            <small>
+              برنامه‌ریزی خودکار همیشه از آخرین گزارش مشاوره استفاده می‌کند؛ اگر گزارش موجود
+              مناسب است، نیازی به تحلیل جدید نیست (تحلیل AI هزینه دارد).
+            </small>
+          </div>
+        </div>
+        <div className="grid grid-2" style={{ gap: "0.8rem" }}>
+          <div
+            className="stack"
+            style={{
+              gap: "0.5rem",
+              border: "1px solid var(--border)",
+              borderRadius: "12px",
+              padding: "0.8rem",
+              background: "#fff",
+            }}
+          >
+            <strong style={{ fontSize: "0.92rem" }}>۱) مشاوره تحصیلی</strong>
+            <small className="muted" style={{ lineHeight: 1.8 }}>
+              هر بار کلیک، یک تحلیل <strong>جدید</strong> با AI می‌سازد و ذخیره می‌کند (نتایج
+              آزمون‌های روان‌شناسی، آزمون‌های آزمایشی و پیشرفت منابع را تحلیل می‌کند — هزینه
+              دارد). اگر گزارش موجود مناسب است، دوباره نگیرید.
+            </small>
+            <form action={runCounselingAction}>
+              <input type="hidden" name="studentId" value={id} />
+              <SubmitButton pendingLabel="در حال تحلیل مشاوره…">مشاوره تحصیلی</SubmitButton>
+            </form>
+          </div>
+          <div
+            className="stack"
+            style={{
+              gap: "0.5rem",
+              border: "1px solid var(--brand)",
+              borderRadius: "12px",
+              padding: "0.8rem",
+              background: "var(--brand-soft, #eef2ff)",
+            }}
+          >
+            <strong style={{ fontSize: "0.92rem" }}>۲) برنامه‌ریزی خودکار</strong>
+            <small className="muted" style={{ lineHeight: 1.8 }}>
+              همیشه از <strong>آخرین گزارش مشاوره موجود</strong> استفاده می‌کند؛ اگر هنوز گزارشی
+              وجود ندارد، یک‌بار تحلیل ساخته می‌شود. بعد از بازبینی نتیجه و اصلاح تنظیمات،
+              برنامه‌ریزی انجام می‌شود. برای تحلیل تازه، اول دکمه «مشاوره تحصیلی» را بزنید.
+            </small>
+            <form action={prepareAutoPlanAction}>
+              <input type="hidden" name="studentId" value={id} />
+              <SubmitButton pendingLabel="در حال آماده‌سازی…">
+                {reviewStage ? "رفتن به مرحله بازبینی گزارش" : "برنامه‌ریزی خودکار"}
+              </SubmitButton>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      {counselingReport ? (
+        <CounselingReportCard report={counselingReport} />
+      ) : (
+        <div className="alert alert-warn">
+          هنوز گزارش مشاوره‌ای برای این دانش‌آموز ثبت نشده است؛ یکی از دو دکمه بالا را بزنید تا
+          تحلیل انجام شود.
+        </div>
+      )}
 
       <PsychProfileCard profile={context.psychProfile} studentId={id} compact />
 
@@ -530,9 +632,7 @@ export default async function AutoPlanPage({
             جایگزینی هفته‌های تأییدشده
           </label>
           <SubmitButton
-            name="mode"
-            value="replan"
-            formAction={generateAutoPlanAction}
+            formAction={replanAutoPlanAction}
             pendingLabel="در حال بازبرنامه‌ریزی…"
           >
             بازبرنامه‌ریزی از تاریخ شروع
@@ -540,15 +640,14 @@ export default async function AutoPlanPage({
           <SubmitButton
             formAction={generateAutoPlanAction}
             pendingLabel="در حال ساخت برنامه…"
+            className={reviewStage ? "" : "btn-secondary"}
           >
-            ذخیره و ساخت برنامه
+            {reviewStage ? "تأیید و انجام برنامه‌ریزی خودکار" : "ذخیره و ساخت برنامه"}
           </SubmitButton>
           {aiAutoPlanningConfigured() ? (
             <SubmitButton
               className="btn-secondary"
-              name="useAi"
-              value="1"
-              formAction={generateAutoPlanAction}
+              formAction={generateAiAutoPlanAction}
               pendingLabel="AI در حال برنامه‌ریزی…"
             >
               ذخیره و ساخت با AI

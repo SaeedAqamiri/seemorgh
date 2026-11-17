@@ -635,6 +635,33 @@ CREATE TABLE IF NOT EXISTS psych_answers (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE UNIQUE INDEX IF NOT EXISTS psych_answers_unique ON psych_answers(attempt_id, question_id);
+
+ALTER TABLE psych_attempts ADD COLUMN IF NOT EXISTS analysis_json jsonb;
+ALTER TABLE psych_attempts ADD COLUMN IF NOT EXISTS analysis_source text;
+ALTER TABLE psych_attempts ADD COLUMN IF NOT EXISTS analysis_at timestamptz;
+
+CREATE TABLE IF NOT EXISTS psych_profile_summaries (
+  id text PRIMARY KEY,
+  workspace_id text NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  student_id text NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  summary text NOT NULL DEFAULT '',
+  data_json jsonb,
+  source text NOT NULL DEFAULT 'ai',
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS psych_profile_summaries_student_unique ON psych_profile_summaries(student_id);
+
+CREATE TABLE IF NOT EXISTS counseling_reports (
+  id text PRIMARY KEY,
+  workspace_id text NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  student_id text NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  summary text NOT NULL DEFAULT '',
+  report_json jsonb,
+  source text NOT NULL DEFAULT 'ai',
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS counseling_reports_student_idx ON counseling_reports(student_id, created_at DESC);
 `;
 
 let initPromise: Promise<void> | null = null;

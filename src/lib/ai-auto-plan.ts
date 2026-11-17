@@ -2,6 +2,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { getDb } from "@/db/client";
 import { aiRuns } from "@/db/schema";
+import { chatJson } from "./ai-client";
 import { daysBetween, startOfWeekSaturday } from "./dates";
 import {
   buildDeterministicAllocation,
@@ -28,7 +29,7 @@ function weeklyCapacity(input: AutoPlanInput): { weekday: number; minutes: numbe
   }));
 }
 
-function anonymizedInput(input: AutoPlanInput) {
+function anonymizedInput(input: AutoPlanInput): Record<string, unknown> {
   const dates = planDates(input);
   const totalCapacity = dates.reduce(
     (sum, date) => sum + dateCapacity(input.availability, input.constraints, date, input.schoolPeriods ?? [], input.exams ?? []),
@@ -124,8 +125,12 @@ export async function generateAiAutoAllocation(input: {
   workspaceId: string;
   studentId: string;
   planner: AutoPlanInput;
+  counselingNotes?: string[];
 }): Promise<AiAutoAllocationResult> {
   const payload = anonymizedInput(input.planner);
+  if (input.counselingNotes && input.counselingNotes.length > 0) {
+    payload.counseling_notes = input.counselingNotes;
+  }
   const inputHash = createHash("sha256").update(JSON.stringify(payload)).digest("hex");
   const model = process.env.AI_MODEL ?? "deterministic";
   const fallback = buildDeterministicAllocation(input.planner);
@@ -141,38 +146,23 @@ export async function generateAiAutoAllocation(input: {
   }
 
   try {
-    const baseUrl = process.env.AI_BASE_URL!.replace(/\/+$/, "");
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(process.env.AI_API_KEY ? { Authorization: `Bearer ${process.env.AI_API_KEY}` } : {}),
-      },
-      body: JSON.stringify({
-        model,
-        temperature: 0.2,
-        max_tokens: 4000,
-        response_format: { type: "json_object" },
-        messages: [
-          {
-            role: "system",
-            content:
-              "تو برنامه‌ریز تحصیلی هستی. فقط JSON معتبر با کلیدهای subjects و warnings برگردان. برای هر درس یک شیء بده: subject_id، tests (تعداد کل تست در بازه)، study_minutes، review_minutes، distribution (even|front_loaded|back_loaded)، focus (جمله کوتاه فارسی). مجموع زمان تست‌ها (tests × minutesPerTest) + study_minutes + review_minutes را با ظرفیت کل و اهداف هماهنگ کن. منابع لازم نیست کامل شوند؛ تعداد تست را بر اساس فاصله هدف و زمان تعیین کن. هیچ درس یا منبعی خارج از فهرست ورودی نساز. notes سیاست را رعایت کن. بدون نام یا داده هویتی. warnings فقط جمله‌های فارسی کوتاه.",
-          },
-          { role: "user", content: JSON.stringify(payload) },
-        ],
-      }),
-      signal: AbortSignal.timeout(45_000),
+    const response = await chatJson<unknown>({
+      messages: [
+        {
+          role: "system",
+          content:
+            "تو برنامه‌ریز تحصیلی هستی. فقط JSON معتبر با کلیدهای subjects و warnings برگردان. برای هر درس یک شیء بده: subject_id، tests (تعداد کل تست در بازه)، study_minutes، review_minutes، distribution (even|front_loaded|back_loaded)، focus (جمله کوتاه فارسی). مجموع زمان تست‌ها (tests × minutesPerTest) + study_minutes + review_minutes را با ظرفیت کل و اهداف هماهنگ کن. منابع لازم نیست کامل شوند؛ تعداد تست را بر اساس فاصله هدف و زمان تعیین کن. هیچ درس یا منبعی خارج از فهرست ورودی نساز. notes سیاست و counseling_notes (توصیه‌های مشاور تحصیلی بر پایه آزمون‌های روان‌شناسی و کارنامه) را در توزیع زمان لحاظ کن. بدون نام یا داده هویتی. warnings فقط جمله‌های فارسی کوتاه.",
+        },
+        { role: "user", content: JSON.stringify(payload) },
+      ],
+      temperature: 0.2,
+      maxTokens: 8000,
+      timeoutMs: 60_000,
     });
 
-    if (!response.ok) throw new Error(`AI HTTP ${response.status}`);
+    if (!response.ok) throw new Error(response.error);
 
-    const data = (await response.json()) as {
-      choices?: { message?: { content?: string } }[];
-      usage?: { total_tokens?: number };
-    };
-    const content = data.choices?.[0]?.message?.content ?? "";
-    const parsed = JSON.parse(content) as unknown;
+    const parsed = response.data as unknown;
     const validated = sanitizeAutoAllocation(input.planner, parsed);
 
     if (!validated.ok) {
@@ -180,10 +170,10 @@ export async function generateAiAutoAllocation(input: {
         workspaceId: input.workspaceId,
         studentId: input.studentId,
         status: "fallback",
-        model,
+        model: response.model,
         inputHash,
         output: parsed,
-        tokens: data.usage?.total_tokens ?? 0,
+        tokens: response.tokens,
         error: validated.errors.slice(0, 6).join(" | "),
       });
       return {
@@ -199,10 +189,10 @@ export async function generateAiAutoAllocation(input: {
       workspaceId: input.workspaceId,
       studentId: input.studentId,
       status: "success",
-      model,
+      model: response.model,
       inputHash,
       output: parsed,
-      tokens: data.usage?.total_tokens ?? 0,
+      tokens: response.tokens,
     });
 
     return { ok: true, allocation: validated.allocation, runId, source: "ai" };

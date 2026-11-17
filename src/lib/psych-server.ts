@@ -16,7 +16,8 @@ import {
   type PsychResultRule,
   type PsychTest,
 } from "@/db/schema";
-import { scorePsychAttempt, type PsychScoreResult, type PsychScoringDimension } from "./psych";
+import { scorePsychAttempt, findPsychBand, type PsychScoreResult, type PsychScoringDimension } from "./psych";
+import { levelFromBands } from "./psych-ai";
 
 export type PsychTestListItem = PsychTest & {
   questionCount: number;
@@ -285,4 +286,98 @@ export async function getAttemptForTaking(
   const content = await getPsychTestContent(workspaceId, testId);
   if (!content) return null;
   return { attempt, content };
+}
+
+export type PsychProfileDimensionRow = {
+  title: string;
+  description: string;
+  score: number;
+  bandLabel: string;
+  bandAnalysis: string;
+  level: "low" | "mid" | "high";
+};
+
+export type PsychProfileAttemptRow = {
+  attempt: PsychAttempt;
+  testTitle: string;
+  testCategory: string;
+  testDescription: string;
+  dimensions: PsychProfileDimensionRow[];
+};
+
+const CATEGORY_ORDER: Record<string, number> = {
+  academic: 0,
+  career: 1,
+  personal: 2,
+  wellbeing: 3,
+  general: 4,
+};
+
+export async function listStudentPsychAttemptViews(
+  workspaceId: string,
+  studentId: string,
+): Promise<PsychProfileAttemptRow[]> {
+  const db = await getDb();
+  const rows = await db
+    .select({ attempt: psychAttempts, test: psychTests })
+    .from(psychAttempts)
+    .innerJoin(psychTests, eq(psychAttempts.testId, psychTests.id))
+    .where(
+      and(
+        eq(psychAttempts.workspaceId, workspaceId),
+        eq(psychAttempts.studentId, studentId),
+        eq(psychAttempts.status, "submitted"),
+      ),
+    )
+    .orderBy(desc(psychAttempts.submittedAt), desc(psychAttempts.createdAt));
+
+  const latestByTest = new Map<string, (typeof rows)[number]>();
+  for (const row of rows) {
+    if (!latestByTest.has(row.test.id)) latestByTest.set(row.test.id, row);
+  }
+  const latest = [...latestByTest.values()];
+  if (latest.length === 0) return [];
+
+  const testIds = latest.map((row) => row.test.id);
+  const dimensionRows = await db
+    .select()
+    .from(psychDimensions)
+    .where(inArray(psychDimensions.testId, testIds))
+    .orderBy(asc(psychDimensions.sortOrder));
+  const dimsByTest = new Map<string, typeof dimensionRows>();
+  for (const dimension of dimensionRows) {
+    const list = dimsByTest.get(dimension.testId) ?? [];
+    list.push(dimension);
+    dimsByTest.set(dimension.testId, list);
+  }
+
+  const views: PsychProfileAttemptRow[] = latest.map((row) => {
+    const dimensions = (dimsByTest.get(row.test.id) ?? []).map((dimension) => {
+      const score = row.attempt.scoresJson?.[dimension.id] ?? 0;
+      const bands = dimension.bandsJson ?? [];
+      const band = findPsychBand(bands, score);
+      return {
+        title: dimension.title,
+        description: dimension.description,
+        score,
+        bandLabel: band?.label ?? "",
+        bandAnalysis: band?.analysis ?? "",
+        level: levelFromBands(band, bands),
+      };
+    });
+    return {
+      attempt: row.attempt,
+      testTitle: row.test.title,
+      testCategory: row.test.category,
+      testDescription: row.test.description,
+      dimensions,
+    };
+  });
+
+  return views.sort((first, second) => {
+    const categoryGap =
+      (CATEGORY_ORDER[first.testCategory] ?? 9) - (CATEGORY_ORDER[second.testCategory] ?? 9);
+    if (categoryGap !== 0) return categoryGap;
+    return first.testTitle.localeCompare(second.testTitle, "fa");
+  });
 }

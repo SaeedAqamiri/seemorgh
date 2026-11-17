@@ -1113,6 +1113,32 @@ export const psychOptions = pgTable(
   (table) => [index("psych_options_question_idx").on(table.questionId)],
 );
 
+export type PsychAiAnalysis = {
+  title: string;
+  summary: string;
+  traits: { title: string; level: string; note: string }[];
+  strengths: string[];
+  cautions: string[];
+  recommendations: string[];
+};
+
+export type PsychProfileSummaryData = {
+  summary: string;
+  personalityTraits: string[];
+  academicTraits: string[];
+  strengths: string[];
+  weaknesses: string[];
+  recommendations: string[];
+};
+
+export type CounselingReportData = {
+  summary: string;
+  strengths: string[];
+  weaknesses: string[];
+  recommendations: string[];
+  planningAdvice: string[];
+};
+
 export const psychAttempts = pgTable(
   "psych_attempts",
   {
@@ -1137,12 +1163,54 @@ export const psychAttempts = pgTable(
     resultCode: text("result_code").notNull().default(""),
     resultTitle: text("result_title").notNull().default(""),
     resultBody: text("result_body").notNull().default(""),
+    analysisJson: jsonb("analysis_json").$type<PsychAiAnalysis>(),
+    analysisSource: text("analysis_source"),
+    analysisAt: timestamp("analysis_at", { withTimezone: true, mode: "date" }),
     createdAt: createdAt(),
   },
   (table) => [
     index("psych_attempts_test_idx").on(table.testId, table.createdAt),
     index("psych_attempts_user_idx").on(table.userId, table.createdAt),
   ],
+);
+
+export const psychProfileSummaries = pgTable(
+  "psych_profile_summaries",
+  {
+    id: id(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    studentId: text("student_id")
+      .notNull()
+      .references(() => students.id, { onDelete: "cascade" }),
+    summary: text("summary").notNull().default(""),
+    dataJson: jsonb("data_json").$type<PsychProfileSummaryData>(),
+    source: text("source").notNull().default("ai"),
+    createdAt: createdAt(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [uniqueIndex("psych_profile_summaries_student_unique").on(table.studentId)],
+);
+
+export const counselingReports = pgTable(
+  "counseling_reports",
+  {
+    id: id(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    studentId: text("student_id")
+      .notNull()
+      .references(() => students.id, { onDelete: "cascade" }),
+    summary: text("summary").notNull().default(""),
+    reportJson: jsonb("report_json").$type<CounselingReportData>(),
+    source: text("source").notNull().default("ai"),
+    createdAt: createdAt(),
+  },
+  (table) => [index("counseling_reports_student_idx").on(table.studentId, table.createdAt)],
 );
 
 export const psychAnswers = pgTable(
@@ -1188,3 +1256,5 @@ export type PsychDimension = typeof psychDimensions.$inferSelect;
 export type PsychQuestion = typeof psychQuestions.$inferSelect;
 export type PsychOption = typeof psychOptions.$inferSelect;
 export type PsychAttempt = typeof psychAttempts.$inferSelect;
+export type PsychProfileSummary = typeof psychProfileSummaries.$inferSelect;
+export type CounselingReport = typeof counselingReports.$inferSelect;

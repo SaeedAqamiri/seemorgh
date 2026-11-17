@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getDb } from "@/db/client";
@@ -21,11 +21,18 @@ import {
   findInProgressAttempt,
 } from "@/lib/psych-server";
 import {
+  findPsychBand,
   normalizePsychCode,
   scorePsychAttempt,
   type PsychEditorPayload,
   type PsychScoringDimension,
 } from "@/lib/psych";
+import {
+  generatePsychAttemptAnalysis,
+  generatePsychProfileSummary,
+  levelFromBands,
+  markAttemptAnalysis,
+} from "@/lib/psych-ai";
 
 function field(form: FormData, name: string): string {
   return String(form.get(name) ?? "").trim();
@@ -518,4 +525,199 @@ export async function submitPsychAttemptAction(formData: FormData): Promise<void
   revalidatePath("/student/psych-tests");
   revalidatePath(`/counselor/psych-tests/${testId}`);
   redirect(resultPath(user.role, testId, attemptId));
+}
+
+function psychCategoryLabel(category: string): string {
+  const labels: Record<string, string> = {
+    academic: "تحصیلی",
+    career: "شغلی و استعداد",
+    personal: "شخصیت",
+    wellbeing: "سلامت",
+    general: "عمومی",
+  };
+  return labels[category] ?? category;
+}
+
+async function resolveAnalysisAccess(attemptId: string) {
+  const user = await getSessionUser();
+  if (!user) redirect("/login");
+  const db = await getDb();
+  const [row] = await db
+    .select({ attempt: psychAttempts, test: psychTests })
+    .from(psychAttempts)
+    .innerJoin(psychTests, eq(psychAttempts.testId, psychTests.id))
+    .where(and(eq(psychAttempts.id, attemptId), eq(psychAttempts.workspaceId, user.workspaceId)))
+    .limit(1);
+  if (!row) return null;
+  if (user.role === "student" && row.attempt.userId !== user.id) return null;
+  return { user, row };
+}
+
+export async function generatePsychAnalysisAction(formData: FormData): Promise<void> {
+  const attemptId = field(formData, "attemptId");
+  const redirectTo = field(formData, "redirectTo");
+  const access = await resolveAnalysisAccess(attemptId);
+  if (!access) redirect(redirectTo || "/counselor/psych-tests");
+
+  const { user, row } = access;
+  const content = await getPsychTestContent(user.workspaceId, row.test.id);
+  if (!content) fail(redirectTo || "/counselor/psych-tests", "محتوای آزمون پیدا نشد.");
+
+  const questionsByDimension = new Map<string, { count: number; maxContribution: number }>();
+  for (const question of content.questions) {
+    const seen = new Set<string>();
+    for (const option of question.options) {
+      for (const [dimensionId, value] of Object.entries(option.scoresJson ?? {})) {
+        seen.add(dimensionId);
+        if (!questionsByDimension.has(dimensionId)) {
+          questionsByDimension.set(dimensionId, { count: 0, maxContribution: 0 });
+        }
+        const entry = questionsByDimension.get(dimensionId)!;
+        if (!seen.has(dimensionId)) entry.count += 1;
+        entry.maxContribution = Math.max(entry.maxContribution, Number(value) || 0);
+      }
+    }
+  }
+
+  const dimensions = content.dimensions.map((dimension) => {
+    const score = row.attempt.scoresJson?.[dimension.id] ?? 0;
+    const bands = dimension.bandsJson ?? [];
+    const band = findPsychBand(bands, score);
+    const stats = questionsByDimension.get(dimension.id);
+    const max = Math.max(1, (stats?.count ?? 1) * Math.max(1, stats?.maxContribution ?? 4));
+    return {
+      title: dimension.title,
+      score,
+      max,
+      bandLabel: band?.label ?? "",
+      bandAnalysis: band?.analysis ?? "",
+      level: levelFromBands(band, bands),
+    };
+  });
+
+  const generated = await generatePsychAttemptAnalysis({
+    workspaceId: user.workspaceId,
+    studentId: row.attempt.studentId,
+    attemptId: row.attempt.id,
+    testTitle: row.test.title,
+    category: psychCategoryLabel(row.test.category),
+    resultCode: row.attempt.resultCode,
+    resultTitle: row.attempt.resultTitle,
+    dimensions,
+  });
+  await markAttemptAnalysis({
+    attemptId: row.attempt.id,
+    analysis: generated.analysis,
+    source: generated.source,
+  });
+
+  await logAudit({
+    workspaceId: user.workspaceId,
+    actorId: user.id,
+    action: "psych_attempt.analyze",
+    entity: "psych_attempt",
+    entityId: row.attempt.id,
+    diff: { testId: row.test.id, source: generated.source },
+  });
+
+  revalidatePath("/counselor/psych-tests");
+  const profileHref =
+    user.role === "counselor" && row.attempt.studentId
+      ? `/counselor/students/${row.attempt.studentId}/psych`
+      : null;
+  redirect(redirectTo || profileHref || resultPath(user.role, row.test.id, row.attempt.id));
+}
+
+export async function generatePsychProfileSummaryAction(formData: FormData): Promise<void> {
+  const user = await getSessionUser();
+  if (!user) redirect("/login");
+  const redirectTo = field(formData, "redirectTo");
+  const db = await getDb();
+
+  let studentId = field(formData, "studentId");
+  if (user.role === "student") {
+    const [student] = await db
+      .select({ id: students.id })
+      .from(students)
+      .where(eq(students.userId, user.id))
+      .limit(1);
+    if (!student) redirect("/student/psych-tests");
+    studentId = student.id;
+  } else {
+    const [student] = await db
+      .select({ id: students.id })
+      .from(students)
+      .where(and(eq(students.id, studentId), eq(students.workspaceId, user.workspaceId)))
+      .limit(1);
+    if (!student) redirect(redirectTo || "/counselor");
+  }
+
+  const rows = await db
+    .select({ attempt: psychAttempts, test: psychTests })
+    .from(psychAttempts)
+    .innerJoin(psychTests, eq(psychAttempts.testId, psychTests.id))
+    .where(
+      and(
+        eq(psychAttempts.workspaceId, user.workspaceId),
+        eq(psychAttempts.studentId, studentId),
+        eq(psychAttempts.status, "submitted"),
+      ),
+    )
+    .orderBy(desc(psychAttempts.submittedAt), desc(psychAttempts.createdAt));
+
+  const backPath =
+    redirectTo || (user.role === "counselor" ? `/counselor/students/${studentId}/psych` : "/student/psych-tests");
+  if (rows.length === 0) fail(backPath, "هنوز نتیجه‌ای برای تحلیل ثبت نشده است.");
+
+  const latestByTest = new Map<string, (typeof rows)[number]>();
+  for (const row of rows) {
+    if (!latestByTest.has(row.test.id)) latestByTest.set(row.test.id, row);
+  }
+
+  const testIds = [...latestByTest.keys()];
+  const dimensionRows = testIds.length
+    ? await db.select().from(psychDimensions).where(inArray(psychDimensions.testId, testIds))
+    : [];
+  const dimsByTest = new Map<string, typeof dimensionRows>();
+  for (const dimension of dimensionRows) {
+    const list = dimsByTest.get(dimension.testId) ?? [];
+    list.push(dimension);
+    dimsByTest.set(dimension.testId, list);
+  }
+
+  const attempts = [...latestByTest.values()].map((row) => ({
+    testTitle: row.test.title,
+    category: row.test.category,
+    resultCode: row.attempt.resultCode,
+    resultTitle: row.attempt.resultTitle,
+    dimensions: (dimsByTest.get(row.test.id) ?? []).map((dimension) => {
+      const score = row.attempt.scoresJson?.[dimension.id] ?? 0;
+      const bands = dimension.bandsJson ?? [];
+      const band = findPsychBand(bands, score);
+      return {
+        title: dimension.title,
+        level: levelFromBands(band, bands),
+        bandLabel: band?.label ?? "",
+      };
+    }),
+  }));
+
+  const generated = await generatePsychProfileSummary({
+    workspaceId: user.workspaceId,
+    studentId,
+    attempts,
+    persistStudentId: studentId,
+  });
+
+  await logAudit({
+    workspaceId: user.workspaceId,
+    actorId: user.id,
+    action: "psych_profile.summarize",
+    entity: "student",
+    entityId: studentId,
+    diff: { source: generated.source, tests: attempts.length },
+  });
+
+  revalidatePath(backPath);
+  redirect(`${backPath}${backPath.includes("?") ? "&" : "?"}summary=${generated.source}`);
 }

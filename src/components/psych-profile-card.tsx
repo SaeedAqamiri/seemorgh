@@ -22,9 +22,14 @@ export function PsychProfileCard({
             <h2>پروفایل روان‌شناختی</h2>
             <small>هنوز نتیجه‌ای برای این دانش‌آموز ثبت نشده است.</small>
           </div>
-          <Link className="btn btn-secondary btn-sm" href="/counselor/psych-tests">
-            مشاهده آزمون‌ها
-          </Link>
+          <div className="row" style={{ gap: "0.4rem" }}>
+            <Link className="btn btn-secondary btn-sm" href={`/counselor/students/${studentId}/psych`}>
+              پروفایل روان‌شناختی
+            </Link>
+            <Link className="btn btn-secondary btn-sm" href="/counselor/psych-tests">
+              مشاهده آزمون‌ها
+            </Link>
+          </div>
         </div>
         <p className="muted" style={{ margin: 0, lineHeight: 1.9 }}>
           با شرکت دانش‌آموز در آزمون‌های تحصیلی، شغلی و شخصیتی، پروفایل او کامل می‌شود و
@@ -43,9 +48,14 @@ export function PsychProfileCard({
             {attempts.length.toLocaleString("fa-IR")} آزمون ثبت‌شده — بر پایه جدیدترین نتیجه هر آزمون
           </small>
         </div>
-        <Link className="btn btn-secondary btn-sm" href="/counselor/psych-tests">
-          آزمون‌ها
-        </Link>
+        <div className="row" style={{ gap: "0.4rem" }}>
+          <Link className="btn btn-secondary btn-sm" href={`/counselor/students/${studentId}/psych`}>
+            پروفایل کامل
+          </Link>
+          <Link className="btn btn-secondary btn-sm" href="/counselor/psych-tests">
+            آزمون‌ها
+          </Link>
+        </div>
       </div>
 
       {(strengths.length > 0 || careerInterests.length > 0) && (

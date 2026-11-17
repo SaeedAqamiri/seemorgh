@@ -22,6 +22,7 @@ import {
 } from "@/lib/auto-plan";
 import { aiAutoPlanningConfigured, generateAiAutoAllocation } from "@/lib/ai-auto-plan";
 import { examAnchorFor, getAutoPlanContext } from "@/lib/auto-plan-data";
+import { getLatestCounselingReport } from "@/lib/counseling-report";
 import { saveStudentMockExamSelection, studentMockExamPrograms } from "@/lib/mock-exams";
 import { addDays, isISODate, todayISO } from "@/lib/dates";
 import { buildGridFromTasks, saveGeneratedPanel } from "@/lib/panel";
@@ -268,7 +269,10 @@ export async function savePlanningSetupAction(formData: FormData): Promise<void>
   redirect(studentPath(setup.studentId, "?success=saved"));
 }
 
-export async function generateAutoPlanAction(formData: FormData): Promise<void> {
+async function runGenerateAction(
+  formData: FormData,
+  options: { mode: "generate" | "replan"; useAi: boolean },
+): Promise<void> {
   const { counselor, setup, context } = await resolveSetup(formData);
 
   if (context.detail.availability.length === 0) {
@@ -284,11 +288,31 @@ export async function generateAutoPlanAction(formData: FormData): Promise<void> 
   let aiRunId: string | null = null;
   let source: "deterministic" | "ai" = "deterministic";
 
-  if (field(formData, "useAi") === "1" && aiAutoPlanningConfigured()) {
+  const counseling = await getLatestCounselingReport(setup.studentId).catch(() => null);
+  if (counseling) {
+    const notes = [...counseling.planningAdvice, ...counseling.recommendations].slice(0, 5);
+    if (notes.length > 0) {
+      plannerInput.policy = {
+        ...plannerInput.policy,
+        notes: `${plannerInput.policy.notes} توصیه‌های مشاوره تحصیلی: ${notes.join(" | ")}`.slice(
+          0,
+          900,
+        ),
+      };
+      warnings.push(
+        `برنامه بر اساس تحلیل مشاوره (${counseling.source === "ai" ? "AI" : "پایه"}) تنظیم شد.`,
+      );
+    }
+  }
+
+  if (options.useAi && aiAutoPlanningConfigured()) {
     const aiResult = await generateAiAutoAllocation({
       workspaceId: counselor.workspaceId,
       studentId: setup.studentId,
       planner: plannerInput,
+      counselingNotes: counseling
+        ? [...counseling.planningAdvice, ...counseling.recommendations].slice(0, 6)
+        : [],
     });
     aiRunId = aiResult.runId;
     if (aiResult.ok) {
@@ -315,7 +339,7 @@ export async function generateAutoPlanAction(formData: FormData): Promise<void> 
     );
   }
 
-  const overwrite = field(formData, "overwrite") === "1" || field(formData, "mode") === "replan";
+  const overwrite = field(formData, "overwrite") === "1" || options.mode === "replan";
   const db = await getDb();
   let created = 0;
   let skipped = 0;
@@ -446,4 +470,16 @@ export async function generateAutoPlanAction(formData: FormData): Promise<void> 
     skipped ? `&skipped=${skipped}` : ""
   }`;
   redirect(studentPath(setup.studentId, suffix));
+}
+
+export async function generateAutoPlanAction(formData: FormData): Promise<void> {
+  await runGenerateAction(formData, { mode: "generate", useAi: false });
+}
+
+export async function replanAutoPlanAction(formData: FormData): Promise<void> {
+  await runGenerateAction(formData, { mode: "replan", useAi: false });
+}
+
+export async function generateAiAutoPlanAction(formData: FormData): Promise<void> {
+  await runGenerateAction(formData, { mode: "generate", useAi: true });
 }

@@ -180,6 +180,9 @@ export default async function StudentDetailPage({
           <Link className="btn btn-secondary btn-sm" href={`/counselor/students/${id}/resources`}>
             مدیریت منابع
           </Link>
+          <Link className="btn btn-secondary btn-sm" href={`/counselor/students/${id}/psych`}>
+            پروفایل روان‌شناختی
+          </Link>
           <Link className="btn btn-secondary btn-sm" href={panelHref}>
             برنامه‌ریزی
           </Link>
