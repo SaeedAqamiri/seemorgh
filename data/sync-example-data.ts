@@ -4,7 +4,8 @@
  *   bun run db:sync            → merge بدون بازنشانی (روی دیتابیس خالی یا هم‌خانواده)
  *   bun run db:sync --reset    → بکاپ + حذف .data/pg و بازسازی کامل
  *
- * مراحل: ساخت اسکیمای تازه → import کامل data/example → بانک سوال تالیفی (۶۸ سوال)
+ * مراحل: ساخت اسکیمای تازه → import کامل data/example → استخر منابع (۲۰۰+ منبع به تفکیک رشته)
+ * → هم‌تراز کردن منابع دانش‌آموزان با استخر → تکمیل دروس برنامه → بانک سوال تالیفی (۶۸ سوال)
  * → بانک سوال منتا (~۱۵۰ هزار سوال، فقط اگر ‎.monta/import/all-questions.jsonl موجود باشد).
  * سرور باید قبل از اجرا خاموش باشد (PGlite همزمان یک دیتادیر را نمی‌پذیرد).
  */
@@ -13,9 +14,10 @@ import { join } from "node:path";
 import { sql } from "drizzle-orm";
 import { getDb } from "../src/db/client";
 import { EXAMPLE_DATE_FIELDS, EXAMPLE_TABLES } from "../src/lib/example-data";
-import { questionBanks, questions, students, users, plans, tasks } from "../src/db/schema";
+import { plans, questionBanks, questions, resourcePool, students, tasks, users, workspaces } from "../src/db/schema";
 import { seedQuestionBank } from "../scripts/seed-question-bank";
 import { importMontaQuestions } from "../src/lib/import-monta";
+import { alignPersonalResourcesWithPool, ensureStudentSubjectResources, seedResourcePool } from "../src/lib/resource-pool";
 
 type Row = Record<string, unknown>;
 
@@ -78,7 +80,7 @@ async function importExample(): Promise<void> {
 
 let db: Awaited<ReturnType<typeof getDb>> | undefined;
 
-async function countAll(table: typeof students | typeof users | typeof plans | typeof tasks | typeof questions | typeof questionBanks): Promise<number> {
+async function countAll(table: typeof students | typeof users | typeof plans | typeof tasks | typeof questions | typeof questionBanks | typeof resourcePool): Promise<number> {
   const [row] = await db!.select({ n: sql<number>`count(*)::int` }).from(table);
   return row.n;
 }
@@ -101,7 +103,7 @@ async function main(): Promise<void> {
     console.log(`merge mode: دیتابیس از قبل ${existingStudents} دانش‌آموز دارد (تکراری‌ها skip می‌شوند)`);
   }
 
-  console.log("1/3 import data/example ...");
+  console.log("1/6 import data/example ...");
   try {
     await importExample();
   } catch (error) {
@@ -113,11 +115,29 @@ async function main(): Promise<void> {
     throw error;
   }
 
-  console.log("2/3 seed بانک سوال تالیفی ...");
+  console.log("2/6 seed استخر منابع (۲۰۰+ منبع به تفکیک رشته) ...");
+  const [workspace] = await db!.select({ id: workspaces.id }).from(workspaces).limit(1);
+  if (!workspace) throw new Error("workspace not found; import data/example را بررسی کنید");
+  const pool = await seedResourcePool(workspace.id);
+  console.log(`  resource-pool: inserted=${pool.books}, chapters=${pool.chapters}`);
+
+  console.log("3/6 هم‌تراز کردن منابع دانش‌آموزان با استخر ...");
+  const aligned = await alignPersonalResourcesWithPool(workspace.id);
+  console.log(
+    `  resource-align: updated=${aligned.updated}, synthesized=${aligned.synthesized}, missing=${aligned.missing}`,
+  );
+
+  console.log("4/6 تکمیل منابع دروس دفترچه برنامه ...");
+  const ensured = await ensureStudentSubjectResources(workspace.id);
+  console.log(
+    `  student-resources: added=${ensured.added}, synthesized=${ensured.synthesized}`,
+  );
+
+  console.log("5/6 seed بانک سوال تالیفی ...");
   const seeded = await seedQuestionBank();
   console.log(`  seed-questions: inserted=${seeded.inserted}, skipped=${seeded.skipped}`);
 
-  console.log("3/3 بانک سوال منتا ...");
+  console.log("6/6 بانک سوال منتا ...");
   if (existsSync(MONTA_JSONL)) {
     const monta = await importMontaQuestions();
     console.log(`  monta: inserted=${monta.inserted}, skipped=${monta.skipped}, banks=${monta.banks}`);
@@ -133,6 +153,7 @@ async function main(): Promise<void> {
   console.log(`tasks:    ${await countAll(tasks)}`);
   console.log(`questions: ${await countAll(questions)}`);
   console.log(`banks:     ${await countAll(questionBanks)}`);
+  console.log(`pool:      ${await countAll(resourcePool)}`);
   console.log("\nسینک کامل شد. حالا سرور را اجرا کنید: bun run dev");
   process.exit(0);
 }

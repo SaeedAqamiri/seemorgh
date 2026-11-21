@@ -32,6 +32,7 @@ import { hashPassword } from "../src/lib/password";
 import { PANEL_SLOTS } from "../src/lib/panel";
 import { ensureSubjectCatalog } from "../src/lib/subject-catalog";
 import { recomputeResourceTotals } from "../src/lib/resource-chapters";
+import { availabilityForGrade, STUDY_CONSTRAINTS } from "../src/lib/study-windows";
 
 const PASSWORD = "seemorgh123";
 
@@ -573,20 +574,6 @@ async function main() {
   const today = todayISO();
   const currentWeek = startOfWeekSaturday(today);
   const todayIndex = weekdayIndex(today);
-  const availabilityVariants = [
-    [0, 1, 2, 3, 4, 5].map((weekday) => ({ weekday, startMin: 16 * 60, endMin: 20 * 60 })),
-    [
-      ...([1, 3, 5] as const).map((weekday) => ({ weekday, startMin: 17 * 60, endMin: 21 * 60 })),
-      ...([0, 2, 4] as const).map((weekday) => ({ weekday, startMin: 7 * 60, endMin: 9 * 60 })),
-      { weekday: 6, startMin: 9 * 60, endMin: 14 * 60 },
-    ],
-    [
-      ...([0, 1, 2, 3, 4] as const).map((weekday) => ({ weekday, startMin: 18 * 60, endMin: 22 * 60 })),
-      { weekday: 5, startMin: 8 * 60, endMin: 12 * 60 },
-      { weekday: 6, startMin: 14 * 60, endMin: 20 * 60 },
-    ],
-  ];
-  const dailyCaps = [240, 300, 360, 420, 480, 540, 600, 720];
   const tracks = ["konkur", "final", "both"] as const;
 
   let resourceTotal = 0;
@@ -622,7 +609,6 @@ async function main() {
       const random = makeRandom(`${phone}-extra-student`);
       const track = tracks[index % tracks.length];
       const restWeekday = index % 2 === 0 ? 6 : 5;
-      const maxDailyMinutes = pick(dailyCaps, random);
 
       const [user] = await db
         .insert(users)
@@ -654,12 +640,11 @@ async function main() {
 
       await db.insert(studentConstraints).values({
         studentId: student.id,
-        maxDailyMinutes,
         restWeekday,
-        bufferPct: pick([0, 10, 15, 20], random),
+        ...STUDY_CONSTRAINTS,
       });
       await db.insert(availability).values(
-        availabilityVariants[index % availabilityVariants.length].map((slot) => ({
+        availabilityForGrade(def.grade, restWeekday).map((slot) => ({
           studentId: student.id,
           ...slot,
         })),

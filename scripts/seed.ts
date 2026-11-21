@@ -24,6 +24,7 @@ import { hashPassword } from "../src/lib/password";
 import { buildSnapshot, selectExamQuestions } from "../src/lib/exam";
 import { generatePlan } from "../src/lib/planner";
 import { SUBJECT_CATALOG } from "../src/lib/subjects";
+import { availabilityForGrade, STUDY_CONSTRAINTS } from "../src/lib/study-windows";
 
 const DEMO_PHONE = "09120000000";
 const DEMO_PASSWORD = "seemorgh123";
@@ -266,11 +267,11 @@ async function main() {
       .returning();
     await db.update(students).set({ userId: studentUser.id }).where(eq(students.id, student.id));
 
+    const studyWindows = availabilityForGrade(student.grade, 6);
     await db.insert(studentConstraints).values({
       studentId: student.id,
-      maxDailyMinutes: 300,
       restWeekday: 6,
-      bufferPct: 15,
+      ...STUDY_CONSTRAINTS,
     });
 
     await db.insert(examTargets).values({
@@ -340,28 +341,13 @@ async function main() {
         }));
 
     await db.insert(availability).values(
-      [0, 1, 2, 3, 4].flatMap((weekday) => [
-        { studentId: student.id, weekday, startMin: 16 * 60, endMin: 19 * 60 },
-      ]),
+      studyWindows.map((slot) => ({ studentId: student.id, ...slot })),
     );
-    await db.insert(availability).values({
-      studentId: student.id,
-      weekday: 5,
-      startMin: 9 * 60,
-      endMin: 13 * 60,
-    });
 
     const generated = generatePlan({
       weekStart,
-      availability: [
-        ...[0, 1, 2, 3, 4].map((weekday) => ({
-          weekday,
-          startMin: 16 * 60,
-          endMin: 19 * 60,
-        })),
-        { weekday: 5, startMin: 9 * 60, endMin: 13 * 60 },
-      ],
-      constraints: { maxDailyMinutes: 300, restWeekday: 6, bufferPct: 15 },
+      availability: studyWindows,
+      constraints: { restWeekday: 6, ...STUDY_CONSTRAINTS },
       resources: resourceRows.map((resource) => ({
         id: resource.id,
         subjectId: resource.subjectId,
