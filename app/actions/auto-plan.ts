@@ -123,6 +123,11 @@ async function parseAndSaveSetup(formData: FormData): Promise<SavedSetup> {
   const subjectTitles = new Map(
     context.detail.subjects.map((subject) => [subject.id, subject.title]),
   );
+  const db = await getDb();
+  const existingGoalRows = await db
+    .select()
+    .from(studyGoals)
+    .where(eq(studyGoals.studentId, studentId));
   const goals: StudyGoalInput[] = [];
   const seen = new Set<string>();
 
@@ -144,11 +149,33 @@ async function parseAndSaveSetup(formData: FormData): Promise<SavedSetup> {
     seen.add(subjectId);
   }
 
+  // General subjects are not part of the konkur/mock-exam goals UI, but they
+  // must stay in the plan for final-exam preparation. Preserve their existing
+  // goals instead of deleting them with the specialized-only form.
+  const specializedSubjectIds = new Set(
+    context.detail.subjects
+      .filter((subject) => subject.kind === "specialized")
+      .map((subject) => subject.id),
+  );
+  for (const goal of existingGoalRows) {
+    if (specializedSubjectIds.has(goal.subjectId)) continue;
+    const subjectTitle = subjectTitles.get(goal.subjectId);
+    if (!subjectTitle || seen.has(goal.subjectId)) continue;
+    goals.push({
+      subjectId: goal.subjectId,
+      subjectTitle,
+      metric: goal.metric === "score" ? "score" : "percent",
+      currentValue: goal.currentValue,
+      targetValue: goal.targetValue,
+      weight: goal.weight,
+    });
+    seen.add(goal.subjectId);
+  }
+
   if (goals.length === 0) {
     fail(studentPath(studentId), "حداقل یک هدف درسی را فعال کنید.");
   }
 
-  const db = await getDb();
   await db.transaction(async (tx) => {
     await tx.delete(studyGoals).where(eq(studyGoals.studentId, studentId));
     await tx.insert(studyGoals).values(
@@ -217,7 +244,17 @@ function plannerInputFor(
     totalUnits: resource.totalUnits,
     completedUnits: resource.completedUnits,
     priority: resource.priority,
-    chapters: resource.chaptersJson,
+    chapters: resource.chapters.map((chapter) => ({
+      id: chapter.id,
+      title: chapter.title,
+      pages: chapter.pages,
+      startPage: chapter.pageStart ?? 1,
+      endPage: chapter.pageEnd ?? chapter.pages,
+      testCount: chapter.testCount,
+      completedTests: chapter.completedTests,
+      exerciseCount: chapter.exerciseCount,
+      completedExercises: chapter.completedExercises,
+    })),
   }));
 
   return {

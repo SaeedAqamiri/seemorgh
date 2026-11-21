@@ -3,6 +3,7 @@ import type {
   GeneratedPlan,
   PlannedTask,
   PlannerAvailability,
+  PlannerChapter,
   PlannerConstraints,
   PlannerResource,
 } from "./planner";
@@ -569,6 +570,7 @@ export function sanitizeAutoAllocation(
 type Window = { startMin: number; endMin: number };
 
 const BREAK_MIN = 5;
+const MAX_BLOCKS_PER_DAY = 4;
 
 function mergeWindows(windows: Window[]): Window[] {
   const sorted = [...windows]
@@ -728,6 +730,28 @@ function targetChaptersForDate(input: AutoPlanInput, date: string): string[] {
   return next.budget.flatMap((item) => item.chapters);
 }
 
+function chapterAtUnits(
+  resource: PlannerResource,
+  startUnits: number,
+): PlannerChapter | null {
+  const chapters = resource.chapters ?? [];
+  if (chapters.length === 0) return null;
+  const sizeFor = (chapter: PlannerChapter) => {
+    if (resource.unitType === "page") return Math.max(0, chapter.pages);
+    if (resource.unitType === "exercise") return Math.max(0, chapter.exerciseCount ?? 0);
+    if (resource.unitType === "chapter") return 1;
+    return Math.max(0, chapter.testCount ?? 0);
+  };
+  const target = Math.max(0, startUnits);
+  let cursor = 0;
+  for (const chapter of chapters) {
+    const size = sizeFor(chapter);
+    if (size > 0 && target < cursor + size) return chapter;
+    cursor += size;
+  }
+  return chapters.at(-1) ?? null;
+}
+
 function pickResource(
   states: Map<string, ResourceState>,
   subjectId: string,
@@ -737,7 +761,9 @@ function pickResource(
   const candidates = [...states.values()]
     .filter(
       (state) =>
-        state.resource.subjectId === subjectId && state.remaining > 0 && state.resource.totalUnits > 0,
+        state.resource.subjectId === subjectId &&
+        state.resource.totalUnits > 0 &&
+        (state.remaining > 0 || type !== "test"),
     )
     .filter(
       (state) =>
@@ -992,8 +1018,13 @@ function scheduleWeek(
     const daySubjects = new Set<string>();
     const targetChapters = targetChaptersForDate(input, date);
     let safety = 0;
+    let dayBlocks = 0;
 
-    while (dayRemaining >= input.policy.minBlockMinutes && safety < 80) {
+    while (
+      dayRemaining >= input.policy.minBlockMinutes &&
+      safety < 80 &&
+      dayBlocks < MAX_BLOCKS_PER_DAY
+    ) {
       safety += 1;
 
       const candidates = [...remaining.values()].filter((bucket) => {
@@ -1044,29 +1075,46 @@ function scheduleWeek(
       const placement = placeBlock(windows, cursor, duration);
       if (!placement) break;
 
-      const resourceState = pickResource(states, chosen.subjectId, option.type, targetChapters);
-      const rawUnits = unitsForBlock(option.type, duration, resourceState, input, chosen.subjectId);
-      const taken =
-        option.type === "test" && !resourceState
-          ? { state: null, units: rawUnits }
-          : takeUnits(resourceState, rawUnits);
+      const testResource = pickResource(states, chosen.subjectId, option.type, targetChapters);
+      const fallbackResource =
+        option.type === "test" && !testResource
+          ? pickResource(states, chosen.subjectId, "study", targetChapters)
+          : null;
+      const resourceState = testResource ?? fallbackResource;
+      const effectiveType =
+        option.type === "test" && !testResource ? "study" : option.type;
+      const rawUnits = unitsForBlock(effectiveType, duration, resourceState, input, chosen.subjectId);
+      const taken = resourceState ? takeUnits(resourceState, rawUnits) : { state: null, units: rawUnits };
       const targetUnits = resourceState ? taken.units : rawUnits;
       const matchedChapterEntry = resourceState?.resource.chapters?.find((chapter) =>
         targetChapters.some((target) => chapterMatches(target, chapter.title)),
       );
-      const matchedChapter = matchedChapterEntry?.title;
+      const chapterEntry =
+        matchedChapterEntry ??
+        (resourceState
+          ? chapterAtUnits(
+              resourceState.resource,
+              Math.max(
+                0,
+                resourceState.resource.completedUnits +
+                  resourceState.consumed -
+                  targetUnits,
+              ),
+            )
+          : null);
       const topic =
-        option.type === "test" || !resourceState
-          ? matchedChapter ?? resourceState?.resource.title ?? chosen.subjectTitle
-          : resourceTopic(resourceState, targetUnits, chosen.subjectTitle);
+        chapterEntry?.title ??
+        (option.type === "test" || !resourceState
+          ? resourceState?.resource.title ?? chosen.subjectTitle
+          : resourceTopic(resourceState, targetUnits, chosen.subjectTitle));
 
       const isExerciseResource = resourceState?.resource.unitType === "exercise";
       const taskType =
-        option.type === "test" && !resourceState
+        effectiveType === "test" && !resourceState
           ? "study"
-          : option.type === "test" && isExerciseResource
+          : effectiveType === "test" && isExerciseResource
             ? "exercise"
-            : option.type;
+            : effectiveType;
       const actionKind: PlannedTask["actionKind"] = taskType;
 
       tasks.push({
@@ -1075,7 +1123,7 @@ function scheduleWeek(
         plannedEnd: placement.end,
         subjectId: chosen.subjectId,
         resourceId: taken.state?.resource.id ?? resourceState?.resource.id ?? "",
-        chapterId: matchedChapterEntry?.id ?? null,
+        chapterId: chapterEntry?.id ?? null,
         resourceText: topic,
         topic,
         type: taskType,
@@ -1091,6 +1139,7 @@ function scheduleWeek(
       else chosen.studyMinutes -= duration;
 
       dayRemaining -= duration;
+      dayBlocks += 1;
       cursor = placement.end + BREAK_MIN;
       lastSubjectId = chosen.subjectId;
       daySubjects.add(chosen.subjectId);

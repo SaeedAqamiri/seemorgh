@@ -11,6 +11,8 @@ import {
   runCounselingAction,
 } from "@/app/actions/counseling";
 import { SubmitButton } from "@/components/submit-button";
+import { MockExamPicker } from "@/components/mock-exam-picker";
+import { SubjectGoalsEditor } from "@/components/subject-goals-editor";
 import { PsychProfileCard } from "@/components/psych-profile-card";
 import { CounselingReportCard } from "@/components/counseling-report-card";
 import { aiAutoPlanningConfigured } from "@/lib/ai-auto-plan";
@@ -79,24 +81,45 @@ export default async function AutoPlanPage({
     .sort((a, b) => a.weekStart.localeCompare(b.weekStart))
     .slice(0, 8);
 
-  const subjectRows = detail.subjects.map((subject) => {
-    const existing = goalBySubject.get(subject.id);
-    const metric: GoalMetric = existing?.metric ?? defaultMetric;
-    const current = existing?.currentValue ?? defaultCurrentFor(context, subject.id, metric);
-    const target = existing?.targetValue ?? defaultTargetFor(current, metric);
-    return {
-      id: subject.id,
-      title: subject.title,
-      enabled: Boolean(existing),
-      metric,
-      current,
-      target,
-      weight: existing?.weight ?? 3,
-      examPercent: currentPercentBySubject.get(subject.id) ?? null,
-      resourceRemaining:
-        summary.bySubject.find((row) => row.subjectId === subject.id)?.remainingUnits ?? 0,
-    };
-  });
+  const subjectRows = detail.subjects
+    .filter((subject) => subject.kind === "specialized")
+    .map((subject) => {
+      const existing = goalBySubject.get(subject.id);
+      const metric: GoalMetric = existing?.metric ?? defaultMetric;
+      const examPercent = currentPercentBySubject.get(subject.id) ?? null;
+      const current =
+        metric === "percent" && examPercent !== null
+          ? examPercent
+          : existing?.currentValue ?? defaultCurrentFor(context, subject.id, metric);
+      const target = existing?.targetValue ?? defaultTargetFor(current, metric);
+      return {
+        id: subject.id,
+        title: subject.title,
+        enabled: Boolean(existing),
+        metric,
+        current,
+        target,
+        weight: existing?.weight ?? 3,
+        examPercent,
+        resourceRemaining:
+          summary.bySubject.find((row) => row.subjectId === subject.id)?.remainingUnits ?? 0,
+        testsPerHour:
+          context.subjectSpeeds[subject.id]?.testsPerHour ?? defaultTestsPerHour,
+        exercisesPerHour:
+          context.subjectSpeeds[subject.id]?.exercisesPerHour ?? defaultExercisesPerHour,
+      };
+    });
+
+  const mockExamOptions = context.allMockExams.map((program) => ({
+    id: program.id,
+    dateLabel: formatJalaliNumeric(program.examDate),
+    provider: program.provider,
+    title: program.title,
+    budgetText: (program.budgetJson ?? [])
+      .slice(0, 3)
+      .map((item) => `${item.subjectTitle}: ${item.chapters.slice(0, 2).join("، ")}`)
+      .join(" · "),
+  }));
 
   return (
     <div className="stack" style={{ gap: "1rem" }}>
@@ -230,10 +253,10 @@ export default async function AutoPlanPage({
       <div className="card">
         <div className="section-head">
           <div>
-            <h2>وضعیت فعلی</h2>
+            <h2>وضعیت فعلی دروس اختصاصی</h2>
             <small>
-              وضعیت هر درس از جدیدترین کارنامه ثبت‌شده پیش‌پر می‌شود؛ می‌توانید آن را دستی
-              تغییر دهید.
+              وضعیت هر درس اختصاصی از جدیدترین کارنامه ثبت‌شده پیش‌پر می‌شود. اگر سابقه آزمون
+              دارید آن را با همین اعداد هماهنگ نگه دارید؛ اگر ندارید، در بخش اهداف دستی وارد کنید.
             </small>
           </div>
           <Link className="btn btn-secondary btn-sm" href={`/counselor/students/${id}/exam-analysis`}>
@@ -331,104 +354,11 @@ export default async function AutoPlanPage({
             </div>
           </div>
 
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>فعال</th>
-                  <th>درس</th>
-                  <th>نوع سنجش</th>
-                  <th>وضعیت فعلی</th>
-                  <th>مقدار مطلوب</th>
-                  <th>وزن</th>
-                  <th>تست/ساعت</th>
-                  <th>تمرین/ساعت</th>
-                </tr>
-              </thead>
-              <tbody>
-                {subjectRows.map((row) => (
-                  <tr key={row.id}>
-                    <td>
-                      <input
-                        type="checkbox"
-                        name="enabled"
-                        value={row.id}
-                        defaultChecked={row.enabled}
-                      />
-                    </td>
-                    <td>
-                      {row.title}
-                      <input type="hidden" name="subjectId" value={row.id} />
-                    </td>
-                    <td>
-                      <select name="metric" defaultValue={row.metric}>
-                        <option value="percent">درصد کنکور</option>
-                        <option value="score">نمره از ۲۰</option>
-                      </select>
-                    </td>
-                    <td>
-                      <input
-                        type="number"
-                        name="currentValue"
-                        step="0.5"
-                        min={0}
-                        max={100}
-                        defaultValue={row.current}
-                        style={{ width: "90px" }}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="number"
-                        name="targetValue"
-                        step="0.5"
-                        min={0}
-                        max={100}
-                        defaultValue={row.target}
-                        style={{ width: "90px" }}
-                      />
-                    </td>
-                    <td>
-                      <select name="weight" defaultValue={String(row.weight)}>
-                        {[1, 2, 3, 4, 5].map((value) => (
-                          <option key={value} value={value}>
-                            {value}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td>
-                      <input
-                        type="number"
-                        name={`testsPerHour_${row.id}`}
-                        min={1}
-                        max={120}
-                        defaultValue={
-                          context.subjectSpeeds[row.id]?.testsPerHour ?? defaultTestsPerHour
-                        }
-                        style={{ width: "80px" }}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="number"
-                        name={`exercisesPerHour_${row.id}`}
-                        min={1}
-                        max={120}
-                        defaultValue={
-                          context.subjectSpeeds[row.id]?.exercisesPerHour ?? defaultExercisesPerHour
-                        }
-                        style={{ width: "80px" }}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <SubjectGoalsEditor rows={subjectRows} />
           <small className="muted" style={{ display: "block", marginTop: "0.5rem" }}>
-            اگر نمره از ۲۰ انتخاب شود، مقدار مطلوب هم از ۲۰ است و برنامه به سمت مطالعه و
-            تسلط مفهومی وزن بیشتری می‌دهد.
+            فقط دروس اختصاصی در این بخش آمده‌اند. دروس عمومی در آزمون‌های آزمایشی و کنکور نیستند
+            و برای امتحان نهایی در برنامه حفظ می‌شوند. اگر نمره از ۲۰ انتخاب شود، مقدار مطلوب هم
+            از ۲۰ است و برنامه به سمت مطالعه و تسلط مفهومی وزن بیشتری می‌دهد.
           </small>
         </div>
 
@@ -445,18 +375,12 @@ export default async function AutoPlanPage({
               تقویم آزمون‌ها
             </Link>
           </div>
-          <div className="form-grid">
-            <div className="field">
-              <label>آزمون هدف (پیش‌فرض: آخرین آزمون)</label>
-              <select name="goalMockExamId" defaultValue={context.goalExamId ?? ""}>
-                <option value="">خودکار — آخرین آزمون انتخاب‌شده</option>
-                {context.allMockExams.map((program) => (
-                  <option key={program.id} value={program.id}>
-                    {formatJalaliNumeric(program.examDate)} — {program.provider} — {program.title}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <MockExamPicker
+            exams={mockExamOptions}
+            selectedIds={[...selectedIds]}
+            goalExamId={context.goalExamId ?? null}
+          />
+          <div className="form-grid" style={{ marginTop: "0.8rem" }}>
             <div className="field">
               <label>شروع بازبرنامه‌ریزی (اختیاری)</label>
               <input
@@ -465,42 +389,6 @@ export default async function AutoPlanPage({
                 defaultValue={context.replanFromDate ?? ""}
               />
             </div>
-          </div>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>انتخاب</th>
-                  <th>تاریخ</th>
-                  <th>موسسه</th>
-                  <th>عنوان</th>
-                  <th>بودجه‌بندی</th>
-                </tr>
-              </thead>
-              <tbody>
-                {context.allMockExams.map((program) => (
-                  <tr key={program.id}>
-                    <td>
-                      <input
-                        type="checkbox"
-                        name="mockExamId"
-                        value={program.id}
-                        defaultChecked={selectedIds.has(program.id)}
-                      />
-                    </td>
-                    <td>{formatJalaliNumeric(program.examDate)}</td>
-                    <td>{program.provider}</td>
-                    <td>{program.title}</td>
-                    <td>
-                      {(program.budgetJson ?? [])
-                        .slice(0, 3)
-                        .map((item) => `${item.subjectTitle}: ${item.chapters.slice(0, 2).join("، ")}`)
-                        .join(" · ")}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
           <small className="muted" style={{ display: "block", marginTop: "0.5rem" }}>
             اگر آزمونی انتخاب نشود، برنامه بر اساس اهداف دستی و تاریخ هدف ساخته می‌شود.

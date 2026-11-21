@@ -26,6 +26,7 @@
     "db:seed:groups": "tsx scripts/seed-groups.ts",
     "db:seed:extra": "tsx scripts/seed-extra-fields.ts",
     "db:seed:mock-planning": "tsx scripts/seed-mock-planning.ts",
+    "db:plan:retime": "tsx scripts/seed-mock-planning.ts --retime",
     "db:sync": "NODE_OPTIONS=--conditions=react-server tsx data/sync-example-data.ts"
   },
   "dependencies": {

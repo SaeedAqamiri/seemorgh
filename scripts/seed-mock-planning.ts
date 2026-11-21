@@ -1,6 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import { getDb } from "../src/db/client";
 import {
+  availability,
   externalExams,
   groupMockExams,
   mockExamPrograms,
@@ -8,6 +9,7 @@ import {
   plans,
   resources,
   schoolLessons,
+  studentConstraints,
   studentGroups,
   studentMockExams,
   students,
@@ -26,8 +28,14 @@ import { addDays, startOfWeekSaturday, todayISO } from "../src/lib/dates";
 import { ensureMockExamCatalog, ensureGroupMockExamPlan, studentMockExamPrograms } from "../src/lib/mock-exams";
 import { buildGridFromTasks, saveGeneratedPanel } from "../src/lib/panel";
 import { saveSchoolLessons } from "../src/lib/school-schedule";
-import { getBellSlots } from "../src/lib/schedule";
+import { getWeekBellSlots } from "../src/lib/schedule";
 import { ensureSubjectCatalog } from "../src/lib/subject-catalog";
+import {
+  availabilityForGrade,
+  SCHOOL_PERIOD_COUNT,
+  schoolWeekdaysForGrade,
+  STUDY_CONSTRAINTS,
+} from "../src/lib/study-windows";
 
 type Level = "weak" | "normal" | "strong";
 
@@ -63,15 +71,22 @@ function overallPercent(subjects: ExamSubjectScore[]): number {
   return Math.round(total / subjects.length);
 }
 
-async function seedSchoolLessons(studentId: string, field: string, subjectTitleById: Map<string, string>) {
+async function seedSchoolLessons(
+  studentId: string,
+  field: string,
+  grade: string,
+  subjectTitleById: Map<string, string>,
+  options: { force?: boolean } = {},
+) {
   const db = await getDb();
   const existing = await db
     .select({ id: schoolLessons.id })
     .from(schoolLessons)
     .where(eq(schoolLessons.studentId, studentId))
     .limit(1);
-  if (existing.length > 0) return;
-  const slots = await getBellSlots(studentId);
+  if (existing.length > 0 && !options.force) return;
+  const weekSlots = await getWeekBellSlots(studentId);
+  const slots = weekSlots[0] ?? [];
   const titles = field === "ریاضی"
     ? ["حسابان", "هندسه", "فیزیک", "شیمی", "ادبیات فارسی", "عربی", "دین و زندگی", "زبان انگلیسی"]
     : field === "انسانی"
@@ -82,9 +97,12 @@ async function seedSchoolLessons(studentId: string, field: string, subjectTitleB
     .filter((value): value is string => Boolean(value));
   const random = randomFor(`${studentId}:school`);
   const lessons: { weekday: number; slotIndex: number; subjectId: string }[] = [];
-  for (let weekday = 0; weekday <= 4; weekday += 1) {
-    const periodCount = 4 + Math.floor(random() * 3);
-    for (let slotIndex = 0; slotIndex < periodCount && slotIndex < slots.length; slotIndex += 1) {
+  for (const weekday of schoolWeekdaysForGrade(grade)) {
+    for (
+      let slotIndex = 0;
+      slotIndex < SCHOOL_PERIOD_COUNT && slotIndex < slots.length;
+      slotIndex += 1
+    ) {
       lessons.push({
         weekday,
         slotIndex,
@@ -166,7 +184,17 @@ async function persistPlan(studentId: string, input: Awaited<ReturnType<typeof g
       totalUnits: resource.totalUnits,
       completedUnits: resource.completedUnits,
       priority: resource.priority,
-      chapters: resource.chaptersJson,
+      chapters: resource.chapters.map((chapter) => ({
+        id: chapter.id,
+        title: chapter.title,
+        pages: chapter.pages,
+        startPage: chapter.pageStart ?? 1,
+        endPage: chapter.pageEnd ?? chapter.pages,
+        testCount: chapter.testCount,
+        completedTests: chapter.completedTests,
+        exerciseCount: chapter.exerciseCount,
+        completedExercises: chapter.completedExercises,
+      })),
     })),
     policy: input.policy,
     schoolPeriods: input.schoolPeriods,
@@ -254,6 +282,7 @@ async function persistPlan(studentId: string, input: Awaited<ReturnType<typeof g
 }
 
 async function main() {
+  const retime = process.argv.includes("--retime");
   const db = await getDb();
   const workspaces = await db.select().from(subjects);
   const workspaceIds = [...new Set(workspaces.map((row) => row.workspaceId))];
@@ -287,7 +316,28 @@ async function main() {
         ? (Number(progressRow?.completed ?? 0) / Number(progressRow?.total ?? 1)) * 100
         : 35;
       const level = levelFromProgress(percent);
-      await seedSchoolLessons(student.id, student.field, subjectTitleById);
+      const [constraint] = await db
+        .select()
+        .from(studentConstraints)
+        .where(eq(studentConstraints.studentId, student.id))
+        .limit(1);
+      const restWeekday = constraint?.restWeekday ?? 6;
+      if (retime) {
+        await db.delete(availability).where(eq(availability.studentId, student.id));
+        await db.insert(availability).values(
+          availabilityForGrade(student.grade, restWeekday).map((slot) => ({
+            studentId: student.id,
+            ...slot,
+          })),
+        );
+        await db
+          .update(studentConstraints)
+          .set(STUDY_CONSTRAINTS)
+          .where(eq(studentConstraints.studentId, student.id));
+      }
+      await seedSchoolLessons(student.id, student.field, student.grade, subjectTitleById, {
+        force: retime,
+      });
 
       const groupPrograms = student.groupId
         ? await db

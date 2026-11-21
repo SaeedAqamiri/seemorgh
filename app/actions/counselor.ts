@@ -370,16 +370,24 @@ export async function updateResourceAction(formData: FormData): Promise<void> {
     | "exercise"
     | "page"
     | "chapter";
-  const parsedChapters = parseChapterPlan(
-    field(formData, "chapters"),
-    inputTotal,
-    supportsTests ? "test" : "exercise",
-  );
-  const chapterTotal = totalFromChapters(parsedChapters.chapters, unitType);
-  const totalUnits = chapterTotal ?? inputTotal;
+  // Chapters are defined once when the book is copied from the pool. The
+  // resource page only edits progress, so the chapter plan is left untouched
+  // unless an explicit chapter plan is submitted.
+  const chaptersText = field(formData, "chapters");
+  let parsedChapters: ReturnType<typeof parseChapterPlan> | null = null;
+  let totalUnits = inputTotal;
+  if (chaptersText) {
+    const parsed = parseChapterPlan(
+      chaptersText,
+      inputTotal,
+      supportsTests ? "test" : "exercise",
+    );
+    if (parsed.error) fail(context.basePath, parsed.error);
+    parsedChapters = parsed;
+    totalUnits = totalFromChapters(parsed.chapters, unitType) ?? inputTotal;
+  }
 
   if (completedUnits > totalUnits) fail(context.basePath, "پیشرفت نمی‌تواند بیشتر از کل باشد.");
-  if (parsedChapters.error) fail(context.basePath, parsedChapters.error);
 
   await db
     .update(resources)
@@ -397,7 +405,9 @@ export async function updateResourceAction(formData: FormData): Promise<void> {
       ),
     );
 
-  await replaceResourceChapters(db, resourceId, parsedChapters.chapters);
+  if (parsedChapters) {
+    await replaceResourceChapters(db, resourceId, parsedChapters.chapters);
+  }
 
   revalidateResourceViews(context);
   redirect(`${context.basePath}?success=resource-updated`);

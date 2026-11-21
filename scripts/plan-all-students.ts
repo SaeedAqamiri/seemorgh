@@ -15,7 +15,7 @@ import {
 } from "../src/db/schema";
 import { addDays, daysBetween, startOfWeekSaturday, todayISO, weekDates } from "../src/lib/dates";
 import { chaptersByResourceIds } from "../src/lib/resource-chapters";
-import { getBellSlots, type PanelSlot } from "../src/lib/schedule";
+import { getWeekBellSlots, type PanelSlot } from "../src/lib/schedule";
 
 type ResourceState = {
   id: string;
@@ -91,7 +91,7 @@ async function main() {
       .sort();
     const lastExam = examDates.at(-1) ?? addDays(weekStart, 7 * 8);
     const examDateSet = new Set(targetRows.map((target) => target.examDate));
-    const slots = await getBellSlots(student.id);
+    const slots = await getWeekBellSlots(student.id);
 
     const chapterMap = await chaptersByResourceIds(
       db,
@@ -216,15 +216,16 @@ async function main() {
     for (const currentWeek of weekStarts) {
       const dates = weekDates(currentWeek);
       const grid: WeeklyGridJson = dates.map(() =>
-        slots.map(() => ({ kind: "rest" }) satisfies PanelCellJson),
+        (slots[0] ?? []).map(() => ({ kind: "rest" }) satisfies PanelCellJson),
       );
 
       const availableCells: { day: number; slot: number; date: string }[] = [];
       for (let day = 0; day < 7; day += 1) {
+        const daySlots = slots[day] ?? [];
         if (day === constraints.restWeekday) continue;
         if (examDateSet.has(dates[day])) continue;
-        for (let slot = 0; slot < slots.length; slot += 1) {
-          if (isSlotAvailable(day, slots[slot])) {
+        for (let slot = 0; slot < daySlots.length; slot += 1) {
+          if (isSlotAvailable(day, daySlots[slot])) {
             availableCells.push({ day, slot, date: dates[day] });
           }
         }
@@ -332,22 +333,26 @@ async function main() {
 
         if (planned.length > 0) {
           await tx.insert(tasks).values(
-            planned.map(({ date, slot, action }) => ({
-              planId: plan.id,
-              planDate: date,
-              plannedStart: slots[slot].startMin,
-              plannedEnd: slots[slot].endMin,
-              subjectId: action.subjectId,
-              resourceId: action.resourceId,
-              chapterId: action.chapterId,
-              resourceText: action.resourceText,
-              topic: action.topic,
-              type: actionType(action.kind),
-              actionKind: action.kind,
-              routineMode: null,
-              targetUnits: action.count,
-              estMinutes: slots[slot].endMin - slots[slot].startMin,
-            })),
+            planned.map(({ date, slot, action }) => {
+              const day = dates.indexOf(date);
+              const slotDef = slots[day]?.[slot];
+              return {
+                planId: plan.id,
+                planDate: date,
+                plannedStart: slotDef?.startMin ?? 8 * 60,
+                plannedEnd: slotDef?.endMin ?? 9 * 60 + 30,
+                subjectId: action.subjectId,
+                resourceId: action.resourceId,
+                chapterId: action.chapterId,
+                resourceText: action.resourceText,
+                topic: action.topic,
+                type: actionType(action.kind),
+                actionKind: action.kind,
+                routineMode: null,
+                targetUnits: action.count,
+                estMinutes: Math.max(0, (slotDef?.endMin ?? 570) - (slotDef?.startMin ?? 480)),
+              };
+            }),
           );
         }
 
