@@ -28,7 +28,7 @@ export default async function StudentResourcesPage({
 
   const [summary, poolResources] = await Promise.all([
     Promise.resolve(summarizeResourceProgress(detail.resources)),
-    listResourcePool(counselor.workspaceId),
+    listResourcePool(counselor.workspaceId, { field: detail.student.field }),
   ]);
 
   return (
@@ -51,6 +51,7 @@ export default async function StudentResourcesPage({
 
       <ResourceManager
         studentId={id}
+        field={detail.student.field}
         resources={detail.resources}
         subjects={detail.subjects}
         poolResources={poolResources}

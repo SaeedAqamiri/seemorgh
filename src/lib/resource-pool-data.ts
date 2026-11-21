@@ -30,6 +30,9 @@ const PUBLISHERS = [
   { name: "خیلی سبز", factor: 1 },
   { name: "گاج", factor: 1.1 },
   { name: "مبتکران", factor: 0.9 },
+  { name: "الگو", factor: 0.95 },
+  { name: "مهروماه", factor: 0.85 },
+  { name: "قلم چی", factor: 1.05 },
 ] as const;
 
 const lessons = (count: number) => Array.from({ length: count }, (_, index) => `درس ${index + 1}`);
@@ -141,7 +144,7 @@ const BLUEPRINTS: Blueprint[] = [
     "هندسه",
     "احتمال",
   ] },
-  { subject: "حسابان", grade: "دهم", bookTitle: "ریاضی دهم", testsPerChapter: 95, titles: [
+  { subject: "حسابان", grade: "دهم", bookTitle: "حسابان دهم", testsPerChapter: 95, titles: [
     "مجموعه، الگو و دنباله",
     "مثلثات",
     "توان‌های رسیدن",
@@ -306,9 +309,36 @@ const BLUEPRINTS: Blueprint[] = [
   ] },
 ];
 
+/**
+ * General courses that do not have a dedicated detailed blueprint yet. Titles
+ * are intentionally generic so the pool still offers a usable, chapter-based
+ * resource for every course in the planning booklet.
+ */
+const GENERIC_BLUEPRINTS: Blueprint[] = [
+  { subject: "نگارش", grade: "دهم", testsPerChapter: 20, titles: lessons(8) },
+  { subject: "نگارش", grade: "یازدهم", testsPerChapter: 20, titles: lessons(8) },
+  { subject: "نگارش", grade: "دوازدهم", testsPerChapter: 20, titles: lessons(8) },
+  { subject: "هنر", grade: "دهم", testsPerChapter: 25, titles: lessons(6) },
+  { subject: "جغرافیای ایران", grade: "دهم", testsPerChapter: 40, titles: lessons(6) },
+  { subject: "تاریخ معاصر", grade: "یازدهم", testsPerChapter: 40, titles: lessons(6) },
+  { subject: "انسان و محیط زیست", grade: "یازدهم", testsPerChapter: 35, titles: lessons(6) },
+  { subject: "تفکر و سواد رسانه‌ای", grade: "دهم", testsPerChapter: 30, titles: lessons(6) },
+  { subject: "آمادگی دفاعی", grade: "دهم", testsPerChapter: 35, titles: lessons(6) },
+  { subject: "کارگاه کارآفرینی و تولید", grade: "یازدهم", testsPerChapter: 30, titles: lessons(6) },
+  { subject: "مدیریت خانواده و سبک زندگی", grade: "دوازدهم", testsPerChapter: 35, titles: lessons(6) },
+  { subject: "سلامت و بهداشت", grade: "دوازدهم", testsPerChapter: 35, titles: lessons(6) },
+  { subject: "هویت اجتماعی", grade: "دوازدهم", testsPerChapter: 40, titles: lessons(6) },
+  { subject: "تحلیل فرهنگی", grade: "دوازدهم", testsPerChapter: 30, titles: lessons(6) },
+  { subject: "تعلیمات ادیان الهی و اخلاق", grade: "دهم", testsPerChapter: 30, titles: lessons(8) },
+  { subject: "تعلیمات ادیان الهی و اخلاق", grade: "یازدهم", testsPerChapter: 30, titles: lessons(8) },
+  { subject: "تعلیمات ادیان الهی و اخلاق", grade: "دوازدهم", testsPerChapter: 30, titles: lessons(8) },
+  { subject: "آزمایشگاه علوم تجربی", grade: "دهم", testsPerChapter: 30, titles: lessons(8) },
+  { subject: "آزمایشگاه علوم تجربی", grade: "یازدهم", testsPerChapter: 30, titles: lessons(8) },
+];
+
 export function buildPoolBooks(): PoolBookSeed[] {
   const books: PoolBookSeed[] = [];
-  for (const blueprint of BLUEPRINTS) {
+  for (const blueprint of [...BLUEPRINTS, ...GENERIC_BLUEPRINTS]) {
     for (const publisher of PUBLISHERS) {
       const chapters = blueprint.titles.map((title) => {
         const tests = Math.max(10, Math.round(blueprint.testsPerChapter * publisher.factor));

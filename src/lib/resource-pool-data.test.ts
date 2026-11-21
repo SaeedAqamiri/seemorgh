@@ -4,9 +4,9 @@ import { buildPoolBooks } from "./resource-pool-data";
 describe("resource pool catalog", () => {
   const books = buildPoolBooks();
 
-  it("contains between 100 and 200 catalog books", () => {
-    expect(books.length).toBeGreaterThanOrEqual(100);
-    expect(books.length).toBeLessThanOrEqual(200);
+  it("contains at least 200 catalog books", () => {
+    expect(books.length).toBeGreaterThanOrEqual(200);
+    expect(books.length).toBeLessThanOrEqual(600);
   });
 
   it("gives every book a subject, grade, publisher and chapter breakdown", () => {
