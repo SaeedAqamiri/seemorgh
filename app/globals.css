@@ -569,8 +569,11 @@ tr:last-child td {
 }
 
 .perf-edit-wrap > .perf-tag {
-  opacity: 0.75;
   font-size: 0.66rem;
+  background: var(--plan-soft);
+  color: var(--plan-strong);
+  border-inline-start: 3px solid var(--plan-strong);
+  padding: 0.14rem 0.4rem;
 }
 
 .perf-tag {
@@ -583,8 +586,34 @@ tr:last-child td {
 }
 
 .perf-tag-done {
-  background: var(--brand-soft);
+  background: transparent;
   color: var(--brand-strong);
+  padding: 0;
+}
+
+.perf-plan {
+  background: var(--plan-soft);
+  border-inline-start: 3px solid var(--plan-strong);
+  border-radius: 8px;
+  padding: 0.28rem 0.45rem;
+}
+
+.perf-plan .perf-tag {
+  background: transparent;
+  padding: 0;
+  color: var(--plan-strong);
+  font-weight: 600;
+}
+
+.perf-done {
+  background: var(--perf-soft);
+  border-inline-start: 3px solid var(--brand);
+  border-radius: 8px;
+  padding: 0.28rem 0.45rem;
+}
+
+.perf-done .perf-note {
+  background: rgba(255, 255, 255, 0.65);
 }
 
 .perf-note {
@@ -783,24 +812,24 @@ tr:last-child td {
   border-top: 2px dashed var(--muted);
 }
 
-.pulse-wrap {
+.mirror-wrap {
   border-radius: 12px;
 }
 
-.pulse-table {
+.mirror-table {
   border-collapse: separate;
   border-spacing: 0;
 }
 
-.pulse-table th,
-.pulse-table td {
+.mirror-table th,
+.mirror-table td {
   border-bottom: 1px solid var(--border);
   padding: 0.55rem 0.7rem;
   vertical-align: top;
   font-size: 0.78rem;
 }
 
-.pulse-table thead th {
+.mirror-table thead th {
   position: sticky;
   top: 0;
   background: var(--surface-2);
@@ -809,22 +838,22 @@ tr:last-child td {
   z-index: 1;
 }
 
-.pulse-table .pulse-day {
-  min-width: 138px;
+.mirror-table .mirror-day {
+  min-width: 168px;
 }
 
-.pulse-table .pulse-day span {
+.mirror-table .mirror-day span {
   display: block;
   font-weight: 700;
 }
 
-.pulse-table .pulse-day small {
+.mirror-table .mirror-day small {
   display: block;
   font-size: 0.7rem;
   font-weight: 400;
 }
 
-.pulse-table .pulse-subject {
+.mirror-table .mirror-subject {
   position: sticky;
   inset-inline-start: 0;
   z-index: 2;
@@ -834,65 +863,59 @@ tr:last-child td {
   box-shadow: -1px 0 0 var(--border) inset;
 }
 
-.pulse-table thead .pulse-subject {
+.mirror-table thead .mirror-subject {
   background: var(--surface-2);
   z-index: 3;
 }
 
-.pulse-table .pulse-total {
+.mirror-table .mirror-total {
   background: var(--surface-2);
-  min-width: 150px;
+  min-width: 170px;
 }
 
-.pulse-table .pulse-sumrow td,
-.pulse-table .pulse-sumrow th {
+.mirror-table .mirror-sumrow td,
+.mirror-table .mirror-sumrow th {
   background: var(--brand-soft);
   font-weight: 700;
 }
 
-.pulse-cell {
-  display: grid;
-  gap: 0.12rem;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.pulse-metric {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  color: var(--text);
-}
-
-.pulse-metric.is-zero {
+.mirror-table .mirror-sumrow .mirror-label,
+.mirror-table .mirror-total .mirror-label {
   color: var(--muted);
-  opacity: 0.55;
+  font-weight: 400;
 }
 
-.pulse-empty {
+.mirror-cell {
+  display: grid;
+  gap: 0.18rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.mirror-line {
+  line-height: 1.6;
+}
+
+.mirror-label {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.mirror-value {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.mirror-na {
+  color: var(--muted);
+  opacity: 0.45;
+  font-weight: 400;
+}
+
+.mirror-empty {
   color: var(--muted);
   opacity: 0.5;
   display: block;
   text-align: center;
-}
-
-.pulse-dot {
-  display: inline-block;
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-}
-
-.pulse-dot.is-study {
-  background: #2563eb;
-}
-
-.pulse-dot.is-test {
-  background: var(--brand);
-}
-
-.pulse-dot.is-exercise {
-  background: #d97706;
 }
 
 .narrative {

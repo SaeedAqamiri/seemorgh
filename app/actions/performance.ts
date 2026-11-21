@@ -7,6 +7,7 @@ import { getDb } from "@/db/client";
 import { performancePanels, students, subjects } from "@/db/schema";
 import { getSessionUser } from "@/lib/auth";
 import { isISODate, startOfWeekSaturday, weekDates } from "@/lib/dates";
+import { ScheduleValidationError } from "@/lib/schedule";
 import {
   generatePerformanceNarrative,
 } from "@/lib/ai-performance";
@@ -16,6 +17,7 @@ import {
   getPerformanceAnalysis,
   getPerformanceRangeData,
   getPerformanceView,
+  loadSubjectDayLabels,
   PerformanceValidationError,
   savePerformancePanel,
 } from "@/lib/performance";
@@ -80,16 +82,18 @@ export async function savePerformancePanelAction(formData: FormData): Promise<vo
   );
 
   let grid: unknown;
+  let weekSlots: unknown;
   try {
     grid = JSON.parse(field(formData, "cellsJson") || "null");
+    weekSlots = JSON.parse(field(formData, "slotsJson") || "null");
   } catch {
     redirect(perfPath(ctx.role, studentId, weekStart, "&error=" + encodeURIComponent("داده جدول عملکرد نامعتبر است.")));
   }
 
   try {
-    await savePerformancePanel({ studentId, weekStart, grid, actorId: user.id });
+    await savePerformancePanel({ studentId, weekStart, grid, actorId: user.id, slots: weekSlots ?? undefined });
   } catch (error) {
-    if (error instanceof PerformanceValidationError) {
+    if (error instanceof PerformanceValidationError || error instanceof ScheduleValidationError) {
       redirect(perfPath(ctx.role, studentId, weekStart, "&error=" + encodeURIComponent(error.message)));
     }
     throw error;
@@ -292,7 +296,8 @@ export async function generatePerformanceNarrativeAction(formData: FormData): Pr
   }
 
   const dates = weekDates(weekStart);
-  const matrix = buildSubjectDayMatrix(perf.grid, dates, subjectMeta);
+  const labels = await loadSubjectDayLabels(db, studentRow.workspaceId);
+  const matrix = buildSubjectDayMatrix(perf.grid, dates, subjectMeta, labels);
   const planningInsights = buildPlanningInsights(plan.grid, dates, plan.slots, subjectMeta);
   const resourceProgress = await getStudentResourceProgress(studentId);
   const result = await generatePerformanceNarrative({

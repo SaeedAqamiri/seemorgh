@@ -4,6 +4,7 @@ import {
   dailyLogs,
   performancePanels,
   plans,
+  resourceChapters,
   resources,
   students,
   subjects,
@@ -21,10 +22,12 @@ import { diffResourceActionCounts } from "./resource-progress";
 import { subjectSupportsTests } from "./subjects";
 import { ensureSubjectCatalog } from "./subject-catalog";
 import {
-  getBellSlots,
+  getWeekBellSlots,
+  saveWeekBellSlots,
   PANEL_DAYS,
   PANEL_SLOTS,
   type PanelSlot,
+  type WeekBellSlots,
   slotIndexForStart,
 } from "./schedule";
 
@@ -48,7 +51,7 @@ export type PerfCellState = {
 export type PerformanceView = {
   weekStart: string;
   grid: PerformanceGridJson;
-  slots: PanelSlot[];
+  slots: WeekBellSlots;
   narrative: string;
   narrativeAt: Date | null;
   updatedAt: Date | null;
@@ -228,7 +231,8 @@ function assertPerfGrid(value: unknown, slotCount: number): asserts value is Per
 
 export async function getPerformanceView(studentId: string, weekStart: string): Promise<PerformanceView> {
   const db = await getDb();
-  const slots = await getBellSlots(studentId);
+  const slots = await getWeekBellSlots(studentId);
+  const slotCount = slots[0]?.length ?? PANEL_SLOTS.length;
   const [panel] = await db
     .select()
     .from(performancePanels)
@@ -246,8 +250,8 @@ export async function getPerformanceView(studentId: string, weekStart: string): 
   }
 
   const baseGrid = panel?.cellsJson
-    ? normalizePerfGrid(panel.cellsJson, slots.length)
-    : emptyPerformanceGrid(slots.length);
+    ? normalizePerfGrid(panel.cellsJson, slotCount)
+    : emptyPerformanceGrid(slotCount);
   const kindById = await loadSubjectKindMap(db, studentId);
   const grid = normalizePerfGridForSubjectKinds(baseGrid, kindById);
 
@@ -267,6 +271,7 @@ export type SavePerformanceInput = {
   weekStart: string;
   grid: unknown;
   actorId: string;
+  slots?: unknown;
 };
 
 export async function savePerformancePanel(input: SavePerformanceInput): Promise<void> {
@@ -278,9 +283,13 @@ export async function savePerformancePanel(input: SavePerformanceInput): Promise
     .limit(1);
   if (!studentRow) throw new PerformanceValidationError("دانش‌آموز پیدا نشد.");
 
-  const slots = await getBellSlots(input.studentId);
-  assertPerfGrid(input.grid, slots.length);
-  let grid = normalizePerfGrid(input.grid, slots.length);
+  const slots =
+    input.slots !== undefined
+      ? await saveWeekBellSlots(input.studentId, input.slots)
+      : await getWeekBellSlots(input.studentId);
+  const slotCount = slots[0]?.length ?? PANEL_SLOTS.length;
+  assertPerfGrid(input.grid, slotCount);
+  let grid = normalizePerfGrid(input.grid, slotCount);
 
   const [subjectRows, resourceRows, existingPanelRows] = await Promise.all([
     db
@@ -344,7 +353,7 @@ export async function savePerformancePanel(input: SavePerformanceInput): Promise
 
   const previousGrid = existingPanelRows[0]?.cellsJson
     ? normalizePerfGridForSubjectKinds(
-        normalizePerfGrid(existingPanelRows[0].cellsJson, slots.length),
+        normalizePerfGrid(existingPanelRows[0].cellsJson, slotCount),
         kindById,
       )
     : null;
@@ -390,7 +399,7 @@ export async function savePerformancePanel(input: SavePerformanceInput): Promise
     for (const task of planTasks) {
       const day = dates.indexOf(task.planDate);
       if (day < 0) continue;
-      const slot = slotIndexForStart(slots, task.plannedStart);
+      const slot = slotIndexForStart(slots[day] ?? [], task.plannedStart);
       if (slot < 0) continue;
       const cell = grid[day]?.[slot];
       if (!cell) continue;
@@ -457,6 +466,10 @@ export type SubjectDayCell = {
   studyMinutes: number;
   testMinutes: number;
   exerciseMinutes: number;
+  testCount: number;
+  exerciseCount: number;
+  topics: string[];
+  resources: string[];
 };
 
 export type SubjectDayRow = {
@@ -468,6 +481,13 @@ export type SubjectDayRow = {
   totalStudyMinutes: number;
   totalTestMinutes: number;
   totalExerciseMinutes: number;
+  totalTestCount: number;
+  totalExerciseCount: number;
+};
+
+export type SubjectDayLabels = {
+  resourceTitle?: Map<string, string>;
+  chapterTitle?: Map<string, string>;
 };
 
 export type SubjectTimeRow = {
@@ -504,10 +524,73 @@ function reportBucket(cell: PerfActivityCell): {
   return { study: 0, test: cell.minutes, exercise: 0 };
 }
 
+export function emptySubjectDayCell(date: string): SubjectDayCell {
+  return {
+    date,
+    practiceMinutes: 0,
+    studyMinutes: 0,
+    testMinutes: 0,
+    exerciseMinutes: 0,
+    testCount: 0,
+    exerciseCount: 0,
+    topics: [],
+    resources: [],
+  };
+}
+
+function pushUnique(list: string[], value: string | undefined | null) {
+  const text = value?.trim();
+  if (text && !list.includes(text)) list.push(text);
+}
+
+function subjectDayEntryHasContent(activity: PerfActivityCell): boolean {
+  const bucket = reportBucket(activity);
+  if (bucket.study > 0 || bucket.test > 0 || bucket.exercise > 0) return true;
+  const count = "count" in activity && typeof activity.count === "number" ? activity.count : 0;
+  return count > 0;
+}
+
+function accumulateSubjectDayCell(
+  cell: SubjectDayCell,
+  activity: PerfActivityCell,
+  labels: SubjectDayLabels,
+) {
+  const bucket = reportBucket(activity);
+  cell.practiceMinutes += bucket.test + bucket.exercise;
+  cell.studyMinutes += bucket.study;
+  cell.testMinutes += bucket.test;
+  cell.exerciseMinutes += bucket.exercise;
+
+  if (
+    activity.kind === "study" ||
+    activity.kind === "review" ||
+    (activity.kind === "routine" && activity.routineMode === "study")
+  ) {
+    pushUnique(cell.topics, activity.resourceText);
+    pushUnique(cell.resources, activity.resourceText);
+    return;
+  }
+  if (
+    activity.kind === "test" ||
+    activity.kind === "timedTest" ||
+    activity.kind === "exercise" ||
+    (activity.kind === "routine" && activity.routineMode === "test")
+  ) {
+    const count = activity.count ?? 0;
+    if (activity.kind === "exercise") cell.exerciseCount += count;
+    else cell.testCount += count;
+    const chapterId = "chapterId" in activity ? activity.chapterId : undefined;
+    if (chapterId) pushUnique(cell.topics, labels.chapterTitle?.get(chapterId));
+    const resourceId = "resourceId" in activity ? activity.resourceId : undefined;
+    if (resourceId) pushUnique(cell.resources, labels.resourceTitle?.get(resourceId));
+  }
+}
+
 export function buildSubjectDayMatrix(
   perfGrid: PerformanceGridJson,
   dates: string[],
   subjectMeta: Map<string, { title: string; kind: string }>,
+  labels: SubjectDayLabels = {},
 ): SubjectDayRow[] {
   const bySubject = new Map<
     string,
@@ -520,6 +603,8 @@ export function buildSubjectDayMatrix(
       totalStudyMinutes: number;
       totalTestMinutes: number;
       totalExerciseMinutes: number;
+      totalTestCount: number;
+      totalExerciseCount: number;
     }
   >();
 
@@ -531,9 +616,7 @@ export function buildSubjectDayMatrix(
       if (!("subjectId" in activity) || !activity.subjectId) continue;
       const meta = subjectMeta.get(activity.subjectId);
       if (!meta) continue;
-      const bucket = reportBucket(activity);
-      const practice = bucket.test + bucket.exercise;
-      if (practice === 0 && bucket.study === 0) continue;
+      if (!subjectDayEntryHasContent(activity)) continue;
       const row =
         bySubject.get(activity.subjectId) ??
         {
@@ -545,24 +628,19 @@ export function buildSubjectDayMatrix(
           totalStudyMinutes: 0,
           totalTestMinutes: 0,
           totalExerciseMinutes: 0,
+          totalTestCount: 0,
+          totalExerciseCount: 0,
         };
-      const dayCell =
-        row.days.get(date) ?? {
-          date,
-          practiceMinutes: 0,
-          studyMinutes: 0,
-          testMinutes: 0,
-          exerciseMinutes: 0,
-        };
-      dayCell.practiceMinutes += practice;
-      dayCell.studyMinutes += bucket.study;
-      dayCell.testMinutes += bucket.test;
-      dayCell.exerciseMinutes += bucket.exercise;
+      const dayCell = row.days.get(date) ?? emptySubjectDayCell(date);
+      const before = { ...dayCell, topics: [...dayCell.topics], resources: [...dayCell.resources] };
+      accumulateSubjectDayCell(dayCell, activity, labels);
       row.days.set(date, dayCell);
-      row.totalPracticeMinutes += practice;
-      row.totalStudyMinutes += bucket.study;
-      row.totalTestMinutes += bucket.test;
-      row.totalExerciseMinutes += bucket.exercise;
+      row.totalPracticeMinutes += dayCell.practiceMinutes - before.practiceMinutes;
+      row.totalStudyMinutes += dayCell.studyMinutes - before.studyMinutes;
+      row.totalTestMinutes += dayCell.testMinutes - before.testMinutes;
+      row.totalExerciseMinutes += dayCell.exerciseMinutes - before.exerciseMinutes;
+      row.totalTestCount += dayCell.testCount - before.testCount;
+      row.totalExerciseCount += dayCell.exerciseCount - before.exerciseCount;
       bySubject.set(activity.subjectId, row);
     }
   }
@@ -573,19 +651,14 @@ export function buildSubjectDayMatrix(
       title: row.title,
       kind: row.kind,
       days: dates.map(
-        (date) =>
-          row.days.get(date) ?? {
-            date,
-            practiceMinutes: 0,
-            studyMinutes: 0,
-            testMinutes: 0,
-            exerciseMinutes: 0,
-          },
+        (date) => row.days.get(date) ?? emptySubjectDayCell(date),
       ),
       totalPracticeMinutes: row.totalPracticeMinutes,
       totalStudyMinutes: row.totalStudyMinutes,
       totalTestMinutes: row.totalTestMinutes,
       totalExerciseMinutes: row.totalExerciseMinutes,
+      totalTestCount: row.totalTestCount,
+      totalExerciseCount: row.totalExerciseCount,
     }))
     .sort((a, b) => a.title.localeCompare(b.title, "fa"));
 }
@@ -593,7 +666,7 @@ export function buildSubjectDayMatrix(
 export function buildPlanningInsights(
   planGrid: WeeklyGridJson | null,
   dates: string[],
-  slots: readonly PanelSlot[],
+  slots: readonly PanelSlot[][],
   subjectMeta: Map<string, { title: string; kind: string }>,
 ): PlanningInsights {
   const bySubject = new Map<string, SubjectTimeRow>();
@@ -601,15 +674,16 @@ export function buildPlanningInsights(
   if (!planGrid) return { subjectTimes: [], firstSubjectByDay };
 
   for (let day = 0; day < dates.length; day += 1) {
+    const daySlots = slots[day] ?? [];
     let first: string | null = null;
-    for (let slot = 0; slot < slots.length; slot += 1) {
+    for (let slot = 0; slot < daySlots.length; slot += 1) {
       const cell = planGrid[day]?.[slot];
       if (!cell || cell.kind === "empty" || cell.kind === "rest") continue;
       if (!("subjectId" in cell) || !cell.subjectId) continue;
       const title = subjectMeta.get(cell.subjectId)?.title;
       if (!title) continue;
       const row = bySubject.get(title) ?? { title, morning: 0, afternoon: 0, evening: 0 };
-      const start = slots[slot].startMin;
+      const start = daySlots[slot].startMin;
       if (start < 12 * 60) row.morning += 1;
       else if (start < 18 * 60) row.afternoon += 1;
       else row.evening += 1;
@@ -670,16 +744,19 @@ export function buildPerformanceAnalysis(
   perfGrid: PerformanceGridJson,
   plannedStartByDate?: Map<string, number>,
   openedMinutesByDate?: Map<string, number>,
-  slots: readonly PanelSlot[] = PANEL_SLOTS,
+  slots: readonly PanelSlot[][] = Array.from({ length: PANEL_DAYS }, () =>
+    PANEL_SLOTS.map((slot) => ({ ...slot })),
+  ),
 ): PerformanceAnalysis {
   const dates = weekDates(weekStart);
   const days: DayStartStatus[] = [];
 
   for (let day = 0; day < PANEL_DAYS; day += 1) {
+    const daySlots = slots[day] ?? [];
     const gridPlannedStartMin = (() => {
       if (!planGrid) return null;
-      for (let slot = 0; slot < slots.length; slot += 1) {
-        if (plannedKind(planGrid[day]?.[slot])) return slots[slot].startMin;
+      for (let slot = 0; slot < daySlots.length; slot += 1) {
+        if (plannedKind(planGrid[day]?.[slot])) return daySlots[slot].startMin;
       }
       return null;
     })();
@@ -793,6 +870,25 @@ export type PerformanceRangeData = {
   dailyRoutine: string;
 };
 
+export async function loadSubjectDayLabels(
+  db: Awaited<ReturnType<typeof getDb>>,
+  workspaceId: string,
+): Promise<SubjectDayLabels> {
+  const resourceRows = await db
+    .select({ id: resources.id, title: resources.title })
+    .from(resources)
+    .where(eq(resources.workspaceId, workspaceId));
+  const chapterRows = await db
+    .select({ id: resourceChapters.id, title: resourceChapters.title })
+    .from(resourceChapters)
+    .innerJoin(resources, eq(resourceChapters.resourceId, resources.id))
+    .where(eq(resources.workspaceId, workspaceId));
+  return {
+    resourceTitle: new Map(resourceRows.map((row) => [row.id, row.title])),
+    chapterTitle: new Map(chapterRows.map((row) => [row.id, row.title])),
+  };
+}
+
 export async function getPerformanceRangeData(
   studentId: string,
   from: string,
@@ -809,10 +905,13 @@ export async function getPerformanceRangeData(
 
   await ensureSubjectCatalog(studentRow.workspaceId);
 
-  const subjectRows = await db
-    .select({ id: subjects.id, title: subjects.title, kind: subjects.kind })
-    .from(subjects)
-    .where(eq(subjects.workspaceId, studentRow.workspaceId));
+  const [subjectDayLabels, subjectRows] = await Promise.all([
+    loadSubjectDayLabels(db, studentRow.workspaceId),
+    db
+      .select({ id: subjects.id, title: subjects.title, kind: subjects.kind })
+      .from(subjects)
+      .where(eq(subjects.workspaceId, studentRow.workspaceId)),
+  ]);
   const subjectTitles = new Map(subjectRows.map((row) => [row.id, row.title]));
   const subjectMeta = new Map(
     subjectRows.map((row) => [row.id, { title: row.title, kind: row.kind }]),
@@ -828,6 +927,8 @@ export async function getPerformanceRangeData(
       title: string;
       kind: string;
       cells: Map<string, SubjectDayCell>;
+      totalTestCount: number;
+      totalExerciseCount: number;
     }
   >();
   const timeBySubject = new Map<string, SubjectTimeRow>();
@@ -903,29 +1004,22 @@ export async function getPerformanceRangeData(
           if (note) notes.push({ weekday: dayIndex, slot, text: note.slice(0, 300) });
           const meta = subjectMeta.get(activity.subjectId);
           if (!meta) return;
-          const bucket = reportBucket(activity);
-          const practice = bucket.test + bucket.exercise;
-          if (practice === 0 && bucket.study === 0) return;
+          if (!subjectDayEntryHasContent(activity)) return;
           const entry =
             matrixCells.get(activity.subjectId) ??
             {
               title: meta.title,
               kind: meta.kind,
               cells: new Map<string, SubjectDayCell>(),
+              totalTestCount: 0,
+              totalExerciseCount: 0,
             };
-          const dayCell =
-            entry.cells.get(date) ?? {
-              date,
-              practiceMinutes: 0,
-              studyMinutes: 0,
-              testMinutes: 0,
-              exerciseMinutes: 0,
-            };
-          dayCell.practiceMinutes += practice;
-          dayCell.studyMinutes += bucket.study;
-          dayCell.testMinutes += bucket.test;
-          dayCell.exerciseMinutes += bucket.exercise;
+          const dayCell = entry.cells.get(date) ?? emptySubjectDayCell(date);
+          const before = { testCount: dayCell.testCount, exerciseCount: dayCell.exerciseCount };
+          accumulateSubjectDayCell(dayCell, activity, subjectDayLabels);
           entry.cells.set(date, dayCell);
+          entry.totalTestCount += dayCell.testCount - before.testCount;
+          entry.totalExerciseCount += dayCell.exerciseCount - before.exerciseCount;
           matrixCells.set(activity.subjectId, entry);
         });
       }
@@ -978,6 +1072,10 @@ export async function getPerformanceRangeData(
             studyMinutes: 0,
             testMinutes: 0,
             exerciseMinutes: 0,
+            testCount: 0,
+            exerciseCount: 0,
+            topics: [],
+            resources: [],
           },
       ),
       totalPracticeMinutes: [...entry.cells.values()].reduce(
@@ -996,6 +1094,8 @@ export async function getPerformanceRangeData(
         (sum, cell) => sum + cell.exerciseMinutes,
         0,
       ),
+      totalTestCount: entry.totalTestCount,
+      totalExerciseCount: entry.totalExerciseCount,
     }))
     .sort((a, b) => a.title.localeCompare(b.title, "fa"));
 

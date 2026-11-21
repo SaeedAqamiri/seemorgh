@@ -7,41 +7,121 @@ import { SubmitButton } from "@/components/submit-button";
 import { aiPerformanceConfigured } from "@/lib/ai-performance";
 import { formatJalaliNumeric, WEEKDAY_LABELS, weekdayIndex } from "@/lib/dates";
 import { faNumber } from "@/lib/panel";
-import type { PerformanceAnalysis, SubjectDayRow } from "@/lib/performance";
+import type {
+  PerformanceAnalysis,
+  SubjectDayCell,
+  SubjectDayRow,
+} from "@/lib/performance";
 
 function faHours(minutes: number): string {
   return (minutes / 60).toLocaleString("fa-IR", { maximumFractionDigits: 1 });
 }
 
-function PulseCell({
-  study,
-  test,
-  exercise,
-}: {
-  study: number;
-  test: number;
-  exercise: number;
-}) {
-  const metrics = [
-    { key: "study", label: "مطالعه", value: study },
-    { key: "test", label: "تست", value: test },
-    { key: "exercise", label: "تمرین", value: exercise },
-  ].filter((metric) => metric.value > 0);
+type MirrorLine = { key: string; label: string; value: string };
 
-  if (metrics.length === 0) {
-    return <span className="pulse-empty">—</span>;
+function mirrorLines(cell: SubjectDayCell): MirrorLine[] {
+  return [
+    { key: "topic", label: "مبحث", value: cell.topics.join("؛ ") },
+    {
+      key: "test",
+      label: "تعداد تست",
+      value: cell.testCount > 0 ? `${faNumber(cell.testCount)}` : "",
+    },
+    {
+      key: "exercise",
+      label: "تعداد تمرین",
+      value: cell.exerciseCount > 0 ? `${faNumber(cell.exerciseCount)}` : "",
+    },
+    {
+      key: "study",
+      label: "مجموع ساعات مطالعه",
+      value: cell.studyMinutes > 0 ? `${faHours(cell.studyMinutes)} ساعت` : "",
+    },
+    { key: "resource", label: "منبع مطالعاتی", value: cell.resources.join("؛ ") },
+  ];
+}
+
+function MirrorCell({ cell }: { cell: SubjectDayCell }) {
+  if (
+    cell.topics.length === 0 &&
+    cell.resources.length === 0 &&
+    cell.studyMinutes === 0 &&
+    cell.testMinutes === 0 &&
+    cell.exerciseMinutes === 0 &&
+    cell.testCount === 0 &&
+    cell.exerciseCount === 0
+  ) {
+    return <span className="mirror-empty">—</span>;
   }
 
   return (
-    <div className="pulse-cell">
-      {metrics.map((metric) => (
-        <span key={metric.key} className="pulse-metric">
-          <i className={`pulse-dot is-${metric.key}`} /> {metric.label} {faHours(metric.value)}
-        </span>
+    <div className="mirror-cell">
+      {mirrorLines(cell).map((line) => (
+        <div key={line.key} className="mirror-line">
+          <span className="mirror-label">{line.label}:</span>{" "}
+          {line.value ? <span className="mirror-value">{line.value}</span> : <span className="mirror-na">—</span>}
+        </div>
       ))}
     </div>
   );
 }
+
+function MirrorTotalCell({
+  studyMinutes,
+  testMinutes,
+  exerciseMinutes,
+  testCount,
+  exerciseCount,
+}: {
+  studyMinutes: number;
+  testMinutes: number;
+  exerciseMinutes: number;
+  testCount: number;
+  exerciseCount: number;
+}) {
+  const isEmpty =
+    studyMinutes === 0 &&
+    testCount === 0 &&
+    exerciseCount === 0 &&
+    testMinutes === 0 &&
+    exerciseMinutes === 0;
+  if (isEmpty) return <span className="mirror-empty">—</span>;
+
+  return (
+    <div className="mirror-cell mirror-total-cell">
+      <div className="mirror-line">
+        <span className="mirror-label">مطالعه:</span>{" "}
+        <span className="mirror-value">{faHours(studyMinutes)} ساعت</span>
+      </div>
+      <div className="mirror-line">
+        <span className="mirror-label">تست:</span>{" "}
+        <span className="mirror-value">
+          {faNumber(testCount)} عدد
+          {testMinutes > 0 ? ` (${faHours(testMinutes)} ساعت)` : ""}
+        </span>
+      </div>
+      <div className="mirror-line">
+        <span className="mirror-label">تمرین:</span>{" "}
+        <span className="mirror-value">
+          {faNumber(exerciseCount)} عدد
+          {exerciseMinutes > 0 ? ` (${faHours(exerciseMinutes)} ساعت)` : ""}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+const emptyCell: SubjectDayCell = {
+  date: "",
+  practiceMinutes: 0,
+  studyMinutes: 0,
+  testMinutes: 0,
+  exerciseMinutes: 0,
+  testCount: 0,
+  exerciseCount: 0,
+  topics: [],
+  resources: [],
+};
 
 export function PerformanceRangeReport({
   studentId,
@@ -75,6 +155,40 @@ export function PerformanceRangeReport({
     .split(/\n+/)
     .map((line) => line.trim())
     .filter(Boolean);
+
+  const dayTotals = (date: string) => {
+    let studyMinutes = 0;
+    let testMinutes = 0;
+    let exerciseMinutes = 0;
+    let testCount = 0;
+    let exerciseCount = 0;
+    for (const subject of subjectDayMatrix) {
+      const cell = subject.days.find((day) => day.date === date);
+      if (!cell) continue;
+      studyMinutes += cell.studyMinutes;
+      testMinutes += cell.testMinutes;
+      exerciseMinutes += cell.exerciseMinutes;
+      testCount += cell.testCount;
+      exerciseCount += cell.exerciseCount;
+    }
+    return { studyMinutes, testMinutes, exerciseMinutes, testCount, exerciseCount };
+  };
+
+  const grandTotals = () => {
+    let studyMinutes = 0;
+    let testMinutes = 0;
+    let exerciseMinutes = 0;
+    let testCount = 0;
+    let exerciseCount = 0;
+    for (const subject of subjectDayMatrix) {
+      studyMinutes += subject.totalStudyMinutes;
+      testMinutes += subject.totalTestMinutes;
+      exerciseMinutes += subject.totalExerciseMinutes;
+      testCount += subject.totalTestCount;
+      exerciseCount += subject.totalExerciseCount;
+    }
+    return { studyMinutes, testMinutes, exerciseMinutes, testCount, exerciseCount };
+  };
 
   return (
     <div className="stack report-tab" style={{ gap: "1rem" }}>
@@ -123,126 +237,76 @@ export function PerformanceRangeReport({
       <div className="card">
         <div className="section-head">
           <div>
-            <h2>ساعت شروع روز</h2>
+            <h2>آینه عملکرد</h2>
             <small>
-              مقایسهٔ ساعت واقعی شروع با ساعت برنامه. نقطه‌های سبز به‌موقع، قرمز خارج از برنامه و
-              خاکستری بدون برنامه بوده‌اند.
-            </small>
-          </div>
-        </div>
-        {analysis.hasAnyData ? (
-          <StartChart days={analysis.days} />
-        ) : (
-          <div className="empty">با ثبت عملکرد در دفترچه عملکرد، نمودار تحلیل همین‌جا ساخته می‌شود.</div>
-        )}
-      </div>
-
-      <div className="card">
-        <div className="section-head">
-          <div>
-            <h2>ضربان هفته</h2>
-            <small>
-              هر درس یک ردیف و هر روز یک ستون؛ عددها ساعت مطالعه، تست و تمرین همان درس در آن روز
-              هستند. برای دیدن روزهای بیشتر جدول را افقی بکشید.
+              عملکرد را در یک نگاه ببین: هر درس یک ردیف و هر روز یک ستون؛ در هر خانه مبحث، تعداد
+              تست و تمرین، ساعت مطالعه و منبع همان روز آمده است. برای دیدن روزهای بیشتر جدول را
+              افقی بکشید.
             </small>
           </div>
         </div>
         {subjectDayMatrix.length === 0 ? (
           <div className="empty">برای این بازه داده‌ای ثبت نشده است.</div>
         ) : (
-          <div className="table-wrap pulse-wrap">
+          <div className="table-wrap mirror-wrap">
             <table
-              className="pulse-table"
-              style={{ minWidth: `${170 + dates.length * 152}px` }}
+              className="mirror-table"
+              style={{ minWidth: `${170 + dates.length * 210}px` }}
             >
               <thead>
                 <tr>
-                  <th className="pulse-subject">درس / روز</th>
+                  <th className="mirror-subject">درس / روز</th>
                   {dates.map((date) => (
-                    <th key={date} className="pulse-day">
+                    <th key={date} className="mirror-day">
                       <span>{WEEKDAY_LABELS[weekdayIndex(date)]}</span>
                       <small>{formatJalaliNumeric(date)}</small>
                     </th>
                   ))}
-                  <th className="pulse-total">جمع بازه</th>
+                  <th className="mirror-total">جمع بازه</th>
                 </tr>
               </thead>
               <tbody>
                 {subjectDayMatrix.map((subject) => (
                   <tr key={subject.subjectId}>
-                    <th scope="row" className="pulse-subject">
+                    <th scope="row" className="mirror-subject">
                       {subject.title}
                     </th>
                     {dates.map((date) => {
                       const cell = subject.days.find((day) => day.date === date) ?? {
+                        ...emptyCell,
                         date,
-                        practiceMinutes: 0,
-                        studyMinutes: 0,
-                        testMinutes: 0,
-                        exerciseMinutes: 0,
                       };
                       return (
                         <td key={date}>
-                          <PulseCell
-                            study={cell.studyMinutes}
-                            test={cell.testMinutes}
-                            exercise={cell.exerciseMinutes}
-                          />
+                          <MirrorCell cell={cell} />
                         </td>
                       );
                     })}
-                    <td className="pulse-total">
-                      <PulseCell
-                        study={subject.totalStudyMinutes}
-                        test={subject.totalTestMinutes}
-                        exercise={subject.totalExerciseMinutes}
+                    <td className="mirror-total">
+                      <MirrorTotalCell
+                        studyMinutes={subject.totalStudyMinutes}
+                        testMinutes={subject.totalTestMinutes}
+                        exerciseMinutes={subject.totalExerciseMinutes}
+                        testCount={subject.totalTestCount}
+                        exerciseCount={subject.totalExerciseCount}
                       />
                     </td>
                   </tr>
                 ))}
-                <tr className="pulse-sumrow">
-                  <th scope="row" className="pulse-subject">
+                <tr className="mirror-sumrow">
+                  <th scope="row" className="mirror-subject">
                     جمع روز
                   </th>
                   {dates.map((date) => {
-                    const study = subjectDayMatrix.reduce(
-                      (sum, subject) =>
-                        sum +
-                        (subject.days.find((day) => day.date === date)?.studyMinutes ?? 0),
-                      0,
-                    );
-                    const test = subjectDayMatrix.reduce(
-                      (sum, subject) =>
-                        sum + (subject.days.find((day) => day.date === date)?.testMinutes ?? 0),
-                      0,
-                    );
-                    const exercise = subjectDayMatrix.reduce(
-                      (sum, subject) =>
-                        sum +
-                        (subject.days.find((day) => day.date === date)?.exerciseMinutes ?? 0),
-                      0,
-                    );
+                    const totals = dayTotals(date);
                     return (
                       <td key={date}>
-                        <PulseCell study={study} test={test} exercise={exercise} />
+                        <MirrorTotalCell {...totals} />
                       </td>
                     );
                   })}
-                  <td className="pulse-total">
-                    <PulseCell
-                      study={subjectDayMatrix.reduce(
-                        (sum, subject) => sum + subject.totalStudyMinutes,
-                        0,
-                      )}
-                      test={subjectDayMatrix.reduce(
-                        (sum, subject) => sum + subject.totalTestMinutes,
-                        0,
-                      )}
-                      exercise={subjectDayMatrix.reduce(
-                        (sum, subject) => sum + subject.totalExerciseMinutes,
-                        0,
-                      )}
-                    />
+                  <td className="mirror-total">
+                    <MirrorTotalCell {...grandTotals()} />
                   </td>
                 </tr>
               </tbody>
