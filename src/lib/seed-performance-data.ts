@@ -10,7 +10,8 @@ import {
   type PerformanceGridJson,
 } from "../db/schema";
 import { startOfWeekSaturday, tehranDateTime, todayISO, weekDates } from "./dates";
-import { getBellSlots, type PanelSlot } from "./schedule";
+import { getWeekBellSlots, type PanelSlot } from "./schedule";
+import { getSchoolLessons } from "./school-schedule";
 
 function hashSeed(value: string): number {
   let result = 2166136261;
@@ -148,7 +149,14 @@ export async function seedPerformanceData(): Promise<{ panels: number; logs: num
   let logs = 0;
 
   for (const student of studentRows) {
-    const slots = await getBellSlots(student.id);
+    const weekSlots = await getWeekBellSlots(student.id);
+    const schoolLessons = await getSchoolLessons(student.id);
+    const schoolSlotByDay = new Map<number, Map<number, { subjectId: string; title: string }>>();
+    for (const lesson of schoolLessons) {
+      const bySlot = schoolSlotByDay.get(lesson.weekday) ?? new Map();
+      bySlot.set(lesson.slotIndex, { subjectId: lesson.subjectId, title: lesson.subjectTitle });
+      schoolSlotByDay.set(lesson.weekday, bySlot);
+    }
     const weekRows = await db
       .select()
       .from(weeklyPanels)
@@ -167,10 +175,23 @@ export async function seedPerformanceData(): Promise<{ panels: number; logs: num
 
       for (let day = 0; day < 7; day += 1) {
         const planRow = weekRow.gridJson[day] ?? [];
+        const slots = weekSlots[day] ?? [];
+        const schoolBySlot = schoolSlotByDay.get(day) ?? new Map();
         const { mode, doneRate } = dayMode(random);
         const perfRow: PerformanceCellJson[] = [];
 
         for (let slot = 0; slot < slots.length; slot += 1) {
+          const school = schoolBySlot.get(slot);
+          if (school) {
+            perfRow.push({
+              kind: "school",
+              subjectId: school.subjectId,
+              label: school.title,
+              minutes: Math.max(20, slots[slot].endMin - slots[slot].startMin),
+              note: "",
+            });
+            continue;
+          }
           const planCell = planRow[slot] ?? { kind: "empty" };
           perfRow.push(toPerformanceCell(planCell, slots[slot], doneRate, random));
         }
