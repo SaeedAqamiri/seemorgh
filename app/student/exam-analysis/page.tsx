@@ -10,6 +10,7 @@ import {
   getStudentTrendAnalysis,
   listStudentExamResults,
 } from "@/lib/exam-analysis";
+import { loadExamWizardData } from "@/lib/exam-analysis-wizard";
 
 export default async function StudentExamAnalysisPage({
   searchParams,
@@ -69,6 +70,15 @@ export default async function StudentExamAnalysisPage({
       )
     : null;
 
+  const wizard = selectedExam
+    ? await loadExamWizardData({
+        studentId: student.id,
+        workspaceId: user.workspaceId,
+        role: "student",
+        exam: selectedExam,
+      })
+    : undefined;
+
   return (
     <ExamAnalysisView
       studentId={student.id}
@@ -82,6 +92,8 @@ export default async function StudentExamAnalysisPage({
       to={rangeTo}
       selectedExam={selectedExam}
       selectedAnalysis={selectedAnalysis}
+      role="student"
+      wizard={wizard}
       success={success}
       error={error}
     />

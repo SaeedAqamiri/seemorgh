@@ -30,6 +30,7 @@ import {
 } from "../src/lib/dates";
 import { hashPassword } from "../src/lib/password";
 import { PANEL_SLOTS } from "../src/lib/panel";
+import { availabilityForGrade, STUDY_CONSTRAINTS } from "../src/lib/study-windows";
 
 const PASSWORD = "seemorgh123";
 const NEW_STUDENT_NAMES = [
@@ -321,16 +322,13 @@ async function main() {
 
     await db.insert(studentConstraints).values({
       studentId: student.id,
-      maxDailyMinutes: 720,
       restWeekday: 6,
-      bufferPct: 0,
+      ...STUDY_CONSTRAINTS,
     });
     await db.insert(availability).values(
-      [0, 1, 2, 3, 4, 5].map((weekday) => ({
+      availabilityForGrade("دوازدهم", 6).map((slot) => ({
         studentId: student.id,
-        weekday,
-        startMin: 8 * 60,
-        endMin: 20 * 60,
+        ...slot,
       })),
     );
     await db.insert(examTargets).values([

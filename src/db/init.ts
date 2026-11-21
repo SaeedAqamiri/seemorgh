@@ -452,6 +452,29 @@ ALTER TABLE external_exams ADD COLUMN IF NOT EXISTS mock_exam_id text;
 CREATE INDEX IF NOT EXISTS external_exams_student_idx ON external_exams(student_id, exam_date);
 CREATE UNIQUE INDEX IF NOT EXISTS external_exams_student_title_date_unique ON external_exams(student_id, title, exam_date);
 
+CREATE TABLE IF NOT EXISTS exam_analyses (
+  id text PRIMARY KEY,
+  workspace_id text NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  student_id text NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  exam_source text NOT NULL,
+  exam_ref_id text NOT NULL,
+  title text NOT NULL DEFAULT '',
+  exam_date text NOT NULL DEFAULT '',
+  step1_json jsonb,
+  counselor_note_high text NOT NULL DEFAULT '',
+  counselor_note_low text NOT NULL DEFAULT '',
+  step2_json jsonb,
+  counselor_advice text NOT NULL DEFAULT '',
+  advice_approved boolean NOT NULL DEFAULT false,
+  step3_json jsonb,
+  final_goal text NOT NULL DEFAULT '',
+  goals_source text NOT NULL DEFAULT '',
+  created_by text REFERENCES users(id) ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS exam_analyses_exam_unique ON exam_analyses(student_id, exam_source, exam_ref_id);
+
 CREATE TABLE IF NOT EXISTS school_lessons (
   id text PRIMARY KEY,
   student_id text NOT NULL REFERENCES students(id) ON DELETE CASCADE,

@@ -1,17 +1,15 @@
 import Link from "next/link";
 import { deleteExternalExamAction } from "@/app/actions/exam-analysis";
+import { ExamAnalysisWizard } from "@/components/exam-analysis-wizard";
 import { ExamOcrForm } from "@/components/exam-ocr-form";
 import { ExamResultForm } from "@/components/exam-result-form";
 import { ExamResultsList } from "@/components/exam-results-list";
 import { ExamTrendReport } from "@/components/exam-trend-report";
 import { ReportRangeForm } from "@/components/report-range-form";
-import { SingleExamAnalysisCard } from "@/components/single-exam-analysis-card";
 import { SubmitButton } from "@/components/submit-button";
-import type {
-  ExamResultView,
-  SingleExamAnalysis,
-  TrendAnalysis,
-} from "@/lib/exam-analysis";
+import { aiClientConfigured } from "@/lib/ai-client";
+import type { ExamResultView, SingleExamAnalysis, TrendAnalysis } from "@/lib/exam-analysis";
+import type { ExamWizardData } from "@/lib/exam-analysis-wizard";
 
 export function ExamAnalysisView({
   studentId,
@@ -26,6 +24,8 @@ export function ExamAnalysisView({
   to,
   selectedExam,
   selectedAnalysis,
+  role = "student",
+  wizard,
   success,
   error,
 }: {
@@ -41,6 +41,8 @@ export function ExamAnalysisView({
   to: string;
   selectedExam: ExamResultView | null;
   selectedAnalysis: SingleExamAnalysis | null;
+  role?: "counselor" | "student";
+  wizard?: ExamWizardData;
   success?: string;
   error?: string;
 }) {
@@ -69,7 +71,30 @@ export function ExamAnalysisView({
 
       {selectedExam && selectedAnalysis ? (
         <div className="stack" style={{ gap: "0.8rem" }}>
-          <SingleExamAnalysisCard analysis={selectedAnalysis} />
+          {wizard ? (
+            <ExamAnalysisWizard
+              key={`${wizard.examSource}:${wizard.examRefId}:${wizard.version}`}
+              role={wizard.role}
+              studentId={wizard.studentId}
+              studentName={studentName ?? ""}
+              examSource={wizard.examSource}
+              examRefId={wizard.examRefId}
+              examTitle={wizard.examTitle}
+              weightedPercent={wizard.weightedPercent}
+              step1Rows={wizard.step1Rows}
+              counselorNoteHigh={wizard.counselorNoteHigh}
+              counselorNoteLow={wizard.counselorNoteLow}
+              step2Rows={wizard.step2Rows}
+              advice={wizard.advice}
+              adviceApproved={wizard.adviceApproved}
+              step3Rows={wizard.step3Rows}
+              finalGoal={wizard.finalGoal}
+              goalsSource={wizard.goalsSource}
+              skipStats={wizard.skipStats}
+              aiReady={aiClientConfigured()}
+              success={success}
+            />
+          ) : null}
           {selectedExam.source === "external" ? (
             <div className="card">
               <div className="section-head">

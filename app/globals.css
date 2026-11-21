@@ -1424,6 +1424,74 @@ a.group-chip:hover {
   }
 }
 
+
+/* ── Remaining volume until the next exam ───────────────────────── */
+.volume-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.volume-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.7rem;
+}
+
+.volume-deadline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 0.5rem 0.75rem;
+  border-radius: 10px;
+  background: var(--surface-2);
+  font-size: 0.85rem;
+}
+
+.volume-summary {
+  display: flex;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+
+.volume-stat {
+  flex: 1 1 150px;
+  min-width: 150px;
+}
+
+.volume-unit {
+  margin-inline-start: 0.3rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.volume-weekly {
+  margin-top: 0.25rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--brand-strong);
+}
+
+.volume-table td {
+  font-variant-numeric: tabular-nums;
+}
+
+.volume-table td:first-child {
+  min-width: 190px;
+}
+
+.volume-progress {
+  width: 110px;
+  margin-bottom: 0.15rem;
+}
+
+.volume-zero {
+  color: var(--brand);
+}
+
 @media print {
   .topbar,
   .btn,

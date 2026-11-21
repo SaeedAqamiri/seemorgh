@@ -12,6 +12,7 @@ import {
   getStudentTrendAnalysis,
   listStudentExamResults,
 } from "@/lib/exam-analysis";
+import { loadExamWizardData } from "@/lib/exam-analysis-wizard";
 
 export default async function CounselorExamAnalysisPage({
   params,
@@ -77,6 +78,15 @@ export default async function CounselorExamAnalysisPage({
       )
     : null;
 
+  const wizard = selectedExam
+    ? await loadExamWizardData({
+        studentId: id,
+        workspaceId: counselor.workspaceId,
+        role: "counselor",
+        exam: selectedExam,
+      })
+    : undefined;
+
   return (
     <ExamAnalysisView
       studentId={id}
@@ -91,6 +101,8 @@ export default async function CounselorExamAnalysisPage({
       to={rangeTo}
       selectedExam={selectedExam}
       selectedAnalysis={selectedAnalysis}
+      role="counselor"
+      wizard={wizard}
       success={success}
       error={error}
     />

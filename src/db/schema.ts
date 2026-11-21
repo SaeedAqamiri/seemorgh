@@ -825,6 +825,69 @@ export const externalExams = pgTable(
   ],
 );
 
+export type ExamAnalysisCauseRow = {
+  subjectId: string | null;
+  subjectTitle: string;
+  percent: number;
+  wrong: number;
+  blank: number;
+  total: number;
+  questionNote: string;
+  cause: string;
+  action: string;
+  actionSource: "" | "ai" | "user";
+};
+
+export type ExamAnalysisPreparationRow = {
+  subjectId: string | null;
+  subjectTitle: string;
+  topicTests: number;
+  timedTests: number;
+  avgPercent: number | null;
+  approxPercent: number | null;
+};
+
+export type ExamAnalysisGoalRow = {
+  subjectTitle: string;
+  currentPercent: number;
+  targetPercent: number | null;
+  note: string;
+};
+
+export const examAnalyses = pgTable(
+  "exam_analyses",
+  {
+    id: id(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    studentId: text("student_id")
+      .notNull()
+      .references(() => students.id, { onDelete: "cascade" }),
+    examSource: text("exam_source").notNull(),
+    examRefId: text("exam_ref_id").notNull(),
+    title: text("title").notNull().default(""),
+    examDate: text("exam_date").notNull().default(""),
+    step1Json: jsonb("step1_json").$type<ExamAnalysisCauseRow[]>(),
+    counselorNoteHigh: text("counselor_note_high").notNull().default(""),
+    counselorNoteLow: text("counselor_note_low").notNull().default(""),
+    step2Json: jsonb("step2_json").$type<ExamAnalysisPreparationRow[]>(),
+    counselorAdvice: text("counselor_advice").notNull().default(""),
+    adviceApproved: boolean("advice_approved").notNull().default(false),
+    step3Json: jsonb("step3_json").$type<ExamAnalysisGoalRow[]>(),
+    finalGoal: text("final_goal").notNull().default(""),
+    goalsSource: text("goals_source").notNull().default(""),
+    createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("exam_analyses_exam_unique").on(table.studentId, table.examSource, table.examRefId),
+  ],
+);
+
 export const schoolLessons = pgTable(
   "school_lessons",
   {
@@ -1254,6 +1317,7 @@ export type PerformancePanel = typeof performancePanels.$inferSelect;
 export type Question = typeof questions.$inferSelect;
 export type Exam = typeof exams.$inferSelect;
 export type ExternalExam = typeof externalExams.$inferSelect;
+export type ExamAnalysis = typeof examAnalyses.$inferSelect;
 export type SchoolLesson = typeof schoolLessons.$inferSelect;
 export type MockExamProgram = typeof mockExamPrograms.$inferSelect;
 export type StudentMockExam = typeof studentMockExams.$inferSelect;
