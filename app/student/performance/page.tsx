@@ -15,7 +15,6 @@ import {
   getPanelOptions,
   getWeeklyPanelView,
   plannedCellLabel,
-  slotLabel,
 } from "@/lib/panel";
 import { getPerformanceView } from "@/lib/performance";
 
@@ -53,7 +52,6 @@ export default async function StudentPerformancePage({
 
   const dates = weekDates(weekStart);
   const dayTitles = dates.map((date) => formatJalaliNumeric(date));
-  const slotLabels = (plan.slots ?? perf.slots).map((slot) => slotLabel(slot));
   const slotBounds = plan.slots ?? perf.slots;
   const perfHref = (value: string) => `/student/performance?week=${value}`;
 
@@ -96,8 +94,7 @@ export default async function StudentPerformancePage({
           weekStart={weekStart}
           weekdayLabels={[...WEEKDAY_LABELS]}
           dayTitles={dayTitles}
-          slotLabels={slotLabels}
-          slotBounds={slotBounds}
+          slots={slotBounds}
           plannedLabels={plannedLabels}
           initialGrid={perf.grid as unknown as PerfCellState[][]}
           subjects={options.subjects}

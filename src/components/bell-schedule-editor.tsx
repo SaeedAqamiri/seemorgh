@@ -53,8 +53,8 @@ export function BellScheduleEditor({
       <input type="hidden" name="slotsJson" value={JSON.stringify(slots)} />
       <div className="row between">
         <small className="muted">
-          هر روز ۱۰ زنگ دارد؛ پیش‌فرض ۸:۰۰ تا ۲۳:۰۰ و هر زنگ ۹۰ دقیقه. ساعت شروع و پایان هر زنگ
-          را می‌توانید تغییر دهید.
+          ساعت پیش‌فرض زنگ‌ها؛ با ذخیره، روی همه روزهای هفته اعمال می‌شود. برای تغییر ساعت فقط
+          یک روز خاص، از داخل همان زنگ در «جدول هفتگی» استفاده کنید.
         </small>
         <div className="row">
           {!editing ? (
@@ -122,6 +122,12 @@ export function BellScheduleEditor({
           ))}
         </div>
       )}
+      {!editing ? (
+        <small className="muted">
+          شنبه (روز اول) نمایش داده شده؛ اگر ساعت یک روز متفاوت است، یعنی همان روز داخل جدول
+          هفتگی شخصی‌سازی شده است.
+        </small>
+      ) : null}
     </form>
   );
 }

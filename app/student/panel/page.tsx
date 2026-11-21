@@ -13,7 +13,7 @@ import {
   WEEKDAY_LABELS,
   weekDates,
 } from "@/lib/dates";
-import { getPanelOptions, getWeeklyPanelView, slotLabel } from "@/lib/panel";
+import { getPanelOptions, getWeeklyPanelView } from "@/lib/panel";
 import { getSchoolLessons } from "@/lib/school-schedule";
 
 const SUCCESS: Record<string, string> = {
@@ -39,7 +39,7 @@ export default async function StudentPanelPage({
 
   const dates = weekDates(weekStart);
   const dayTitles = dates.map((date) => formatJalaliNumeric(date));
-  const slotLabels = panelView.slots.map((slot) => slotLabel(slot));
+  const slotLabels = panelView.slots[0].map((_, index) => `زنگ ${(index + 1).toLocaleString("fa-IR")}`);
   const panelHref = (value: string) => `/student/panel?week=${value}`;
 
   return (
@@ -80,7 +80,7 @@ export default async function StudentPanelPage({
         <BellScheduleEditor
           studentId={student.id}
           weekStart={weekStart}
-          initialSlots={panelView.slots}
+          initialSlots={panelView.slots[0]}
           action={saveBellSlotsAction}
         />
       </div>
@@ -111,7 +111,7 @@ export default async function StudentPanelPage({
           weekStart={weekStart}
           weekdayLabels={[...WEEKDAY_LABELS]}
           dayTitles={dayTitles}
-          slotLabels={slotLabels}
+          slots={panelView.slots}
           initialGrid={panelView.grid as unknown as PanelCellState[][]}
           initialRoutine={panelView.dailyRoutine}
           initialHomework={panelView.nextWeekHomework}

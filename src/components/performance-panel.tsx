@@ -36,13 +36,14 @@ type ResourceOption = {
 
 export type ViewMode = "both" | "plan" | "perf";
 
+export type PerfSlotState = { startMin: number; endMin: number };
+
 export type PerformancePanelProps = {
   studentId: string;
   weekStart: string;
   weekdayLabels: string[];
   dayTitles: string[];
-  slotLabels: string[];
-  slotBounds: { startMin: number; endMin: number }[];
+  slots: PerfSlotState[][];
   plannedLabels: string[][];
   initialGrid: PerfCellState[][];
   subjects: SubjectOption[];
@@ -99,6 +100,30 @@ function textKindFor(cell: PerfCellState): boolean {
 
 function cloneGrid(grid: PerfCellState[][]): PerfCellState[][] {
   return grid.map((row) => row.map((cell) => ({ ...cell })));
+}
+
+function cloneSlots(slots: PerfSlotState[][]): PerfSlotState[][] {
+  return slots.map((row) => row.map((slot) => ({ ...slot })));
+}
+
+function slotTimeOptions(): { value: number; label: string }[] {
+  const options: { value: number; label: string }[] = [];
+  for (let minutes = 0; minutes <= 24 * 60; minutes += 15) {
+    const hh = String(Math.floor(minutes / 60)).padStart(2, "0");
+    const mm = String(minutes % 60).padStart(2, "0");
+    options.push({ value: minutes, label: `${hh}:${mm}` });
+  }
+  return options;
+}
+
+function faClock(minutes: number): string {
+  const hh = String(Math.floor(minutes / 60)).padStart(2, "0");
+  const mm = String(minutes % 60).padStart(2, "0");
+  return `${hh}:${mm}`;
+}
+
+function slotRangeLabel(slot?: { startMin: number; endMin: number }): string {
+  return slot ? `${faClock(slot.startMin)}–${faClock(slot.endMin)}` : "";
 }
 
 function defaultCell(kind: PerfCellState["kind"], minutes: number, note = ""): PerfCellState {
@@ -170,17 +195,30 @@ export function PerformancePanel(props: PerformancePanelProps) {
   const [grid, setGrid] = useState<PerfCellState[][]>(() =>
     cloneGrid(normalizeGridForKinds(props.initialGrid)),
   );
+  const [slots, setSlots] = useState<PerfSlotState[][]>(() => cloneSlots(props.slots));
   const [viewMode, setViewMode] = useState<ViewMode>("both");
   const [groups, setGroups] = useState<Record<string, "general" | "specialized">>({});
 
+  const timeOptions = slotTimeOptions();
+
+  const updateSlot = (day: number, index: number, patch: Partial<PerfSlotState>) => {
+    setSlots((current) =>
+      current.map((row, d) =>
+        d === day ? row.map((slot, i) => (i === index ? { ...slot, ...patch } : slot)) : row,
+      ),
+    );
+  };
+
   const startEdit = () => {
     setGrid(cloneGrid(normalizeGridForKinds(props.initialGrid)));
+    setSlots(cloneSlots(props.slots));
     setGroups({});
     setEditing(true);
   };
 
   const cancelEdit = () => {
     setGrid(cloneGrid(normalizeGridForKinds(props.initialGrid)));
+    setSlots(cloneSlots(props.slots));
     setGroups({});
     setEditing(false);
   };
@@ -217,7 +255,7 @@ export function PerformancePanel(props: PerformancePanelProps) {
 
   const setKind = (day: number, slot: number, kind: PerfCellState["kind"]) => {
     const previous = grid[day][slot];
-    const bounds = props.slotBounds[slot] ?? { startMin: 480, endMin: 570 };
+    const bounds = slots[day]?.[slot] ?? { startMin: 480, endMin: 570 };
     const safeKind =
       previous.subjectId &&
       !supportsTestsFor(previous.subjectId) &&
@@ -274,12 +312,14 @@ export function PerformancePanel(props: PerformancePanelProps) {
     });
   };
 
-  const perfLabel = (cell: PerfCellState) => {
+  const perfLabel = (cell: PerfCellState, day: number, slot: number) => {
     if (cell.kind === "empty") return <span className="muted">—</span>;
     if (cell.kind === "rest") return <span className="panel-rest action-rest">استراحت</span>;
+    const time = slotRangeLabel(slots[day]?.[slot]);
     if (cell.kind === "exam" || cell.kind === "examAnalysis") {
       return (
         <div className={`panel-action action-${cell.kind}`}>
+          <span className="perf-tag">{time}</span>
           <strong>{ACTION_LABELS[cell.kind]}</strong>
           {cell.title ? <div className="muted" style={{ fontSize: "0.72rem" }}>{cell.title}</div> : null}
           <div className="muted" style={{ fontSize: "0.72rem" }}>
@@ -291,32 +331,41 @@ export function PerformancePanel(props: PerformancePanelProps) {
     const subject = cell.subjectId ? subjectById.get(cell.subjectId) : undefined;
     const title = subject?.title ?? "درس";
     const color = subject?.color ?? "#1f6f4a";
+    const kindLabel = subject?.kind === "specialized" ? "تخصصی" : "عمومی";
     const resource = cell.resourceId ? resourceById.get(cell.resourceId) : undefined;
     const chapter = resource?.chapters.find((item) => item.id === cell.chapterId);
+    const isSchool = cell.kind === "school";
 
     return (
       <div className={`panel-action action-${cell.kind}`} style={{ borderInlineStartColor: color }}>
+        <span className="perf-tag">{time}</span>
+        <div className="panel-action-subject" style={{ color }}>
+          {isSchool ? title : `${kindLabel} · ${title}`}
+        </div>
         <strong>
           {cell.kind === "routine"
             ? `روتین (${cell.routineMode === "test" ? "تست" : "مطالعه"})`
             : ACTION_LABELS[cell.kind]}
         </strong>
-        <div className="panel-action-subject" style={{ color }}>{title}</div>
-        {textKindFor(cell) && cell.resourceText ? (
-          <div className="muted" style={{ fontSize: "0.72rem" }}>{cell.resourceText}</div>
-        ) : null}
-        {countKindFor(cell) && resource ? (
-          <div className="muted" style={{ fontSize: "0.72rem" }}>
-            {resource.title}
-            {chapter ? ` — ${chapter.title}` : ""}
-          </div>
-        ) : null}
-        <div className="muted" style={{ fontSize: "0.72rem" }}>
-          {Number.isFinite(cell.minutes) ? `${(cell.minutes ?? 0).toLocaleString("fa-IR")} دقیقه` : "—"}
-        </div>
-        {countKindFor(cell) && (cell.count ?? 0) > 0 ? (
-          <div style={{ fontSize: "0.72rem" }}>{(cell.count ?? 0).toLocaleString("fa-IR")} عدد</div>
-        ) : null}
+        {isSchool ? null : (
+          <>
+            {textKindFor(cell) && cell.resourceText ? (
+              <div className="muted" style={{ fontSize: "0.72rem" }}>{cell.resourceText}</div>
+            ) : null}
+            {countKindFor(cell) && resource ? (
+              <div className="muted" style={{ fontSize: "0.72rem" }}>
+                {resource.title}
+                {chapter ? ` — ${chapter.title}` : ""}
+              </div>
+            ) : null}
+            <div className="muted" style={{ fontSize: "0.72rem" }}>
+              {Number.isFinite(cell.minutes) ? `${(cell.minutes ?? 0).toLocaleString("fa-IR")} دقیقه` : "—"}
+            </div>
+            {countKindFor(cell) && (cell.count ?? 0) > 0 ? (
+              <div style={{ fontSize: "0.72rem" }}>{(cell.count ?? 0).toLocaleString("fa-IR")} عدد</div>
+            ) : null}
+          </>
+        )}
       </div>
     );
   };
@@ -342,7 +391,37 @@ export function PerformancePanel(props: PerformancePanelProps) {
       const isEvent = perf.kind === "exam" || perf.kind === "examAnalysis";
       return (
         <div className="perf-edit-wrap">
-          <span className="perf-tag">برنامه: {planned}</span>
+          <div className="row" style={{ gap: "0.25rem" }}>
+            <select
+              aria-label={`شروع زنگ ${slot + 1} ${props.weekdayLabels[day]}`}
+              value={slots[day]?.[slot]?.startMin ?? 480}
+              onChange={(event) =>
+                updateSlot(day, slot, { startMin: Number(event.target.value) })
+              }
+            >
+              {timeOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <select
+              aria-label={`پایان زنگ ${slot + 1} ${props.weekdayLabels[day]}`}
+              value={slots[day]?.[slot]?.endMin ?? 570}
+              onChange={(event) =>
+                updateSlot(day, slot, { endMin: Number(event.target.value) })
+              }
+            >
+              {timeOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <span className="perf-tag">
+            {slotRangeLabel(slots[day]?.[slot])} · برنامه: {planned}
+          </span>
           <div className="panel-edit">
             <select
               aria-label={`نوع عملکرد ${props.weekdayLabels[day]} زنگ ${slot + 1}`}
@@ -507,13 +586,15 @@ export function PerformancePanel(props: PerformancePanelProps) {
       <div className="perf-view">
         {showPlan ? (
           <div className="perf-plan">
-            <span className="perf-tag">برنامه: {planned}</span>
+            <span className="perf-tag">
+              {slotRangeLabel(slots[day]?.[slot])} · برنامه: {planned}
+            </span>
           </div>
         ) : null}
         {showPerf ? (
           <div className="perf-done">
             <span className="perf-tag perf-tag-done">عملکرد:</span>
-            {perfLabel(perf)}
+            {perfLabel(perf, day, slot)}
             {note ? (
               <div className="perf-note" title={note}>
                 {note}
@@ -556,6 +637,7 @@ export function PerformancePanel(props: PerformancePanelProps) {
       <input type="hidden" name="studentId" value={props.studentId} />
       <input type="hidden" name="weekStart" value={props.weekStart} />
       <input type="hidden" name="cellsJson" value={JSON.stringify(grid)} />
+      <input type="hidden" name="slotsJson" value={JSON.stringify(slots)} />
 
       <div className="row between">
         <div className="row">
@@ -595,8 +677,8 @@ export function PerformancePanel(props: PerformancePanelProps) {
           <thead>
             <tr>
               <th>روز / زنگ</th>
-              {props.slotLabels.map((label) => (
-                <th key={label}>{label}</th>
+              {(slots[0] ?? []).map((_, index) => (
+                <th key={index}>زنگ {(index + 1).toLocaleString("fa-IR")}</th>
               ))}
               <th>جمع مطالعه</th>
               <th>جمع مرور</th>

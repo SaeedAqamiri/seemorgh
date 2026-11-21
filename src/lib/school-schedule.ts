@@ -1,7 +1,7 @@
 import { and, asc, eq } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { schoolLessons, subjects } from "@/db/schema";
-import { getBellSlots, type PanelSlot } from "./schedule";
+import { getWeekBellSlots, type PanelSlot } from "./schedule";
 
 export type SchoolLessonInput = {
   weekday: number;
@@ -22,7 +22,7 @@ export class SchoolScheduleValidationError extends Error {}
 
 export async function getSchoolLessons(studentId: string): Promise<SchoolLessonView[]> {
   const db = await getDb();
-  const slots = await getBellSlots(studentId);
+  const weekSlots = await getWeekBellSlots(studentId);
   const rows = await db
     .select({
       weekday: schoolLessons.weekday,
@@ -35,7 +35,7 @@ export async function getSchoolLessons(studentId: string): Promise<SchoolLessonV
     .where(eq(schoolLessons.studentId, studentId))
     .orderBy(asc(schoolLessons.weekday), asc(schoolLessons.slotIndex));
   return rows.map((row) => {
-    const slot = slots[row.slotIndex] ?? { startMin: 0, endMin: 0 };
+    const slot = weekSlots[row.weekday]?.[row.slotIndex] ?? { startMin: 0, endMin: 0 };
     return { ...row, startMin: slot.startMin, endMin: slot.endMin };
   });
 }
@@ -54,7 +54,8 @@ export async function getSchoolIntervals(
 
 export async function saveSchoolLessons(studentId: string, value: unknown): Promise<void> {
   if (!Array.isArray(value)) throw new SchoolScheduleValidationError("ساختار برنامه مدرسه نامعتبر است.");
-  const slots = await getBellSlots(studentId);
+  const weekSlots = await getWeekBellSlots(studentId);
+  const slotCount = weekSlots[0]?.length ?? 0;
   const rows: { weekday: number; slotIndex: number; subjectId: string }[] = [];
   for (const item of value) {
     if (!item || typeof item !== "object") continue;
@@ -63,7 +64,7 @@ export async function saveSchoolLessons(studentId: string, value: unknown): Prom
     const slotIndex = Number(record.slotIndex);
     const subjectId = typeof record.subjectId === "string" ? record.subjectId : "";
     if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6) continue;
-    if (!Number.isInteger(slotIndex) || slotIndex < 0 || slotIndex >= slots.length) continue;
+    if (!Number.isInteger(slotIndex) || slotIndex < 0 || slotIndex >= slotCount) continue;
     if (!subjectId) continue;
     rows.push({ weekday, slotIndex, subjectId });
   }

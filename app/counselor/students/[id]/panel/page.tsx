@@ -2,11 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { saveBellSlotsAction, saveSchoolScheduleAction, saveWeeklyPanelAction } from "@/app/actions/panel";
 import { BellScheduleEditor } from "@/components/bell-schedule-editor";
+import { ExamVolumeCard } from "@/components/exam-volume-card";
 import { SchoolScheduleEditor, type SchoolLessonState } from "@/components/school-schedule-editor";
 import { WeekGridEditor, type PanelCellState } from "@/components/week-panel";
 import { requireCounselor } from "@/lib/auth";
 import { getStudentDetail } from "@/lib/counselor";
-import { getPanelOptions, getWeeklyPanelView, slotLabel } from "@/lib/panel";
+import { getPanelOptions, getWeeklyPanelView } from "@/lib/panel";
 import { getSchoolLessons } from "@/lib/school-schedule";
 import {
   addDays,
@@ -47,7 +48,7 @@ export default async function CounselorPanelPage({
 
   const dates = weekDates(weekStart);
   const dayTitles = dates.map((date) => formatJalaliNumeric(date));
-  const slotLabels = panelView.slots.map((slot) => slotLabel(slot));
+  const slotLabels = panelView.slots[0].map((_, index) => `زنگ ${(index + 1).toLocaleString("fa-IR")}`);
   const statusLabel =
     panelView.planStatus === "approved"
       ? "تأییدشده"
@@ -103,10 +104,50 @@ export default async function CounselorPanelPage({
       ) : null}
 
       <div className="card">
+        <div className="section-head">
+          <div>
+            <h2>حجم باقی‌مانده تا آزمون بعدی</h2>
+            <small>
+              انتخاب آزمون بعدی و منبع/کتاب؛ حجم دقیق تست، تمرین یا صفحهٔ باقی‌مانده از فصل‌بندی
+              منابع محاسبه می‌شود و سهم هفتگی تا تاریخ آزمون را نشان می‌دهد.
+            </small>
+          </div>
+        </div>
+        <ExamVolumeCard
+          today={todayISO()}
+          resources={detail.resources.map((resource) => ({
+            id: resource.id,
+            title: resource.title,
+            subjectId: resource.subjectId,
+            subjectTitle: resource.subjectTitle,
+            unitType: resource.unitType,
+            totalUnits: resource.totalUnits,
+            completedUnits: resource.completedUnits,
+            chapters: resource.chapters.map((chapter) => ({
+              id: chapter.id,
+              title: chapter.title,
+              testCount: chapter.testCount,
+              completedTests: chapter.completedTests,
+              exerciseCount: chapter.exerciseCount,
+              completedExercises: chapter.completedExercises,
+              pages: chapter.pages,
+              completedPages: chapter.completedPages,
+            })),
+          }))}
+          exams={detail.targets.map((target) => ({
+            id: target.id,
+            title: target.title,
+            examDate: target.examDate,
+            examType: target.examType,
+          }))}
+        />
+      </div>
+
+      <div className="card">
         <BellScheduleEditor
           studentId={id}
           weekStart={weekStart}
-          initialSlots={panelView.slots}
+          initialSlots={panelView.slots[0]}
           action={saveBellSlotsAction}
         />
       </div>
@@ -137,7 +178,7 @@ export default async function CounselorPanelPage({
           weekStart={weekStart}
           weekdayLabels={[...WEEKDAY_LABELS]}
           dayTitles={dayTitles}
-          slotLabels={slotLabels}
+          slots={panelView.slots}
           initialGrid={panelView.grid as unknown as PanelCellState[][]}
           initialRoutine={panelView.dailyRoutine}
           initialHomework={panelView.nextWeekHomework}

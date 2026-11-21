@@ -17,6 +17,8 @@ export type PanelCellState = {
   mockExamId?: string | null;
 };
 
+export type PanelSlotState = { startMin: number; endMin: number };
+
 type SubjectOption = { id: string; title: string; kind: string; color: string };
 type ResourceOption = {
   id: string;
@@ -37,7 +39,7 @@ export type WeekGridEditorProps = {
   weekStart: string;
   weekdayLabels: string[];
   dayTitles: string[];
-  slotLabels: string[];
+  slots: PanelSlotState[][];
   initialGrid: PanelCellState[][];
   initialRoutine: string;
   initialHomework: string;
@@ -89,6 +91,28 @@ function textKindFor(cell: PanelCellState): boolean {
 
 function cloneGrid(grid: PanelCellState[][]): PanelCellState[][] {
   return grid.map((row) => row.map((cell) => ({ ...cell })));
+}
+
+function cloneSlots(slots: PanelSlotState[][]): PanelSlotState[][] {
+  return slots.map((row) => row.map((slot) => ({ ...slot })));
+}
+
+function faClock(minutes: number): string {
+  const hh = String(Math.floor(minutes / 60)).padStart(2, "0");
+  const mm = String(minutes % 60).padStart(2, "0");
+  return `${hh}:${mm}`;
+}
+
+function slotRangeLabel(slot?: PanelSlotState): string {
+  return slot ? `${faClock(slot.startMin)}–${faClock(slot.endMin)}` : "";
+}
+
+function slotTimeOptions(): { value: number; label: string }[] {
+  const options: { value: number; label: string }[] = [];
+  for (let minutes = 0; minutes <= 24 * 60; minutes += 15) {
+    options.push({ value: minutes, label: faClock(minutes) });
+  }
+  return options;
 }
 
 function defaultCell(kind: PanelCellState["kind"]): PanelCellState {
@@ -146,12 +170,24 @@ export function WeekGridEditor(props: WeekGridEditorProps) {
   const [grid, setGrid] = useState<PanelCellState[][]>(() =>
     cloneGrid(normalizeGridForKinds(props.initialGrid)),
   );
+  const [slots, setSlots] = useState<PanelSlotState[][]>(() => cloneSlots(props.slots));
   const [routine, setRoutine] = useState(props.initialRoutine);
   const [homework, setHomework] = useState(props.initialHomework);
   const [groups, setGroups] = useState<Record<string, "general" | "specialized">>({});
 
+  const timeOptions = slotTimeOptions();
+
+  const updateSlot = (day: number, index: number, patch: Partial<PanelSlotState>) => {
+    setSlots((current) =>
+      current.map((row, d) =>
+        d === day ? row.map((slot, i) => (i === index ? { ...slot, ...patch } : slot)) : row,
+      ),
+    );
+  };
+
   const startEdit = () => {
     setGrid(cloneGrid(normalizeGridForKinds(props.initialGrid)));
+    setSlots(cloneSlots(props.slots));
     setRoutine(props.initialRoutine);
     setHomework(props.initialHomework);
     setGroups({});
@@ -160,6 +196,7 @@ export function WeekGridEditor(props: WeekGridEditorProps) {
 
   const cancelEdit = () => {
     setGrid(cloneGrid(normalizeGridForKinds(props.initialGrid)));
+    setSlots(cloneSlots(props.slots));
     setRoutine(props.initialRoutine);
     setHomework(props.initialHomework);
     setGroups({});
@@ -247,12 +284,14 @@ export function WeekGridEditor(props: WeekGridEditorProps) {
     });
   };
 
-  const cellLabel = (cell: PanelCellState) => {
+  const cellLabel = (cell: PanelCellState, day: number, slot: number) => {
     if (cell.kind === "empty") return <span className="muted">—</span>;
     if (cell.kind === "rest") return <span className="panel-rest action-rest">استراحت</span>;
+    const time = slotRangeLabel(slots[day]?.[slot]);
     if (cell.kind === "exam" || cell.kind === "examAnalysis") {
       return (
         <div className={`panel-action action-${cell.kind}`}>
+          <span className="perf-tag">{time}</span>
           <strong>{ACTION_LABELS[cell.kind]}</strong>
           {cell.title ? <div className="muted" style={{ fontSize: "0.72rem" }}>{cell.title}</div> : null}
         </div>
@@ -261,30 +300,39 @@ export function WeekGridEditor(props: WeekGridEditorProps) {
     const subject = cell.subjectId ? subjectById.get(cell.subjectId) : undefined;
     const title = subject?.title ?? "درس";
     const color = subject?.color ?? "#1f6f4a";
+    const kindLabel = subject?.kind === "specialized" ? "تخصصی" : "عمومی";
     const resource = cell.resourceId ? resourceById.get(cell.resourceId) : undefined;
     const chapter = resource?.chapters.find((item) => item.id === cell.chapterId);
+    const isSchool = cell.kind === "school";
 
     return (
       <div
         className={`panel-action action-${cell.kind}`}
         style={{ borderInlineStartColor: color }}
       >
-        <strong>{cell.kind === "routine" ? `روتین (${cell.routineMode === "test" ? "تست" : "مطالعه"})` : ACTION_LABELS[cell.kind]}</strong>
+        <span className="perf-tag">{time}</span>
         <div className="panel-action-subject" style={{ color }}>
-          {title}
+          {isSchool ? title : `${kindLabel} · ${title}`}
         </div>
-        {textKindFor(cell) && cell.resourceText ? (
-          <div className="muted" style={{ fontSize: "0.72rem" }}>{cell.resourceText}</div>
-        ) : null}
-        {countKindFor(cell) && resource ? (
-          <div className="muted" style={{ fontSize: "0.72rem" }}>
-            {resource.title}
-            {chapter ? ` — ${chapter.title}` : ""}
-          </div>
-        ) : null}
-        {countKindFor(cell) && (cell.count ?? 0) > 0 ? (
-          <div style={{ fontSize: "0.72rem" }}>{(cell.count ?? 0).toLocaleString("fa-IR")} عدد</div>
-        ) : null}
+        <strong>
+          {cell.kind === "routine" ? `روتین (${cell.routineMode === "test" ? "تست" : "مطالعه"})` : ACTION_LABELS[cell.kind]}
+        </strong>
+        {isSchool ? null : (
+          <>
+            {textKindFor(cell) && cell.resourceText ? (
+              <div className="muted" style={{ fontSize: "0.72rem" }}>{cell.resourceText}</div>
+            ) : null}
+            {countKindFor(cell) && resource ? (
+              <div className="muted" style={{ fontSize: "0.72rem" }}>
+                {resource.title}
+                {chapter ? ` — ${chapter.title}` : ""}
+              </div>
+            ) : null}
+            {countKindFor(cell) && (cell.count ?? 0) > 0 ? (
+              <div style={{ fontSize: "0.72rem" }}>{(cell.count ?? 0).toLocaleString("fa-IR")} عدد</div>
+            ) : null}
+          </>
+        )}
       </div>
     );
   };
@@ -426,11 +474,13 @@ export function WeekGridEditor(props: WeekGridEditorProps) {
       <input type="hidden" name="studentId" value={props.studentId} />
       <input type="hidden" name="weekStart" value={props.weekStart} />
       <input type="hidden" name="gridJson" value={JSON.stringify(grid)} />
+      <input type="hidden" name="slotsJson" value={JSON.stringify(slots)} />
 
       <div className="row between">
         <small className="muted">
-          ردیف‌ها روزهای هفته و ستون‌ها ۱۰ زنگ روزانه‌اند. هر زنگ یک «اقدام» دارد و با «ثبت
-          تغییرات» کل جدول یکجا ذخیره می‌شود.
+          ردیف‌ها روزهای هفته و ستون‌ها ۱۰ زنگ روزانه‌اند. ساعت هر زنگ فقط برای همان روز، داخل خود
+          خانه قابل تغییر است و هر زنگ یک «اقدام» دارد. با «ثبت تغییرات» کل جدول و ساعت زنگ‌ها
+          یکجا ذخیره می‌شود.
         </small>
         <div className="row">
           {!editing ? (
@@ -455,8 +505,8 @@ export function WeekGridEditor(props: WeekGridEditorProps) {
           <thead>
             <tr>
               <th>روز / زنگ</th>
-              {props.slotLabels.map((label) => (
-                <th key={label}>{label}</th>
+              {(slots[0] ?? []).map((_, index) => (
+                <th key={index}>زنگ {(index + 1).toLocaleString("fa-IR")}</th>
               ))}
             </tr>
           </thead>
@@ -481,9 +531,37 @@ export function WeekGridEditor(props: WeekGridEditorProps) {
                       .join(" ")}
                   >
                     {!editing ? (
-                      cellLabel(cell)
+                      cellLabel(cell, day, slot)
                     ) : (
                       <div className="panel-edit">
+                        <div className="row" style={{ gap: "0.25rem" }}>
+                          <select
+                            aria-label={`شروع زنگ ${slot + 1} ${label}`}
+                            value={slots[day]?.[slot]?.startMin ?? 480}
+                            onChange={(event) =>
+                              updateSlot(day, slot, { startMin: Number(event.target.value) })
+                            }
+                          >
+                            {timeOptions.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                          <select
+                            aria-label={`پایان زنگ ${slot + 1} ${label}`}
+                            value={slots[day]?.[slot]?.endMin ?? 570}
+                            onChange={(event) =>
+                              updateSlot(day, slot, { endMin: Number(event.target.value) })
+                            }
+                          >
+                            {timeOptions.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                         <select
                           aria-label={`اقدام ${label} زنگ ${slot + 1}`}
                           value={cell.kind}

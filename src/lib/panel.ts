@@ -17,18 +17,21 @@ import { addDays, weekDates } from "./dates";
 import { chaptersByResourceIds, ensureChaptersFromJson } from "./resource-chapters";
 import {
   faNumber,
-  getBellSlots,
+  getWeekBellSlots,
   PANEL_DAYS,
   PANEL_SLOTS,
-  type PanelSlot,
+  saveWeekBellSlots,
   slotIndexForStart,
   slotLabel,
+  type PanelSlot,
+  type WeekBellSlots,
 } from "./schedule";
+import { getSchoolLessons } from "./school-schedule";
 import { ensureSystemSubject, listSubjectsForField, type SubjectOption } from "./subject-catalog";
 import { subjectSupportsTests } from "./subjects";
 
 export { PANEL_DAYS, PANEL_SLOTS, faNumber, slotLabel };
-export type { PanelSlot };
+export type { WeekBellSlots };
 
 export const PANEL_ACTION_LABELS: Record<PanelActionKind, string> = {
   empty: "خالی",
@@ -49,7 +52,7 @@ export type PanelExam = { title: string; examDate: string; examType: string };
 export type PanelView = {
   weekStart: string;
   grid: WeeklyGridJson;
-  slots: PanelSlot[];
+  slots: WeekBellSlots;
   exams: PanelExam[];
   dailyRoutine: string;
   nextWeekHomework: string;
@@ -351,14 +354,15 @@ function cellFromTask(task: PanelTaskLike): PanelCellJson {
 export function buildGridFromTasks(
   weekStart: string,
   rows: PanelTaskLike[],
-  slots: readonly PanelSlot[] = PANEL_SLOTS,
+  slots: readonly PanelSlot[][] = Array.from({ length: PANEL_DAYS }, () => PANEL_SLOTS.map((slot) => ({ ...slot }))),
 ): WeeklyGridJson {
   const dates = weekDates(weekStart);
-  const grid = emptyGrid(slots.length);
+  const grid = emptyGrid(slots[0]?.length ?? PANEL_SLOTS.length);
   for (const task of rows) {
     const day = dates.indexOf(task.planDate);
     if (day < 0) continue;
-    const slotIndex = slotIndexForStart(slots, task.plannedStart);
+    const daySlots = slots[day] ?? [];
+    const slotIndex = slotIndexForStart(daySlots, task.plannedStart);
     if (slotIndex < 0) continue;
     if (grid[day][slotIndex].kind !== "empty") continue;
     grid[day][slotIndex] = cellFromTask(task);
@@ -370,7 +374,7 @@ export function buildGridFromTasks(
 async function gridFromTasks(
   planId: string,
   weekStart: string,
-  slots: PanelSlot[],
+  slots: WeekBellSlots,
 ): Promise<WeeklyGridJson> {
   const db = await getDb();
   const rows = await db
@@ -446,16 +450,39 @@ async function loadSubjectKindMap(
   return new Map(rows.map((row) => [row.id, row.kind]));
 }
 
+/**
+ * Fills empty bells of school days with a «مدرسه» cell for the lesson scheduled
+ * there (from the weekly school program), so school days appear pre-filled with
+ * just the subject name and the school action.
+ */
+function overlaySchoolCells(
+  grid: WeeklyGridJson,
+  lessons: { weekday: number; slotIndex: number; subjectId: string; subjectTitle: string }[],
+): WeeklyGridJson {
+  for (const lesson of lessons) {
+    const row = grid[lesson.weekday];
+    const cell = row?.[lesson.slotIndex];
+    if (!row || !cell || cell.kind !== "empty") continue;
+    row[lesson.slotIndex] = {
+      kind: "school",
+      subjectId: lesson.subjectId,
+      label: lesson.subjectTitle,
+    };
+  }
+  return grid;
+}
+
 export async function getWeeklyPanelView(studentId: string, weekStart: string): Promise<PanelView> {
   const db = await getDb();
-  const slots = await getBellSlots(studentId);
+  const slots = await getWeekBellSlots(studentId);
+  const slotCount = slots[0]?.length ?? PANEL_SLOTS.length;
   const [panel] = await db
     .select()
     .from(weeklyPanels)
     .where(and(eq(weeklyPanels.studentId, studentId), eq(weeklyPanels.weekStart, weekStart)))
     .limit(1);
 
-  const [planRows, examRows] = await Promise.all([
+  const [planRows, examRows, schoolLessons] = await Promise.all([
     db
       .select()
       .from(plans)
@@ -476,16 +503,18 @@ export async function getWeeklyPanelView(studentId: string, weekStart: string): 
         ),
       )
       .orderBy(asc(examTargets.examDate)),
+    getSchoolLessons(studentId),
   ]);
 
   const plan = planRows[0];
   let grid = panel?.gridJson
-    ? normalizeGrid(panel.gridJson, slots.length)
+    ? normalizeGrid(panel.gridJson, slotCount)
     : plan
       ? await gridFromTasks(plan.id, weekStart, slots)
-      : emptyGrid(slots.length);
+      : emptyGrid(slotCount);
   const kindById = await loadSubjectKindMap(db, studentId);
   grid = normalizeGridForSubjectKinds(grid, kindById);
+  grid = overlaySchoolCells(grid, schoolLessons);
 
   let updatedByName: string | null = null;
   if (panel?.updatedBy) {
@@ -653,6 +682,7 @@ export type SavePanelInput = {
   dailyRoutine: string;
   nextWeekHomework: string;
   actorId: string;
+  slots?: unknown;
 };
 
 export async function saveWeeklyPanel(input: SavePanelInput): Promise<void> {
@@ -665,9 +695,13 @@ export async function saveWeeklyPanel(input: SavePanelInput): Promise<void> {
   if (!studentRow) throw new PanelValidationError("دانش‌آموز پیدا نشد.");
   const systemSubjectId = await ensureSystemSubject(studentRow.workspaceId);
 
-  const slots = await getBellSlots(input.studentId);
-  assertGrid(input.grid, slots.length);
-  let grid = normalizeGrid(input.grid, slots.length);
+  const slots =
+    input.slots !== undefined
+      ? await saveWeekBellSlots(input.studentId, input.slots)
+      : await getWeekBellSlots(input.studentId);
+  const slotCount = slots[0]?.length ?? 0;
+  assertGrid(input.grid, slotCount);
+  let grid = normalizeGrid(input.grid, slotCount);
 
   const [subjectRows, resourceRows] = await Promise.all([
     db
@@ -771,7 +805,8 @@ export async function saveWeeklyPanel(input: SavePanelInput): Promise<void> {
       for (let slot = 0; slot < grid[day].length; slot += 1) {
         const cell = grid[day][slot];
         if (cell.kind === "empty" || cell.kind === "rest") continue;
-        const slotDef = slots[slot];
+        const slotDef = slots[day]?.[slot];
+        if (!slotDef) continue;
         const meta = taskTypeForCell(cell);
         const eventCell = cell.kind === "exam" || cell.kind === "examAnalysis" ? cell : null;
         const countCell = isCountAction(cell)

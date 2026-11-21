@@ -49,8 +49,10 @@ export async function saveWeeklyPanelAction(formData: FormData): Promise<void> {
   const weekStart = startOfWeekSaturday(field(formData, "weekStart") || new Date().toISOString().slice(0, 10));
 
   let grid: unknown;
+  let weekSlots: unknown;
   try {
     grid = JSON.parse(field(formData, "gridJson") || "null");
+    weekSlots = JSON.parse(field(formData, "slotsJson") || "null");
   } catch {
     redirect(panelPath(user.role, studentId, weekStart, "&error=" + encodeURIComponent("داده جدول نامعتبر است.")));
   }
@@ -63,6 +65,7 @@ export async function saveWeeklyPanelAction(formData: FormData): Promise<void> {
       dailyRoutine: field(formData, "dailyRoutine"),
       nextWeekHomework: field(formData, "nextWeekHomework"),
       actorId: user.id,
+      slots: weekSlots ?? undefined,
     });
   } catch (error) {
     if (error instanceof PanelValidationError) {
@@ -73,8 +76,10 @@ export async function saveWeeklyPanelAction(formData: FormData): Promise<void> {
 
   if (user.role === "counselor") {
     revalidatePath(`/counselor/students/${studentId}`);
+    revalidatePath(`/counselor/students/${studentId}/performance`);
   }
   revalidatePath("/student");
+  revalidatePath("/student/performance");
   redirect(panelPath(user.role, studentId, weekStart, "&success=saved"));
 }
 

@@ -272,12 +272,19 @@ export const bellSchedules = pgTable(
     studentId: text("student_id")
       .notNull()
       .references(() => students.id, { onDelete: "cascade" }),
+    weekday: integer("weekday").notNull().default(0),
     slotIndex: integer("slot_index").notNull(),
     startMin: integer("start_min").notNull(),
     endMin: integer("end_min").notNull(),
     createdAt: createdAt(),
   },
-  (table) => [uniqueIndex("bell_schedules_student_slot_unique").on(table.studentId, table.slotIndex)],
+  (table) => [
+    uniqueIndex("bell_schedules_student_day_slot_unique").on(
+      table.studentId,
+      table.weekday,
+      table.slotIndex,
+    ),
+  ],
 );
 
 export const availability = pgTable(

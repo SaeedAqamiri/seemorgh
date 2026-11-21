@@ -158,12 +158,28 @@ CREATE INDEX IF NOT EXISTS resource_pool_chapters_pool_idx ON resource_pool_chap
 CREATE TABLE IF NOT EXISTS bell_schedules (
   id text PRIMARY KEY,
   student_id text NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  weekday integer NOT NULL DEFAULT 0,
   slot_index integer NOT NULL,
   start_min integer NOT NULL,
   end_min integer NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now()
 );
-CREATE UNIQUE INDEX IF NOT EXISTS bell_schedules_student_slot_unique ON bell_schedules(student_id, slot_index);
+ALTER TABLE bell_schedules ADD COLUMN IF NOT EXISTS weekday integer NOT NULL DEFAULT 0;
+-- Drop the legacy (student, slot) unique index BEFORE backfilling, otherwise the
+-- per-day copies would violate it.
+DROP INDEX IF EXISTS bell_schedules_student_slot_unique;
+-- Legacy rows only had (student, slot); copy them to every weekday so each day
+-- starts from the same defaults. Idempotent: existing (student, weekday, slot) rows win.
+INSERT INTO bell_schedules (id, student_id, weekday, slot_index, start_min, end_min, created_at)
+SELECT md5(random()::text || clock_timestamp()::text) || '-bell', src.student_id, wd, src.slot_index, src.start_min, src.end_min, now()
+FROM bell_schedules src
+CROSS JOIN generate_series(1, 6) AS wd
+WHERE src.weekday = 0
+  AND NOT EXISTS (
+    SELECT 1 FROM bell_schedules x
+    WHERE x.student_id = src.student_id AND x.weekday = wd AND x.slot_index = src.slot_index
+  );
+CREATE UNIQUE INDEX IF NOT EXISTS bell_schedules_student_day_slot_unique ON bell_schedules(student_id, weekday, slot_index);
 
 CREATE TABLE IF NOT EXISTS availability (
   id text PRIMARY KEY,
