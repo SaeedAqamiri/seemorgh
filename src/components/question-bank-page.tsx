@@ -9,6 +9,7 @@ import {
   updateQuestionAction,
 } from "@/app/actions/questions";
 import { createPracticeExamAction } from "@/app/actions/exams";
+import { addQuestionsToCollectionAction } from "@/app/actions/collections";
 import { QuestionBankFilters } from "@/components/question-bank-filters";
 import { QuestionTaxonomyFields } from "@/components/question-taxonomy-fields";
 import { SubmitButton } from "@/components/submit-button";
@@ -21,6 +22,7 @@ import {
   type Difficulty,
   type SourceType,
 } from "@/lib/exam";
+import { listCollections, type CollectionSummary } from "@/lib/collections";
 import {
   countQuestions,
   getOrCreateImportToken,
@@ -42,6 +44,7 @@ const SUCCESS: Record<string, string> = {
   "question-updated": "سوال ویرایش شد.",
   "question-archived": "سوال بایگانی شد.",
   "question-restored": "سوال فعال شد.",
+  "questions-added": "سوال‌ها به مجموعه اضافه شدند.",
   token: "کد اتصال qprep بازسازی شد.",
 };
 
@@ -98,13 +101,27 @@ export async function QuestionBankPage({
     .map((key) => parseQuestionBookKey(key))
     .filter((book): book is { subjectId: string; grade: string } => Boolean(book));
   const topics = many(searchParams.topics);
+  const addToCollectionId = one(searchParams.addToCollection);
 
-  const [taxonomy, banks, years, importToken] = await Promise.all([
+  const [taxonomy, banks, years, importToken, collections] = await Promise.all([
     listQuestionTaxonomy(user.workspaceId),
     listBanks(user.workspaceId, user.id),
     listSourceYears(user.workspaceId, user.id),
     getOrCreateImportToken(user.id),
+    listCollections(user.workspaceId, user.id),
   ]);
+  const addToCollection: CollectionSummary | null = addToCollectionId
+    ? collections.find((collection) => collection.id === addToCollectionId) ?? null
+    : null;
+
+  const searchQuery = new URLSearchParams();
+  for (const [key, value] of Object.entries(searchParams)) {
+    if (key === "success" || key === "error") continue;
+    for (const entry of Array.isArray(value) ? value : [value]) {
+      if (entry) searchQuery.append(key, entry);
+    }
+  }
+  const bankUrl = `${base}${searchQuery.size > 0 ? `?${searchQuery.toString()}` : ""}`;
 
   const selectedBank = bank && banks.some((item) => item.id === bank) ? bank : undefined;
   const filters: QuestionFilters = {
@@ -173,6 +190,16 @@ export async function QuestionBankPage({
         <div className="alert alert-success">{SUCCESS[success]}</div>
       ) : null}
       {error ? <div className="alert alert-error">{error}</div> : null}
+
+      {addToCollection ? (
+        <div className="alert alert-success">
+          حالت افزودن سوال به مجموعه «{addToCollection.title}» — سوال‌ها را تیک بزنید و دکمه
+          «افزودن به مجموعه» را بزنید.{" "}
+          <Link href={base} style={{ fontWeight: 700 }}>
+            خروج از این حالت
+          </Link>
+        </div>
+      ) : null}
 
       <div className="grid grid-2">
         <div className="card">
@@ -417,15 +444,56 @@ export async function QuestionBankPage({
 
         {user.role === "counselor" ? (
           <form id={examFormId} action={examNewPath} method="get" className="stack" style={{ marginTop: "0.8rem" }}>
-            <div className="row">
+            {addToCollection ? (
+              <input type="hidden" name="collectionId" value={addToCollection.id} />
+            ) : null}
+            <input type="hidden" name="redirectTo" value={bankUrl} />
+            <div className="row" style={{ flexWrap: "wrap", gap: "0.5rem" }}>
               <span className="muted" style={{ fontSize: "0.85rem" }}>
-                سوال‌های موردنظر را تیک بزنید، سپس آزمون را با زمان و دانش‌آموز بسازید.
+                سوال‌های موردنظر را تیک بزنید، سپس آزمون بسازید یا در یک مجموعه ذخیره کنید.
               </span>
-              <SubmitButton className="btn-secondary">ساخت آزمون با انتخاب‌ها</SubmitButton>
+              {addToCollection ? (
+                <SubmitButton formAction={addQuestionsToCollectionAction} pendingLabel="…">
+                  افزودن به «{addToCollection.title}»
+                </SubmitButton>
+              ) : null}
+              <SubmitButton className="btn-secondary" pendingLabel="…">
+                ساخت آزمون با انتخاب‌ها
+              </SubmitButton>
+              {!addToCollection ? (
+                <>
+                  {collections.length > 0 ? (
+                    <select
+                      name="collectionId"
+                      defaultValue=""
+                      style={{ minWidth: "11rem", height: "auto" }}
+                    >
+                      <option value="">— مجموعه مقصد —</option>
+                      {collections.map((collection) => (
+                        <option key={collection.id} value={collection.id}>
+                          {collection.title}
+                        </option>
+                      ))}
+                    </select>
+                  ) : null}
+                  <input name="newCollectionTitle" placeholder="یا نام مجموعه جدید…" style={{ minWidth: "11rem" }} />
+                  <SubmitButton
+                    className="btn-secondary"
+                    formAction={addQuestionsToCollectionAction}
+                    pendingLabel="…"
+                  >
+                    ذخیره در مجموعه
+                  </SubmitButton>
+                </>
+              ) : null}
             </div>
           </form>
         ) : (
           <form id={examFormId} action={createPracticeExamAction} className="form-grid" style={{ marginTop: "0.8rem" }}>
+            {addToCollection ? (
+              <input type="hidden" name="collectionId" value={addToCollection.id} />
+            ) : null}
+            <input type="hidden" name="redirectTo" value={bankUrl} />
             <div className="field">
               <label>عنوان آزمون تمرینی</label>
               <input name="title" defaultValue="آزمون تمرینی" required />
@@ -442,6 +510,36 @@ export async function QuestionBankPage({
             </label>
             <div className="field">
               <SubmitButton>ساخت آزمون تمرینی از انتخاب‌ها</SubmitButton>
+            </div>
+            <div className="field">
+              {addToCollection ? (
+                <SubmitButton formAction={addQuestionsToCollectionAction} pendingLabel="…">
+                  افزودن به «{addToCollection.title}»
+                </SubmitButton>
+              ) : (
+                <SubmitButton
+                  className="btn-secondary"
+                  formAction={addQuestionsToCollectionAction}
+                  pendingLabel="…"
+                >
+                  ذخیره در مجموعه
+                </SubmitButton>
+              )}
+              {!addToCollection ? (
+                <div className="stack" style={{ gap: "0.4rem", marginTop: "0.5rem" }}>
+                  {collections.length > 0 ? (
+                    <select name="collectionId" defaultValue="" style={{ minWidth: "11rem" }}>
+                      <option value="">— مجموعه مقصد —</option>
+                      {collections.map((collection) => (
+                        <option key={collection.id} value={collection.id}>
+                          {collection.title}
+                        </option>
+                      ))}
+                    </select>
+                  ) : null}
+                  <input name="newCollectionTitle" placeholder="یا نام مجموعه جدید…" />
+                </div>
+              ) : null}
             </div>
           </form>
         )}
@@ -510,6 +608,22 @@ export async function QuestionBankPage({
                         پاسخ: {String(question.correctJson ?? "")}
                       </div>
                     )}
+                    {question.explanation ? (
+                      <details style={{ marginTop: "0.35rem" }}>
+                        <summary
+                          className="btn btn-ghost btn-sm"
+                          style={{ cursor: "pointer", display: "inline-block" }}
+                        >
+                          پاسخ تشریحی
+                        </summary>
+                        <div
+                          className="muted"
+                          style={{ fontSize: "0.82rem", marginTop: "0.3rem", whiteSpace: "pre-wrap" }}
+                        >
+                          {question.explanation}
+                        </div>
+                      </details>
+                    ) : null}
                     <div className="muted" style={{ fontSize: "0.78rem", marginTop: "0.35rem" }}>
                       منبع: {sourceLabel(question)}
                       {question.sourceRef ? ` — ${question.sourceRef}` : ""}

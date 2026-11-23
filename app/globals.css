@@ -1739,3 +1739,33 @@ a.group-chip:hover {
   gap: 0.35rem;
   flex-wrap: wrap;
 }
+
+/* ---- برگه چاپ مجموعه سوال‌ها ---- */
+.print-sheet {
+  max-width: 820px;
+  margin-inline: auto;
+}
+
+.print-question {
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
+.answer-key-section {
+  page-break-before: always;
+  break-before: page;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .print-sheet {
+    max-width: none;
+  }
+
+  .page {
+    padding: 0;
+  }
+}

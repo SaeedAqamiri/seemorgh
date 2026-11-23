@@ -783,6 +783,49 @@ export const examAnswers = pgTable(
   (table) => [uniqueIndex("exam_answers_unique").on(table.attemptId, table.questionId)],
 );
 
+export const questionCollections = pgTable(
+  "question_collections",
+  {
+    id: id(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    description: text("description").notNull().default(""),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index("question_collections_workspace_idx").on(table.workspaceId),
+    index("question_collections_user_idx").on(table.userId),
+  ],
+);
+
+export const questionCollectionItems = pgTable(
+  "question_collection_items",
+  {
+    id: id(),
+    collectionId: text("collection_id")
+      .notNull()
+      .references(() => questionCollections.id, { onDelete: "cascade" }),
+    questionId: text("question_id")
+      .notNull()
+      .references(() => questions.id, { onDelete: "cascade" }),
+    addedAt: timestamp("added_at", { withTimezone: true, mode: "date" })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("question_collection_items_unique").on(
+      table.collectionId,
+      table.questionId,
+    ),
+    index("question_collection_items_question_idx").on(table.questionId),
+  ],
+);
+
 
 export type ExamSubjectScore = {
   subjectId: string | null;
@@ -1315,6 +1358,8 @@ export type Task = typeof tasks.$inferSelect;
 export type WeeklyPanel = typeof weeklyPanels.$inferSelect;
 export type PerformancePanel = typeof performancePanels.$inferSelect;
 export type Question = typeof questions.$inferSelect;
+export type QuestionCollection = typeof questionCollections.$inferSelect;
+export type QuestionCollectionItem = typeof questionCollectionItems.$inferSelect;
 export type Exam = typeof exams.$inferSelect;
 export type ExternalExam = typeof externalExams.$inferSelect;
 export type ExamAnalysis = typeof examAnalyses.$inferSelect;

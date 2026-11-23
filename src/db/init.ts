@@ -369,6 +369,26 @@ ALTER TABLE questions ADD COLUMN IF NOT EXISTS source_year text NOT NULL DEFAULT
 ALTER TABLE questions ADD COLUMN IF NOT EXISTS source_date text NOT NULL DEFAULT '';
 ALTER TABLE questions ADD COLUMN IF NOT EXISTS source_ref text NOT NULL DEFAULT '';
 
+CREATE TABLE IF NOT EXISTS question_collections (
+  id text PRIMARY KEY,
+  workspace_id text NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title text NOT NULL,
+  description text NOT NULL DEFAULT '',
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS question_collections_workspace_idx ON question_collections(workspace_id);
+CREATE INDEX IF NOT EXISTS question_collections_user_idx ON question_collections(user_id);
+
+CREATE TABLE IF NOT EXISTS question_collection_items (
+  id text PRIMARY KEY,
+  collection_id text NOT NULL REFERENCES question_collections(id) ON DELETE CASCADE,
+  question_id text NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+  added_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS question_collection_items_unique ON question_collection_items(collection_id, question_id);
+CREATE INDEX IF NOT EXISTS question_collection_items_question_idx ON question_collection_items(question_id);
+
 CREATE TABLE IF NOT EXISTS exams (
   id text PRIMARY KEY,
   workspace_id text NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
