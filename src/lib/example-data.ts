@@ -106,7 +106,7 @@ export const EXAMPLE_DATE_FIELDS: Record<string, string[]> = {
   psych_dimensions: [],
   psych_questions: ["createdAt"],
   psych_options: [],
-  psych_attempts: ["startedAt", "submittedAt", "createdAt"],
+  psych_attempts: ["startedAt", "submittedAt", "analysisAt", "createdAt"],
   psych_answers: ["createdAt"],
   psych_profile_summaries: ["createdAt", "updatedAt"],
   counseling_reports: ["createdAt"],
