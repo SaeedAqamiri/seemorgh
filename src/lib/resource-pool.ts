@@ -646,9 +646,13 @@ export type AlignPersonalResourcesResult = {
  */
 export async function alignPersonalResourcesWithPool(
   workspaceId?: string,
+  options: { studentIds?: string[] } = {},
 ): Promise<AlignPersonalResourcesResult> {
   const db = await getDb();
   const conditions = workspaceId ? [eq(resources.workspaceId, workspaceId)] : [];
+  if (options.studentIds && options.studentIds.length > 0) {
+    conditions.push(inArray(resources.studentId, options.studentIds));
+  }
   const personal = await db
     .select({
       id: resources.id,

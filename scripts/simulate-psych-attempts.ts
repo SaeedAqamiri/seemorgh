@@ -4,8 +4,9 @@
 //
 // Usage:
 //   bunx tsx scripts/simulate-psych-attempts.ts            # fill missing attempts
-//   bunx tsx scripts/simulate-psych-attempts.ts --force    # wipe + regenerate all
+//   bunx tsx scripts/simulate-psych-attempts.ts --force    # wipe + regenerate selected students
 //   bunx tsx scripts/simulate-psych-attempts.ts --limit 5  # only first N students
+//   bunx tsx scripts/simulate-psych-attempts.ts --group "علامه حلی" --force
 import { and, eq, inArray } from "drizzle-orm";
 import { getDb } from "../src/db/client";
 import {
@@ -16,6 +17,7 @@ import {
   psychOptions,
   psychQuestions,
   psychTests,
+  studentGroups,
   students,
   workspaces,
   type PsychBand,
@@ -26,6 +28,8 @@ const args = process.argv.slice(2);
 const FORCE = args.includes("--force");
 const limitIndex = args.indexOf("--limit");
 const LIMIT = limitIndex >= 0 ? Number(args[limitIndex + 1]) || 0 : 0;
+const groupIndex = args.indexOf("--group");
+const GROUP = groupIndex >= 0 ? (args[groupIndex + 1] ?? "").trim() : "";
 
 function hashString(value: string): number {
   let hash = 2166136261;
@@ -177,23 +181,43 @@ async function main() {
   const [workspace] = await db.select().from(workspaces).limit(1);
   if (!workspace) throw new Error("no workspace");
 
-  if (FORCE) {
-    const existing = await db
-      .select({ id: psychAttempts.id })
-      .from(psychAttempts)
-      .where(eq(psychAttempts.workspaceId, workspace.id));
-    if (existing.length > 0) {
-      console.log(`force: deleting ${existing.length} existing attempts…`);
-      await db.delete(psychAttempts).where(eq(psychAttempts.workspaceId, workspace.id));
-    }
-  }
-
   const studentRows = await db
     .select()
     .from(students)
     .where(eq(students.workspaceId, workspace.id));
-  const active = studentRows.filter((student) => student.userId);
+  let active = studentRows.filter((student) => student.userId);
+
+  if (GROUP) {
+    const groups = await db
+      .select({ id: studentGroups.id, name: studentGroups.name })
+      .from(studentGroups)
+      .where(eq(studentGroups.workspaceId, workspace.id));
+    const matches = groups.filter((group) => group.name.includes(GROUP));
+    if (matches.length === 0) throw new Error(`group not found: ${GROUP}`);
+    const groupIds = new Set(matches.map((group) => group.id));
+    active = active.filter((student) => student.groupId && groupIds.has(student.groupId));
+    console.log(`group filter: ${matches.map((group) => group.name).join(", ")} → ${active.length} students`);
+  }
+
   const selected = LIMIT > 0 ? active.slice(0, LIMIT) : active;
+
+  if (FORCE && selected.length > 0) {
+    const existing = await db
+      .select({ id: psychAttempts.id })
+      .from(psychAttempts)
+      .where(
+        and(
+          eq(psychAttempts.workspaceId, workspace.id),
+          inArray(psychAttempts.studentId, selected.map((student) => student.id)),
+        ),
+      );
+    if (existing.length > 0) {
+      console.log(`force: deleting ${existing.length} existing attempts…`);
+      await db.delete(psychAttempts).where(
+        inArray(psychAttempts.id, existing.map((attempt) => attempt.id)),
+      );
+    }
+  }
 
   const examRows = await db
     .select({ studentId: externalExams.studentId, overallPercent: externalExams.overallPercent })

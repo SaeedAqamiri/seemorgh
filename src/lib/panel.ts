@@ -737,9 +737,6 @@ export async function saveWeeklyPanel(input: SavePanelInput): Promise<void> {
         if (cell.resourceId && !resourceIds.has(cell.resourceId)) {
           throw new PanelValidationError("یکی از منابع انتخابی معتبر نیست.");
         }
-        if (cell.resourceId && !cell.chapterId && (chapterMap.get(cell.resourceId)?.length ?? 0) > 0) {
-          throw new PanelValidationError("برای این منبع، فصل/بخش را هم انتخاب کنید.");
-        }
         if (cell.chapterId) {
           const chapter = chapterById.get(cell.chapterId);
           if (!chapter) throw new PanelValidationError("فصل انتخاب‌شده معتبر نیست.");

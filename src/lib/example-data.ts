@@ -12,10 +12,12 @@ import {
   performancePanels,
   planningSettings,
   plans,
+  counselingReports,
   psychAnswers,
   psychAttempts,
   psychDimensions,
   psychOptions,
+  psychProfileSummaries,
   psychQuestions,
   psychTests,
   reports,
@@ -69,6 +71,8 @@ export const EXAMPLE_TABLES = [
   ["psych_options", psychOptions],
   ["psych_attempts", psychAttempts],
   ["psych_answers", psychAnswers],
+  ["psych_profile_summaries", psychProfileSummaries],
+  ["counseling_reports", counselingReports],
 ] as const;
 
 export const EXAMPLE_DATE_FIELDS: Record<string, string[]> = {
@@ -104,6 +108,8 @@ export const EXAMPLE_DATE_FIELDS: Record<string, string[]> = {
   psych_options: [],
   psych_attempts: ["startedAt", "submittedAt", "createdAt"],
   psych_answers: ["createdAt"],
+  psych_profile_summaries: ["createdAt", "updatedAt"],
+  counseling_reports: ["createdAt"],
 };
 
 export async function exportExampleData(): Promise<Record<string, number>> {

@@ -1,4 +1,4 @@
-import { and, eq, lte } from "drizzle-orm";
+import { and, eq, inArray, lte } from "drizzle-orm";
 import { getDb } from "../db/client";
 import {
   dailyLogs,
@@ -140,9 +140,19 @@ function openedMinutes(mode: DayMode, plannedStart: number | null, random: () =>
   );
 }
 
-export async function seedPerformanceData(): Promise<{ panels: number; logs: number }> {
+export async function seedPerformanceData(
+  options: { studentIds?: string[] } = {},
+): Promise<{ panels: number; logs: number }> {
   const db = await getDb();
-  const studentRows = await db.select().from(students).where(eq(students.status, "active"));
+  if (options.studentIds && options.studentIds.length === 0) return { panels: 0, logs: 0 };
+  const studentRows = await db
+    .select()
+    .from(students)
+    .where(
+      options.studentIds && options.studentIds.length > 0
+        ? and(eq(students.status, "active"), inArray(students.id, options.studentIds))
+        : eq(students.status, "active"),
+    );
   const currentWeek = startOfWeekSaturday(todayISO());
 
   let panels = 0;
@@ -230,6 +240,7 @@ export async function seedPerformanceData(): Promise<{ panels: number; logs: num
           weekStart: weekRow.weekStart,
           cellsJson: perfGrid,
           narrative: "",
+          updatedBy: student.counselorId,
           updatedAt: new Date(),
         })
         .onConflictDoUpdate({
@@ -237,6 +248,7 @@ export async function seedPerformanceData(): Promise<{ panels: number; logs: num
           set: {
             cellsJson: perfGrid,
             narrative: "",
+            updatedBy: student.counselorId,
             updatedAt: new Date(),
           },
         });

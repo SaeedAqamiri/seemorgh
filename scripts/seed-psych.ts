@@ -12,7 +12,9 @@ import {
 } from "../src/db/schema";
 import {
   bandsFor,
+  PSYCH_SCALE_LABELS,
   PSYCH_TEST_CATALOG,
+  scaleForQuestion,
   type CatalogTest,
 } from "../src/lib/psych-catalog";
 
@@ -320,11 +322,6 @@ async function seedCatalogTest(
     dimensionIds.set(dimension.key, row.id);
   }
 
-  const scaleLabels: Record<string, string[]> = {
-    agreement: ["کاملاً مخالفم", "مخالفم", "نظری ندارم", "موافقم", "کاملاً موافقم"],
-    frequency: ["هرگز", "به‌ندرت", "گاهی", "اغلب", "همیشه"],
-  };
-
   for (const [index, question] of catalog.questions.entries()) {
     const dimensionId = dimensionIds.get(question.dimension);
     if (!dimensionId) throw new Error(`dimension missing: ${question.dimension}`);
@@ -333,7 +330,7 @@ async function seedCatalogTest(
       .values({ testId: test.id, sortOrder: index, body: question.body })
       .returning({ id: psychQuestions.id });
 
-    const labels = scaleLabels[question.scale ?? "agreement"];
+    const labels = PSYCH_SCALE_LABELS[scaleForQuestion(question.body, question.scale)];
     await db.insert(psychOptions).values(
       labels.map((body, optionIndex) => ({
         questionId: questionRow.id,

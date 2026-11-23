@@ -570,7 +570,7 @@ export function sanitizeAutoAllocation(
 type Window = { startMin: number; endMin: number };
 
 const BREAK_MIN = 5;
-const MAX_BLOCKS_PER_DAY = 4;
+const MAX_BLOCKS_PER_DAY = 6;
 
 function mergeWindows(windows: Window[]): Window[] {
   const sorted = [...windows]

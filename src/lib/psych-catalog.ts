@@ -15,10 +15,12 @@ export type CatalogDimension = {
   tip?: string;
 };
 
+export type PsychScale = "agreement" | "frequency" | "confidence" | "amount";
+
 export type CatalogQuestion = {
   dimension: string;
   body: string;
-  scale?: "agreement" | "frequency";
+  scale?: PsychScale;
 };
 
 export type CatalogTest = {
@@ -47,15 +49,31 @@ export const PSYCH_CATEGORY_ORDER: PsychCategory[] = [
   "general",
 ];
 
-const AGREEMENT_LABELS = [
-  "کاملاً مخالفم",
-  "مخالفم",
-  "نظری ندارم",
-  "موافقم",
-  "کاملاً موافقم",
-];
+export const PSYCH_SCALE_LABELS: Record<PsychScale, string[]> = {
+  agreement: ["کاملاً مخالفم", "مخالفم", "نظری ندارم", "موافقم", "کاملاً موافقم"],
+  frequency: ["هرگز", "به‌ندرت", "گاهی", "اغلب", "همیشه"],
+  confidence: [
+    "هیچ اطمینانی ندارم",
+    "اطمینان کمی دارم",
+    "نسبتاً مطمئنم",
+    "مطمئنم",
+    "کاملاً مطمئنم",
+  ],
+  amount: ["خیلی کم", "کم", "متوسط", "زیاد", "خیلی زیاد"],
+};
 
-const FREQUENCY_LABELS = ["هرگز", "به‌ندرت", "گاهی", "اغلب", "همیشه"];
+const FREQUENCY_CUES =
+  /(در یک ماه گذشته|هفته|شب‌ها|هر |هرگز|همیشه|اغلب|معمولاً|چند وقت|چند بار|وقتی|در طول|در میانه|تا آخرین لحظه|پشت گوش|موکول|عقب می‌اندازم|عقب می‌انداز|مقدمه‌چینی|به تعویق)/;
+const AMOUNT_CUES = /(شدت|چقدر|میزان)/;
+const CONFIDENCE_CUES = /(مطمئنم|می‌توانم|توانایی|قادرم|اطمینان دارم)/;
+
+export function scaleForQuestion(body: string, explicit?: PsychScale): PsychScale {
+  if (explicit) return explicit;
+  if (CONFIDENCE_CUES.test(body)) return "confidence";
+  if (AMOUNT_CUES.test(body)) return "amount";
+  if (FREQUENCY_CUES.test(body)) return "frequency";
+  return "agreement";
+}
 
 const LEVEL_LABELS: Record<"positive" | "caution" | "neutral", [string, string, string]> = {
   positive: ["ضعیف", "متوسط", "قوی"],
@@ -111,9 +129,11 @@ export function bandsFor(dimension: CatalogDimension, questionCount: number): Ps
   ];
 }
 
-export function optionsFor(scale: CatalogQuestion["scale"] = "agreement") {
-  const labels = scale === "frequency" ? FREQUENCY_LABELS : AGREEMENT_LABELS;
-  return labels.map((body, index) => ({ body, scores: { __dimension__: index } }));
+export function optionsFor(scale: PsychScale = "agreement") {
+  return PSYCH_SCALE_LABELS[scale].map((body, index) => ({
+    body,
+    scores: { __dimension__: index },
+  }));
 }
 
 export const PSYCH_TEST_CATALOG: CatalogTest[] = [

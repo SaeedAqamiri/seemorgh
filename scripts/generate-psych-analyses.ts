@@ -5,6 +5,7 @@
 //   bunx tsx scripts/generate-psych-analyses.ts             # all students
 //   bunx tsx scripts/generate-psych-analyses.ts --limit 6   # first N students
 //   bunx tsx scripts/generate-psych-analyses.ts --concurrency 4
+//   bunx tsx scripts/generate-psych-analyses.ts --group "علامه حلی"
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -13,6 +14,7 @@ import {
   psychAttempts,
   psychDimensions,
   psychTests,
+  studentGroups,
   students,
   workspaces,
   type PsychBand,
@@ -33,6 +35,8 @@ const LIMIT = limitIndex >= 0 ? Number(args[limitIndex + 1]) || 0 : 0;
 const concIndex = args.indexOf("--concurrency");
 const CONCURRENCY = concIndex >= 0 ? Number(args[concIndex + 1]) || 6 : 6;
 const REFALLBACK = args.includes("--refallback");
+const groupIndex = args.indexOf("--group");
+const GROUP = groupIndex >= 0 ? (args[groupIndex + 1] ?? "").trim() : "";
 
 // tsx does not load .env; load it manually so AI_* vars are available.
 try {
@@ -169,7 +173,18 @@ async function main() {
   if (!workspace) throw new Error("no workspace");
 
   const studentRows = await db.select().from(students).where(eq(students.workspaceId, workspace.id));
-  const active = studentRows.filter((student) => student.userId);
+  let active = studentRows.filter((student) => student.userId);
+  if (GROUP) {
+    const groups = await db
+      .select({ id: studentGroups.id, name: studentGroups.name })
+      .from(studentGroups)
+      .where(eq(studentGroups.workspaceId, workspace.id));
+    const matches = groups.filter((group) => group.name.includes(GROUP));
+    if (matches.length === 0) throw new Error(`group not found: ${GROUP}`);
+    const groupIds = new Set(matches.map((group) => group.id));
+    active = active.filter((student) => student.groupId && groupIds.has(student.groupId));
+    console.log(`group filter: ${matches.map((group) => group.name).join(", ")} → ${active.length} students`);
+  }
   const selected = LIMIT > 0 ? active.slice(0, LIMIT) : active;
 
   const withAttempts = await db
