@@ -97,6 +97,19 @@ function cloneSlots(slots: PanelSlotState[][]): PanelSlotState[][] {
   return slots.map((row) => row.map((slot) => ({ ...slot })));
 }
 
+type CellClipboard = {
+  cell: PanelCellState;
+  group: "general" | "specialized";
+  source: string;
+};
+
+type DayClipboard = {
+  cells: PanelCellState[];
+  slots: PanelSlotState[];
+  groups: Record<number, "general" | "specialized">;
+  source: string;
+};
+
 function faClock(minutes: number): string {
   const hh = String(Math.floor(minutes / 60)).padStart(2, "0");
   const mm = String(minutes % 60).padStart(2, "0");
@@ -174,6 +187,8 @@ export function WeekGridEditor(props: WeekGridEditorProps) {
   const [routine, setRoutine] = useState(props.initialRoutine);
   const [homework, setHomework] = useState(props.initialHomework);
   const [groups, setGroups] = useState<Record<string, "general" | "specialized">>({});
+  const [cellClip, setCellClip] = useState<CellClipboard | null>(null);
+  const [dayClip, setDayClip] = useState<DayClipboard | null>(null);
 
   const timeOptions = slotTimeOptions();
 
@@ -281,6 +296,55 @@ export function WeekGridEditor(props: WeekGridEditorProps) {
         count: 30,
       };
       return copy;
+    });
+  };
+
+  const copyCell = (day: number, slot: number) => {
+    setCellClip({
+      cell: { ...grid[day][slot] },
+      group: groupFor(day, slot, grid[day][slot]),
+      source: `${props.weekdayLabels[day]} · زنگ ${(slot + 1).toLocaleString("fa-IR")}`,
+    });
+  };
+
+  const pasteCell = (day: number, slot: number) => {
+    if (!cellClip) return;
+    const cell = normalizeCellForKind({ ...cellClip.cell });
+    updateCell(day, slot, cell);
+    if (!cell.subjectId) {
+      setGroups((current) => ({ ...current, [groupKey(day, slot)]: cellClip.group }));
+    }
+  };
+
+  const copyDay = (day: number) => {
+    const dayGroups: Record<number, "general" | "specialized"> = {};
+    grid[day].forEach((cell, slot) => {
+      dayGroups[slot] = groupFor(day, slot, cell);
+    });
+    setDayClip({
+      cells: grid[day].map((cell) => ({ ...cell })),
+      slots: slots[day].map((slot) => ({ ...slot })),
+      groups: dayGroups,
+      source: props.weekdayLabels[day],
+    });
+  };
+
+  const pasteDay = (day: number) => {
+    if (!dayClip) return;
+    setGrid((current) => {
+      const copy = cloneGrid(current);
+      copy[day] = dayClip.cells.map((cell) => normalizeCellForKind({ ...cell }));
+      return copy;
+    });
+    setSlots((current) =>
+      current.map((row, d) => (d === day ? dayClip.slots.map((slot) => ({ ...slot })) : row)),
+    );
+    setGroups((current) => {
+      const next = { ...current };
+      dayClip.cells.forEach((_, slot) => {
+        next[groupKey(day, slot)] = dayClip.groups[slot] ?? "general";
+      });
+      return next;
     });
   };
 
@@ -479,8 +543,9 @@ export function WeekGridEditor(props: WeekGridEditorProps) {
       <div className="row between">
         <small className="muted">
           ردیف‌ها روزهای هفته و ستون‌ها ۱۰ زنگ روزانه‌اند. ساعت هر زنگ فقط برای همان روز، داخل خود
-          خانه قابل تغییر است و هر زنگ یک «اقدام» دارد. با «ثبت تغییرات» کل جدول و ساعت زنگ‌ها
-          یکجا ذخیره می‌شود.
+          خانه قابل تغییر است و هر زنگ یک «اقدام» دارد. در حالت ویرایش، با «کپی» و «درج» می‌توانید
+          برنامه یک زنگ را روی زنگ دیگر و برنامه کل یک روز (شامل ساعت زنگ‌ها) را روی روز دیگر
+          منتقل کنید. با «ثبت تغییرات» کل جدول و ساعت زنگ‌ها یکجا ذخیره می‌شود.
         </small>
         <div className="row">
           {!editing ? (
@@ -500,6 +565,13 @@ export function WeekGridEditor(props: WeekGridEditorProps) {
         </div>
       </div>
 
+      {editing && (cellClip || dayClip) ? (
+        <div className="row" style={{ gap: "0.4rem" }}>
+          {cellClip ? <span className="badge">در حافظه: زنگ {cellClip.source}</span> : null}
+          {dayClip ? <span className="badge">در حافظه: روز {dayClip.source}</span> : null}
+        </div>
+      ) : null}
+
       <div className="table-wrap">
         <table className="panel-grid">
           <thead>
@@ -518,6 +590,27 @@ export function WeekGridEditor(props: WeekGridEditorProps) {
                   <div className="muted" style={{ fontSize: "0.7rem" }}>
                     {props.dayTitles[day]}
                   </div>
+                  {editing ? (
+                    <div className="panel-day-tools">
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-xs"
+                        title={`کپی برنامه کل ${label}`}
+                        onClick={() => copyDay(day)}
+                      >
+                        کپی روز
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-xs"
+                        disabled={!dayClip}
+                        title={`درج برنامه روز کپی‌شده به جای ${label}`}
+                        onClick={() => pasteDay(day)}
+                      >
+                        درج روز
+                      </button>
+                    </div>
+                  ) : null}
                 </th>
                 {grid[day].map((cell, slot) => (
                   <td
@@ -534,6 +627,27 @@ export function WeekGridEditor(props: WeekGridEditorProps) {
                       cellLabel(cell, day, slot)
                     ) : (
                       <div className="panel-edit">
+                        <div className="cell-copy-tools">
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-xs"
+                            aria-label={`کپی زنگ ${slot + 1} ${label}`}
+                            title="کپی این زنگ"
+                            onClick={() => copyCell(day, slot)}
+                          >
+                            کپی
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-xs"
+                            aria-label={`درج زنگ کپی‌شده در زنگ ${slot + 1} ${label}`}
+                            title="درج زنگ کپی‌شده در این خانه"
+                            disabled={!cellClip}
+                            onClick={() => pasteCell(day, slot)}
+                          >
+                            درج
+                          </button>
+                        </div>
                         <div className="row" style={{ gap: "0.25rem" }}>
                           <select
                             aria-label={`شروع زنگ ${slot + 1} ${label}`}

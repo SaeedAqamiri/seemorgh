@@ -15,8 +15,19 @@ function notificationLink(item: NotificationItem): string | null {
   if (item.type === "exam_graded" && typeof payload.examId === "string") {
     return `/student/exams/${payload.examId}/result`;
   }
+  if (item.type.startsWith("challenge_") && typeof payload.challengeId === "string") {
+    return `/student/challenges/${payload.challengeId}`;
+  }
   return null;
 }
+
+const CHALLENGE_TITLES: Record<string, string> = {
+  challenge_invited: "دعوت به چالش",
+  challenge_accepted: "چالش تایید شد",
+  challenge_declined: "چالش رد شد",
+  challenge_cancelled: "چالش لغو شد",
+  challenge_finished: "نتیجهٔ چالش",
+};
 
 export function NotificationsList({
   items,
@@ -52,7 +63,7 @@ export function NotificationsList({
                     ? "آزمون جدید زمان‌بندی شد"
                     : item.type === "exam_graded"
                       ? "کارنامه آزمون به‌روز شد"
-                      : "اعلان";
+                      : (CHALLENGE_TITLES[item.type] ?? "اعلان");
             const link = notificationLink(item);
             return (
               <div

@@ -547,6 +547,32 @@ CREATE TABLE IF NOT EXISTS group_mock_exams (
 CREATE UNIQUE INDEX IF NOT EXISTS group_mock_exams_unique ON group_mock_exams(group_id, mock_exam_id);
 CREATE INDEX IF NOT EXISTS group_mock_exams_group_idx ON group_mock_exams(group_id);
 
+CREATE TABLE IF NOT EXISTS challenges (
+  id text PRIMARY KEY,
+  workspace_id text NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  exam_id text NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
+  challenge_exam_id text REFERENCES exams(id) ON DELETE SET NULL,
+  inviter_student_id text NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  title text NOT NULL DEFAULT '',
+  scheduled_at timestamptz NOT NULL,
+  status text NOT NULL DEFAULT 'pending',
+  completed_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS challenges_workspace_idx ON challenges(workspace_id);
+CREATE INDEX IF NOT EXISTS challenges_inviter_idx ON challenges(inviter_student_id);
+
+CREATE TABLE IF NOT EXISTS challenge_participants (
+  id text PRIMARY KEY,
+  challenge_id text NOT NULL REFERENCES challenges(id) ON DELETE CASCADE,
+  student_id text NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  status text NOT NULL DEFAULT 'pending',
+  responded_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS challenge_participants_unique ON challenge_participants(challenge_id, student_id);
+CREATE INDEX IF NOT EXISTS challenge_participants_student_idx ON challenge_participants(student_id);
+
 CREATE TABLE IF NOT EXISTS notifications (
   id text PRIMARY KEY,
   user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,

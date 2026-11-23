@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { ContentCard } from "@/components/content-card";
 import { DailyChallengeCard } from "@/components/daily-challenge-card";
+import { StudentSummaryCard } from "@/components/student-summary-card";
 import { requireStudent } from "@/lib/auth";
+import { countPendingInvites } from "@/lib/challenges";
 import { getDailyChallengeState, recordStudentDailyOpen } from "@/lib/daily";
 import {
   formatJalali,
@@ -12,6 +14,7 @@ import {
   weekdayIndex,
 } from "@/lib/dates";
 import { getStudentTodayData, summarizeWeek } from "@/lib/student";
+import { getStudentSummary } from "@/lib/student-summary";
 
 const TYPE_LABELS: Record<string, string> = {
   study: "مطالعه",
@@ -32,9 +35,11 @@ export default async function StudentHomePage({
   const { user, student } = await requireStudent();
   const { error, success } = await searchParams;
   await recordStudentDailyOpen(student.id);
-  const [data, challenge] = await Promise.all([
+  const [data, challenge, summary, pendingInvites] = await Promise.all([
     getStudentTodayData(student.id),
     getDailyChallengeState(student.id),
+    getStudentSummary(student.id),
+    countPendingInvites(student.id),
   ]);
   const week = summarizeWeek(data.weekTasks, data.weekStart);
   const countedTasks = data.tasks.filter(
@@ -71,6 +76,24 @@ export default async function StudentHomePage({
       {success === "challenge" ? (
         <div className="alert alert-success">چالش امروز ثبت شد. روز خوبی داشته باشی!</div>
       ) : null}
+
+      <StudentSummaryCard summary={summary} />
+
+      <div className="card">
+        <div className="row between">
+          <div>
+            <h2 style={{ margin: 0 }}>چالش دو نفره</h2>
+            <small className="muted">
+              با آزمون‌هایی که ساخته‌ای بقیه را به رقابت دعوت کن.
+            </small>
+          </div>
+          <Link className="btn btn-sm" href="/student/challenges">
+            {pendingInvites > 0
+              ? `چالش‌ها (${pendingInvites.toLocaleString("fa-IR")} دعوت جدید)`
+              : "چالش‌ها"}
+          </Link>
+        </div>
+      </div>
 
       {challenge.challenge ? <DailyChallengeCard question={challenge.challenge.question} /> : null}
 

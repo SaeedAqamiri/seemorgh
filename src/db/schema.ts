@@ -1033,6 +1033,58 @@ export const groupMockExams = pgTable(
   ],
 );
 
+export const challenges = pgTable(
+  "challenges",
+  {
+    id: id(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    examId: text("exam_id")
+      .notNull()
+      .references(() => exams.id, { onDelete: "cascade" }),
+    challengeExamId: text("challenge_exam_id").references(() => exams.id, {
+      onDelete: "set null",
+    }),
+    inviterStudentId: text("inviter_student_id")
+      .notNull()
+      .references(() => students.id, { onDelete: "cascade" }),
+    title: text("title").notNull().default(""),
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true, mode: "date" }).notNull(),
+    status: text("status", { enum: ["pending", "cancelled", "completed"] })
+      .notNull()
+      .default("pending"),
+    completedAt: timestamp("completed_at", { withTimezone: true, mode: "date" }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index("challenges_workspace_idx").on(table.workspaceId),
+    index("challenges_inviter_idx").on(table.inviterStudentId),
+  ],
+);
+
+export const challengeParticipants = pgTable(
+  "challenge_participants",
+  {
+    id: id(),
+    challengeId: text("challenge_id")
+      .notNull()
+      .references(() => challenges.id, { onDelete: "cascade" }),
+    studentId: text("student_id")
+      .notNull()
+      .references(() => students.id, { onDelete: "cascade" }),
+    status: text("status", { enum: ["pending", "accepted", "declined", "expired"] })
+      .notNull()
+      .default("pending"),
+    respondedAt: timestamp("responded_at", { withTimezone: true, mode: "date" }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("challenge_participants_unique").on(table.challengeId, table.studentId),
+    index("challenge_participants_student_idx").on(table.studentId),
+  ],
+);
+
 export const notifications = pgTable(
   "notifications",
   {
@@ -1367,6 +1419,8 @@ export type SchoolLesson = typeof schoolLessons.$inferSelect;
 export type MockExamProgram = typeof mockExamPrograms.$inferSelect;
 export type StudentMockExam = typeof studentMockExams.$inferSelect;
 export type GroupMockExam = typeof groupMockExams.$inferSelect;
+export type Challenge = typeof challenges.$inferSelect;
+export type ChallengeParticipant = typeof challengeParticipants.$inferSelect;
 export type PsychTest = typeof psychTests.$inferSelect;
 export type PsychDimension = typeof psychDimensions.$inferSelect;
 export type PsychQuestion = typeof psychQuestions.$inferSelect;

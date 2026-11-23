@@ -54,6 +54,7 @@ export async function AppShell({
                 <Link href="/student/questions">بانک سوال</Link>
                 <Link href="/student/collections">مجموعه‌ها</Link>
                 <Link href="/student/exams">آزمون‌ها</Link>
+                <Link href="/student/challenges">چالش‌ها</Link>
                 <Link href="/student/psych-tests">آزمون روانشناسی</Link>
                 <Link href="/student/content">محتوا</Link>
               </>
