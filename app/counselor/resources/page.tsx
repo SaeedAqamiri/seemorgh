@@ -6,6 +6,7 @@ import { listAllWorkspaceSubjects } from "@/lib/subject-catalog";
 const SUCCESS: Record<string, string> = {
   added: "منبع به استخر اضافه شد.",
   deleted: "منبع از استخر حذف شد.",
+  cover: "جلد منبع ذخیره شد.",
 };
 
 export default async function ResourcePoolPage({

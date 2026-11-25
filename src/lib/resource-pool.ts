@@ -38,6 +38,8 @@ export type PoolBookView = {
   unitType: "test" | "exercise" | "page" | "chapter";
   totalUnits: number;
   priority: number;
+  coverUrl: string | null;
+  coverSource: string | null;
   fields: string[];
   chapters: PoolChapterView[];
 };
@@ -157,6 +159,8 @@ export async function listResourcePool(
       unitType: resourcePool.unitType,
       totalUnits: resourcePool.totalUnits,
       priority: resourcePool.priority,
+      coverUrl: resourcePool.coverUrl,
+      coverSource: resourcePool.coverSource,
       fieldsJson: subjects.fieldsJson,
     })
     .from(resourcePool)
@@ -196,6 +200,8 @@ export async function listResourcePool(
       unitType: book.unitType as PoolBookView["unitType"],
       totalUnits: book.totalUnits,
       priority: book.priority,
+      coverUrl: book.coverUrl,
+      coverSource: book.coverSource,
       fields: book.fieldsJson ?? [...(catalogItemFor(book.subjectTitle)?.fields ?? [])],
       chapters: chaptersByPool.get(book.id) ?? [],
     }))
@@ -221,6 +227,8 @@ export type AddPoolBookInput = {
   priority: number;
   chaptersText: string;
   totalUnits: number;
+  coverUrl?: string | null;
+  coverSource?: string | null;
 };
 
 export async function addPoolBook(input: AddPoolBookInput): Promise<string> {
@@ -261,6 +269,8 @@ export async function addPoolBook(input: AddPoolBookInput): Promise<string> {
       unitType,
       totalUnits,
       priority: input.priority,
+      coverUrl: input.coverUrl ?? null,
+      coverSource: input.coverSource ?? null,
       createdBy: input.actorId,
     })
     .returning({ id: resourcePool.id });
@@ -356,6 +366,8 @@ async function createStudentResourceFromPoolBook(
       totalUnits: book.totalUnits,
       completedUnits: 0,
       priority: Math.max(1, Math.min(5, priority ?? book.priority)),
+      coverUrl: book.coverUrl,
+      coverSource: book.coverSource,
     })
     .returning({ id: resources.id });
 
@@ -663,6 +675,8 @@ export async function alignPersonalResourcesWithPool(
       unitType: resources.unitType,
       totalUnits: resources.totalUnits,
       completedUnits: resources.completedUnits,
+      coverUrl: resources.coverUrl,
+      coverSource: resources.coverSource,
       studentGrade: students.grade,
     })
     .from(resources)
@@ -755,6 +769,7 @@ export async function alignPersonalResourcesWithPool(
       }));
 
       await db.delete(resourceChapters).where(eq(resourceChapters.resourceId, row.id));
+      const keepCustomCover = row.coverSource === "upload" && row.coverUrl;
       await db
         .update(resources)
         .set({
@@ -763,6 +778,8 @@ export async function alignPersonalResourcesWithPool(
           totalUnits,
           completedUnits,
           chaptersJson,
+          coverUrl: keepCustomCover ? row.coverUrl : match.coverUrl,
+          coverSource: keepCustomCover ? row.coverSource : match.coverSource,
         })
         .where(eq(resources.id, row.id));
       await ensureChaptersFromJson(db, {

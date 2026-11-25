@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { SubmitButton } from "./submit-button";
+import { ResourceCover } from "./resource-cover";
+import { ResourcePicker } from "./resource-picker";
 import { subjectSupportsTests } from "@/lib/subjects";
 
 export type PanelCellState = {
@@ -24,6 +26,7 @@ type ResourceOption = {
   id: string;
   subjectId: string;
   title: string;
+  coverUrl?: string | null;
   chapters: {
     id: string;
     title: string;
@@ -399,9 +402,16 @@ export function WeekGridEditor(props: WeekGridEditorProps) {
               <div className="muted" style={{ fontSize: "0.72rem" }}>{cell.resourceText}</div>
             ) : null}
             {countKindFor(cell) && resource ? (
-              <div className="muted" style={{ fontSize: "0.72rem" }}>
-                {resource.title}
-                {chapter ? ` — ${chapter.title}` : ""}
+              <div className="resource-title-cell muted" style={{ fontSize: "0.72rem" }}>
+                <ResourceCover
+                  coverUrl={resource.coverUrl}
+                  title={resource.title}
+                  size="xs"
+                />
+                <span>
+                  {resource.title}
+                  {chapter ? ` — ${chapter.title}` : ""}
+                </span>
               </div>
             ) : null}
             {countKindFor(cell) && (cell.count ?? 0) > 0 ? (
@@ -491,26 +501,26 @@ export function WeekGridEditor(props: WeekGridEditorProps) {
 
         {countMode ? (
           <>
-            <select
-              aria-label={`منبع ${props.weekdayLabels[day]} زنگ ${slot + 1}`}
+            <ResourcePicker
               value={cell.resourceId ?? ""}
-              onChange={(event) =>
+              onChange={(resourceId) =>
                 updateCell(day, slot, {
                   ...cell,
-                  resourceId: event.target.value || null,
+                  resourceId: resourceId || null,
                   chapterId: null,
                 })
               }
-            >
-              <option value="">منبع را انتخاب کنید…</option>
-              {props.resources
+              resources={props.resources
                 .filter((item) => item.subjectId === cell.subjectId)
-                .map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.title}
-                  </option>
-                ))}
-            </select>
+                .map((item) => ({
+                  id: item.id,
+                  title: item.title,
+                  subjectId: item.subjectId,
+                  coverUrl: item.coverUrl,
+                  chapters: item.chapters,
+                }))}
+              ariaLabel={`منبع ${props.weekdayLabels[day]} زنگ ${slot + 1}`}
+            />
             <select
               aria-label={`فصل ${props.weekdayLabels[day]} زنگ ${slot + 1}`}
               value={cell.chapterId ?? ""}

@@ -14,6 +14,7 @@ export type StudentTaskItem = {
   resourceId: string | null;
   resourceTitle: string | null;
   resourceUnitType: "test" | "exercise" | "page" | "chapter" | null;
+  resourceCoverUrl: string | null;
   topic: string;
   type: "study" | "review" | "test" | "timed_test" | "exercise" | "school" | "exam" | "exam_analysis";
   actionKind: string;
@@ -45,6 +46,7 @@ async function taskItemsForPlan(planId: string): Promise<StudentTaskItem[]> {
       subjectColor: subjects.color,
       resourceTitle: resources.title,
       resourceUnitType: resources.unitType,
+      resourceCoverUrl: resources.coverUrl,
       chapterTitle: resourceChapters.title,
     })
     .from(tasks)
@@ -64,6 +66,7 @@ async function taskItemsForPlan(planId: string): Promise<StudentTaskItem[]> {
     resourceId: row.task.resourceId,
     resourceTitle: row.resourceTitle,
     resourceUnitType: row.resourceUnitType,
+    resourceCoverUrl: row.resourceCoverUrl,
     topic: row.task.topic,
     type: row.task.type,
     actionKind: row.task.actionKind,

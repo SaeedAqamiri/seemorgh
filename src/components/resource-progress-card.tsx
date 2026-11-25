@@ -1,4 +1,5 @@
 import type { ResourceProgressSummary } from "@/lib/resource-progress";
+import { ResourceCover } from "@/components/resource-cover";
 
 function fa(value: number): string {
   return value.toLocaleString("fa-IR");
@@ -65,7 +66,15 @@ export function ResourceProgressCard({
                   <tr key={resource.id}>
                     <td>{resource.subjectTitle}</td>
                     <td>
-                      <strong>{resource.title}</strong>
+                      <span className="resource-title-cell">
+                        <ResourceCover
+                          coverUrl={resource.coverUrl}
+                          title={resource.title}
+                          subjectTitle={resource.subjectTitle}
+                          size="xs"
+                        />
+                        <strong>{resource.title}</strong>
+                      </span>
                       <div className="progress" style={{ marginTop: "0.35rem", minWidth: "120px" }}>
                         <span style={{ width: `${Math.min(100, resource.percent)}%` }} />
                       </div>

@@ -6,8 +6,11 @@ import {
   deleteResourceAction,
   updateChapterProgressAction,
   updateResourceAction,
+  updateResourceCoverAction,
 } from "@/app/actions/counselor";
 import { SubmitButton } from "@/components/submit-button";
+import { ResourceCover } from "@/components/resource-cover";
+import { ResourcePicker } from "@/components/resource-picker";
 import type { ResourceWithSubject } from "@/lib/counselor";
 import { FIELD_LABELS } from "@/lib/subjects";
 
@@ -52,7 +55,15 @@ function ResourceBookCard({
     <details className="card" style={{ boxShadow: "none" }}>
       <summary style={{ cursor: "pointer" }}>
         <span className="row between" style={{ gap: "0.5rem", flexWrap: "wrap" }}>
-          <strong>{resource.title}</strong>
+          <span className="resource-title-cell">
+            <ResourceCover
+              coverUrl={resource.coverUrl}
+              title={resource.title}
+              subjectTitle={resource.subjectTitle}
+              size="sm"
+            />
+            <strong>{resource.title}</strong>
+          </span>
           <span className="badge">{pct.toLocaleString("fa-IR")}٪ پیشرفت</span>
         </span>
         <span className="muted" style={{ display: "block", fontSize: "0.78rem" }}>
@@ -192,6 +203,20 @@ function ResourceBookCard({
             </SubmitButton>
           </form>
 
+          <form
+            action={updateResourceCoverAction}
+            className="row"
+            encType="multipart/form-data"
+            style={{ gap: "0.35rem", flexWrap: "wrap" }}
+          >
+            <input type="hidden" name="studentId" value={studentId} />
+            <input type="hidden" name="resourceId" value={resource.id} />
+            <input type="file" name="cover" accept="image/*" style={{ maxWidth: "180px" }} />
+            <SubmitButton className="btn-secondary btn-sm" pendingLabel="…">
+              {resource.coverUrl ? "تغییر جلد" : "افزودن جلد"}
+            </SubmitButton>
+          </form>
+
           <form action={deleteResourceAction}>
             <input type="hidden" name="studentId" value={studentId} />
             <input type="hidden" name="resourceId" value={resource.id} />
@@ -213,6 +238,8 @@ export type PoolResourceOption = {
   publisher: string;
   grade: string;
   totalUnits: number;
+  coverUrl: string | null;
+  coverSource: string | null;
   chapters: { id: string; title: string; testCount: number; exerciseCount: number }[];
 };
 
@@ -358,21 +385,22 @@ export function ResourceManager({
           </div>
           <div className="field" style={{ gridColumn: "1 / -1" }}>
             <label>منبع از استخر</label>
-            <select
+            <ResourcePicker
               name="poolId"
-              required
               value={poolId}
-              onChange={(event) => setPoolId(event.target.value)}
-            >
-              <option value="">منبع را انتخاب کنید…</option>
-              {poolForSubject.map((resource) => (
-                <option key={resource.id} value={resource.id}>
-                  {resource.title}
-                  {resource.grade ? ` (${resource.grade})` : ""} —{" "}
-                  {resource.totalUnits.toLocaleString("fa-IR")} تست · {resource.chapters.length} فصل
-                </option>
-              ))}
-            </select>
+              onChange={setPoolId}
+              resources={poolForSubject.map((resource) => ({
+                id: resource.id,
+                title: resource.title,
+                subjectId: resource.subjectId,
+                subjectTitle: resource.subjectTitle,
+                publisher: resource.publisher,
+                grade: resource.grade,
+                coverUrl: resource.coverUrl,
+                chapters: resource.chapters,
+              }))}
+              ariaLabel="انتخاب منبع از استخر"
+            />
             {poolForSubject.length === 0 ? (
               <small className="muted">برای این درس هنوز منبعی در استخر ثبت نشده است.</small>
             ) : null}

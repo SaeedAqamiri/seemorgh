@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ContentCard } from "@/components/content-card";
 import { DailyChallengeCard } from "@/components/daily-challenge-card";
 import { StudentSummaryCard } from "@/components/student-summary-card";
+import { ResourceCover } from "@/components/resource-cover";
 import { requireStudent } from "@/lib/auth";
 import { countPendingInvites } from "@/lib/challenges";
 import { getDailyChallengeState, recordStudentDailyOpen } from "@/lib/daily";
@@ -209,7 +210,14 @@ export default async function StudentHomePage({
                         : ""}
                   </div>
                   {task.resourceTitle ? (
-                    <div className="task-meta">{task.resourceTitle}</div>
+                    <div className="task-meta resource-title-cell">
+                      <ResourceCover
+                        coverUrl={task.resourceCoverUrl}
+                        title={task.resourceTitle}
+                        size="xs"
+                      />
+                      <span>{task.resourceTitle}</span>
+                    </div>
                   ) : null}
                   {task.status === "done" ? (
                     <div className="task-meta" style={{ color: "var(--brand)" }}>

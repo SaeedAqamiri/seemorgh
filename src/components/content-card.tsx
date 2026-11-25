@@ -1,4 +1,5 @@
 import { CONTENT_KIND_LABELS, resolveEmbed } from "@/lib/embed";
+import { ResourceCover } from "@/components/resource-cover";
 import type { ContentItemView } from "@/lib/content";
 
 export function ContentFrame({ item }: { item: ContentItemView }) {
@@ -40,9 +41,17 @@ export function ContentCard({
             <span className="badge">{CONTENT_KIND_LABELS[item.kind]}</span>
             {item.subjectTitle ? <span className="badge">{item.subjectTitle}</span> : null}
             {item.resourceTitle ? (
-              <span className="badge">
-                {item.resourceTitle}
-                {item.studentName ? ` — ${item.studentName}` : ""}
+              <span className="resource-title-cell">
+                <ResourceCover
+                  coverUrl={item.resourceCoverUrl}
+                  title={item.resourceTitle}
+                  subjectTitle={item.subjectTitle}
+                  size="xs"
+                />
+                <span className="badge">
+                  {item.resourceTitle}
+                  {item.studentName ? ` — ${item.studentName}` : ""}
+                </span>
               </span>
             ) : null}
           </div>

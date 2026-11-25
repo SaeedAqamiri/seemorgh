@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { formatJalaliNumeric } from "@/lib/dates";
+import { ResourceCover } from "@/components/resource-cover";
+import { ResourcePicker } from "@/components/resource-picker";
 
 export type VolumeChapter = {
   id: string;
@@ -22,6 +24,7 @@ export type VolumeResource = {
   unitType: "test" | "exercise" | "page" | "chapter";
   totalUnits: number;
   completedUnits: number;
+  coverUrl?: string | null;
   chapters: VolumeChapter[];
 };
 
@@ -229,21 +232,24 @@ export function ExamVolumeCard({
 
         <div className="field">
           <label htmlFor="volume-resource">منبع / آزمون بعدی</label>
-          <select
+          <ResourcePicker
             id="volume-resource"
-            value={resourceId}
-            onChange={(event) => {
-              setResourceId(event.target.value);
+            value={resourceId === "all" ? "" : resourceId}
+            emptyOption="همه منابع"
+            onChange={(next) => {
+              setResourceId(next || "all");
               setChapterEnd("all");
             }}
-          >
-            <option value="all">همه منابع</option>
-            {resourcesForSelect.map((resource) => (
-              <option key={resource.id} value={resource.id}>
-                {resource.title}
-              </option>
-            ))}
-          </select>
+            resources={resourcesForSelect.map((resource) => ({
+              id: resource.id,
+              title: resource.title,
+              subjectId: resource.subjectId,
+              subjectTitle: resource.subjectTitle,
+              coverUrl: resource.coverUrl,
+              chapters: resource.chapters,
+            }))}
+            ariaLabel="انتخاب منبع برای حجم آزمون"
+          />
         </div>
 
         {selectedResource && selectedResource.chapters.length > 0 ? (
@@ -330,7 +336,15 @@ export function ExamVolumeCard({
                 return (
                   <tr key={row.resource.id}>
                     <td>
-                      <strong>{row.resource.title}</strong>
+                      <span className="resource-title-cell">
+                        <ResourceCover
+                          coverUrl={row.resource.coverUrl}
+                          title={row.resource.title}
+                          subjectTitle={row.resource.subjectTitle}
+                          size="xs"
+                        />
+                        <strong>{row.resource.title}</strong>
+                      </span>
                     </td>
                     <td>{row.resource.subjectTitle}</td>
                     <td>

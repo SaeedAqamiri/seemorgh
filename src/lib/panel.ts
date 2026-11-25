@@ -559,6 +559,8 @@ export type PanelResourceOption = {
   totalUnits: number;
   completedUnits: number;
   priority: number;
+  coverUrl: string | null;
+  coverSource: string | null;
   chapters: PanelChapterOption[];
 };
 
@@ -607,6 +609,8 @@ export async function getPanelOptions(
       totalUnits: resources.totalUnits,
       completedUnits: resources.completedUnits,
       priority: resources.priority,
+      coverUrl: resources.coverUrl,
+      coverSource: resources.coverSource,
       chaptersJson: resources.chaptersJson,
     })
     .from(resources)

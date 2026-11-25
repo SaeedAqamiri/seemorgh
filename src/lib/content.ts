@@ -12,6 +12,7 @@ export type ContentItemView = {
   subjectTitle: string | null;
   resourceId: string | null;
   resourceTitle: string | null;
+  resourceCoverUrl: string | null;
   studentName: string | null;
   createdAt: Date;
 };
@@ -29,6 +30,7 @@ export async function listWorkspaceContent(workspaceId: string): Promise<Content
       subjectTitle: subjects.title,
       resourceId: contentItems.resourceId,
       resourceTitle: resources.title,
+      resourceCoverUrl: resources.coverUrl,
       studentName: students.name,
       createdAt: contentItems.createdAt,
     })
@@ -57,6 +59,7 @@ export async function listStudentContent(
       subjectTitle: subjects.title,
       resourceId: contentItems.resourceId,
       resourceTitle: resources.title,
+      resourceCoverUrl: resources.coverUrl,
       studentName: students.name,
       createdAt: contentItems.createdAt,
     })
@@ -89,6 +92,7 @@ export async function contentForResources(resourceIds: string[]): Promise<Conten
       subjectTitle: subjects.title,
       resourceId: contentItems.resourceId,
       resourceTitle: resources.title,
+      resourceCoverUrl: resources.coverUrl,
       studentName: students.name,
       createdAt: contentItems.createdAt,
     })
@@ -114,6 +118,7 @@ export async function listResourceOptions(workspaceId: string) {
       unitType: resources.unitType,
       studentName: students.name,
       subjectTitle: subjects.title,
+      coverUrl: resources.coverUrl,
     })
     .from(resources)
     .innerJoin(students, eq(resources.studentId, students.id))

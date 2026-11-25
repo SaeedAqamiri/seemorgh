@@ -23,6 +23,8 @@ export type ResourceProgressInput = {
   unitType: "test" | "exercise" | "page" | "chapter";
   totalUnits: number;
   completedUnits: number;
+  coverUrl?: string | null;
+  coverSource?: string | null;
   chapters?: ChapterProgressInput[];
 };
 
@@ -239,6 +241,8 @@ export async function getStudentResourceProgress(
       unitType: resources.unitType,
       totalUnits: resources.totalUnits,
       completedUnits: resources.completedUnits,
+      coverUrl: resources.coverUrl,
+      coverSource: resources.coverSource,
     })
     .from(resources)
     .innerJoin(subjects, eq(resources.subjectId, subjects.id))

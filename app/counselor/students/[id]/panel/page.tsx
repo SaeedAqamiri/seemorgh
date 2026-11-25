@@ -123,6 +123,7 @@ export default async function CounselorPanelPage({
             unitType: resource.unitType,
             totalUnits: resource.totalUnits,
             completedUnits: resource.completedUnits,
+            coverUrl: resource.coverUrl,
             chapters: resource.chapters.map((chapter) => ({
               id: chapter.id,
               title: chapter.title,

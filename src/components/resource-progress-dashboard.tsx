@@ -1,4 +1,5 @@
 import type { ResourceProgressSummary } from "@/lib/resource-progress";
+import { ResourceCover } from "@/components/resource-cover";
 
 const PIE_COLORS = [
   "#1f6f4a",
@@ -270,8 +271,16 @@ export function ResourceProgressDashboard({ summary }: { summary: ResourceProgre
           {summary.rows.map((resource) => (
             <div key={resource.id}>
               <div className="row between">
-                <span style={{ fontSize: "0.85rem" }}>
-                  <strong>{resource.subjectTitle}</strong> — {resource.title}
+                <span className="resource-title-cell" style={{ fontSize: "0.85rem" }}>
+                  <ResourceCover
+                    coverUrl={resource.coverUrl}
+                    title={resource.title}
+                    subjectTitle={resource.subjectTitle}
+                    size="xs"
+                  />
+                  <span>
+                    <strong>{resource.subjectTitle}</strong> — {resource.title}
+                  </span>
                 </span>
                 <span className="muted" style={{ fontSize: "0.78rem" }}>
                   {fa(resource.completedUnits)} / {fa(resource.totalUnits)} — {fa(resource.percent)}٪

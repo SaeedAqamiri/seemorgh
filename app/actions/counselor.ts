@@ -26,6 +26,11 @@ import { parseChapterPlan } from "@/lib/resources";
 import { subjectSupportsTests } from "@/lib/subjects";
 import { chaptersByResourceIds, recomputeResourceTotals, replaceResourceChapters } from "@/lib/resource-chapters";
 import { copyPoolBookToStudent, ResourcePoolError } from "@/lib/resource-pool";
+import {
+  ResourceCoverError,
+  saveCoverUpload,
+  updateResourceCover,
+} from "@/lib/resource-covers";
 import { generatePlan } from "@/lib/planner";
 import { GroupFieldMismatchError, resolveGroupForForm } from "@/lib/student-groups";
 
@@ -59,6 +64,17 @@ function totalFromChapters(
 
 function fail(path: string, message: string): never {
   redirect(`${path}?error=${encodeURIComponent(message)}`);
+}
+
+async function uploadedResourceCover(formData: FormData, basePath: string) {
+  const file = formData.get("cover");
+  if (!(file instanceof File) || file.size === 0) return null;
+  try {
+    return await saveCoverUpload(file);
+  } catch (error) {
+    if (error instanceof ResourceCoverError) fail(basePath, error.message);
+    throw error;
+  }
 }
 
 async function assertStudent(workspaceId: string, studentId: string) {
@@ -316,6 +332,7 @@ export async function addResourceAction(formData: FormData): Promise<void> {
 
   if (completedUnits > totalUnits) fail(context.basePath, "پیشرفت نمی‌تواند بیشتر از کل باشد.");
   if (parsedChapters.error) fail(context.basePath, parsedChapters.error);
+  const cover = await uploadedResourceCover(formData, context.basePath);
 
   const [created] = await db
     .insert(resources)
@@ -328,6 +345,8 @@ export async function addResourceAction(formData: FormData): Promise<void> {
       totalUnits,
       completedUnits,
       priority,
+      coverUrl: cover?.coverUrl ?? null,
+      coverSource: cover?.coverSource ?? null,
     })
     .returning({ id: resources.id });
 
@@ -388,6 +407,7 @@ export async function updateResourceAction(formData: FormData): Promise<void> {
   }
 
   if (completedUnits > totalUnits) fail(context.basePath, "پیشرفت نمی‌تواند بیشتر از کل باشد.");
+  const cover = await uploadedResourceCover(formData, context.basePath);
 
   await db
     .update(resources)
@@ -396,6 +416,7 @@ export async function updateResourceAction(formData: FormData): Promise<void> {
       completedUnits,
       totalUnits,
       priority,
+      ...(cover ? { coverUrl: cover.coverUrl, coverSource: cover.coverSource } : {}),
     })
     .where(
       and(
@@ -411,6 +432,23 @@ export async function updateResourceAction(formData: FormData): Promise<void> {
 
   revalidateResourceViews(context);
   redirect(`${context.basePath}?success=resource-updated`);
+}
+
+export async function updateResourceCoverAction(formData: FormData): Promise<void> {
+  const context = await resolveResourceContext(formData);
+  const resourceId = field(formData, "resourceId");
+  if (!resourceId) fail(context.basePath, "منبع انتخاب نشده است.");
+  const cover = await uploadedResourceCover(formData, context.basePath);
+  if (!cover) fail(context.basePath, "فایل تصویر انتخاب نشده است.");
+  await updateResourceCover({
+    workspaceId: context.workspaceId,
+    studentId: context.studentId,
+    resourceId,
+    coverUrl: cover.coverUrl,
+    coverSource: cover.coverSource,
+  });
+  revalidateResourceViews(context);
+  redirect(`${context.basePath}?success=cover`);
 }
 
 export async function deleteResourceAction(formData: FormData): Promise<void> {

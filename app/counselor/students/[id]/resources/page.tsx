@@ -10,6 +10,7 @@ const SUCCESS: Record<string, string> = {
   resource: "منبع اضافه شد.",
   "resource-updated": "پیشرفت منبع ذخیره شد.",
   "resource-deleted": "منبع حذف شد.",
+  cover: "جلد منبع ذخیره شد.",
 };
 
 export default async function StudentResourcesPage({

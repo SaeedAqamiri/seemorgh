@@ -4,8 +4,10 @@ import { useMemo, useState } from "react";
 import {
   addPoolResourceAction,
   deletePoolResourceAction,
+  updatePoolCoverAction,
 } from "@/app/actions/resource-pool";
 import { SubmitButton } from "@/components/submit-button";
+import { ResourceCover } from "@/components/resource-cover";
 import type { PoolBookView } from "@/lib/resource-pool";
 import { FIELD_LABELS, FIELDS, subjectSupportsTests } from "@/lib/subjects";
 
@@ -148,7 +150,15 @@ export function ResourcePoolManager({
                         style={{ boxShadow: "none" }}
                       >
                         <summary style={{ cursor: "pointer" }}>
-                          <strong>{book.title}</strong>
+                          <span className="resource-title-cell">
+                            <ResourceCover
+                              coverUrl={book.coverUrl}
+                              title={book.title}
+                              subjectTitle={book.subjectTitle}
+                              size="sm"
+                            />
+                            <strong>{book.title}</strong>
+                          </span>
                           <span className="muted" style={{ fontSize: "0.78rem" }}>
                             {" "}
                             · {book.publisher || "بدون ناشر"} · {book.grade || "بدون پایه"} ·{" "}
@@ -182,12 +192,26 @@ export function ResourcePoolManager({
                             </tbody>
                           </table>
                         </div>
-                        <form action={deletePoolResourceAction} style={{ marginTop: "0.4rem" }}>
-                          <input type="hidden" name="poolId" value={book.id} />
-                          <SubmitButton className="btn-danger btn-sm" pendingLabel="…">
-                            حذف از استخر
-                          </SubmitButton>
-                        </form>
+                        <div className="row" style={{ gap: "0.4rem", flexWrap: "wrap", marginTop: "0.4rem" }}>
+                          <form
+                            action={updatePoolCoverAction}
+                            className="row"
+                            encType="multipart/form-data"
+                            style={{ gap: "0.35rem", flexWrap: "wrap" }}
+                          >
+                            <input type="hidden" name="poolId" value={book.id} />
+                            <input type="file" name="cover" accept="image/*" style={{ maxWidth: "210px" }} />
+                            <SubmitButton className="btn-secondary btn-sm" pendingLabel="…">
+                              {book.coverUrl ? "تغییر جلد" : "افزودن جلد"}
+                            </SubmitButton>
+                          </form>
+                          <form action={deletePoolResourceAction}>
+                            <input type="hidden" name="poolId" value={book.id} />
+                            <SubmitButton className="btn-danger btn-sm" pendingLabel="…">
+                              حذف از استخر
+                            </SubmitButton>
+                          </form>
+                        </div>
                       </details>
                     ))}
                   </div>
@@ -203,7 +227,7 @@ export function ResourcePoolManager({
           <h2>افزودن منبع به استخر</h2>
           <small>این بخش فقط در اختیار مشاور است.</small>
         </div>
-        <form action={addPoolResourceAction} className="form-grid">
+        <form action={addPoolResourceAction} className="form-grid" encType="multipart/form-data">
           <div className="field">
             <label>درس</label>
             <select
@@ -266,6 +290,13 @@ export function ResourcePoolManager({
                   : "فصل ۱ | 120\nفصل ۲ | 110\nفصل ۳ | 90"
               }
             />
+          </div>
+          <div className="field">
+            <label>تصویر جلد (اختیاری)</label>
+            <input type="file" name="cover" accept="image/*" />
+            <small className="muted">
+              اگر خالی بماند، جلد خودکار از استخر/Flux استفاده می‌شود.
+            </small>
           </div>
           <div className="field">
             <label>اولویت</label>

@@ -167,6 +167,8 @@ export type ResourceWithSubject = {
   chaptersJson: { title: string; pages: number; startPage: number; endPage: number }[] | null;
   chapters: ResourceChapterRow[];
   priority: number;
+  coverUrl: string | null;
+  coverSource: string | null;
 };
 
 export type StudentDetail = {
@@ -214,6 +216,8 @@ export async function getStudentDetail(
           completedUnits: resources.completedUnits,
           chaptersJson: resources.chaptersJson,
           priority: resources.priority,
+          coverUrl: resources.coverUrl,
+          coverSource: resources.coverSource,
         })
         .from(resources)
         .innerJoin(subjects, eq(resources.subjectId, subjects.id))

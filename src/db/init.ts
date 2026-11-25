@@ -107,6 +107,8 @@ CREATE TABLE IF NOT EXISTS resources (
 );
 CREATE INDEX IF NOT EXISTS resources_student_idx ON resources(student_id);
 ALTER TABLE resources ADD COLUMN IF NOT EXISTS chapters_json jsonb;
+ALTER TABLE resources ADD COLUMN IF NOT EXISTS cover_url text;
+ALTER TABLE resources ADD COLUMN IF NOT EXISTS cover_source text;
 
 CREATE TABLE IF NOT EXISTS resource_chapters (
   id text PRIMARY KEY,
@@ -140,6 +142,8 @@ CREATE TABLE IF NOT EXISTS resource_pool (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS resource_pool_workspace_subject_title_unique ON resource_pool(workspace_id, subject_id, title);
 CREATE INDEX IF NOT EXISTS resource_pool_workspace_idx ON resource_pool(workspace_id);
+ALTER TABLE resource_pool ADD COLUMN IF NOT EXISTS cover_url text;
+ALTER TABLE resource_pool ADD COLUMN IF NOT EXISTS cover_source text;
 
 CREATE TABLE IF NOT EXISTS resource_pool_chapters (
   id text PRIMARY KEY,

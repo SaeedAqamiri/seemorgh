@@ -2,6 +2,7 @@ import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { addContentAction, deleteContentAction } from "@/app/actions/content";
 import { ContentCard } from "@/components/content-card";
+import { ContentResourcePicker } from "@/components/content-resource-picker";
 import { SubmitButton } from "@/components/submit-button";
 import { getDb } from "@/db/client";
 import { subjects } from "@/db/schema";
@@ -89,14 +90,16 @@ export default async function CounselorContentPage({
             </div>
             <div className="field">
               <label>منبع/دانش‌آموز (اختیاری)</label>
-              <select name="resourceId">
-                <option value="">محتوای عمومی همه دانش‌آموزان</option>
-                {resourceOptions.map((resource) => (
-                  <option key={resource.id} value={resource.id}>
-                    {resource.studentName} — {resource.subjectTitle} / {resource.title}
-                  </option>
-                ))}
-              </select>
+              <ContentResourcePicker
+                options={resourceOptions.map((resource) => ({
+                  id: resource.id,
+                  title: resource.title,
+                  unitType: resource.unitType,
+                  studentName: resource.studentName,
+                  subjectTitle: resource.subjectTitle,
+                  coverUrl: resource.coverUrl,
+                }))}
+              />
             </div>
           </div>
           <div className="field">
